@@ -10,9 +10,13 @@ from codecs import open
 def my_setup():
     setup(
         name="auto_uncertainties",
+        packages = ['auto_uncertainties'],
         author="Varchas Gopalaswamy",
+        license='GPLv3',
         author_email="vgop@lle.rochester.edu",
         description="Linear Uncertainty Propagation with Auto-Differentiation",
+        url = 'https://github.com/varchasgopalaswamy/AutoUncertainties',
+        download_url = 'https://github.com/varchasgopalaswamy/AutoUncertainties/archive/refs/tags/0.1.0.tar.gz',
         packages=find_packages(exclude=["tests"]),
         package_dir={"": ".\\" if os.name == "nt" else "./"},
         # include_package_data=True,
