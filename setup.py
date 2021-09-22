@@ -9,15 +9,15 @@ from codecs import open
 
 def my_setup():
     setup(
-        name="uncert",
+        name="auto_uncertainties",
         author="Varchas Gopalaswamy",
         author_email="vgop@lle.rochester.edu",
-        description="Linear Uncertainty Propagation",
+        description="Linear Uncertainty Propagation with Auto-Differentiation",
         packages=find_packages(exclude=["tests"]),
         package_dir={"": ".\\" if os.name == "nt" else "./"},
         # include_package_data=True,
         python_requires=">=3.8",
-        install_requires=["numpy >= 1.18.1", "pint>=0.10.1", "hypothesis", "jax"],
+        install_requires=["numpy >= 1.18.1", "hypothesis", "jax"],
     )
 
 
