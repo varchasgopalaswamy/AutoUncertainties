@@ -17,7 +17,7 @@ def my_setup():
         author_email="vgop@lle.rochester.edu",
         description="Linear Uncertainty Propagation with Auto-Differentiation",
         url = 'https://github.com/varchasgopalaswamy/AutoUncertainties',
-        download_url = 'https://github.com/varchasgopalaswamy/AutoUncertainties/archive/refs/tags/0.1.1.tar.gz',
+        download_url = f'https://github.com/varchasgopalaswamy/AutoUncertainties/archive/refs/tags/{versioneer.get_version()}.tar.gz',
         package_dir={"": ".\\" if os.name == "nt" else "./"},
         # include_package_data=True,
         python_requires=">=3.8",
