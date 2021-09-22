@@ -54,7 +54,6 @@ Scalar uncertainties implement all mathematical and logical `dunder methods <htt
     >>> v = Uncertainty(20.0, 4.0) 
     >>> u + v
     30.0 +/- 5.0
-    1.0 +/- 0.1
     
 Array uncertainties implement a large subset of the numpy ufuncs and methods using :code:`jax.grad` or :code:`jax.jacfwd`, depending on the output shape. 
 
