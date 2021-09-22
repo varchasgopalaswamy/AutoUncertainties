@@ -103,6 +103,6 @@ To install simply run :code:`pip install auto_uncertainties`
 Inspirations
 ================
 
-The class structure of :code:`Uncertainty`, and the NumPy ufunc implementation is heavily inspired by the excellent package _`pint<https://github.com/hgrecco/pint>`_. 
+The class structure of :code:`Uncertainty`, and the NumPy ufunc implementation is heavily inspired by the excellent package `pint <https://github.com/hgrecco/pint>`_. 
 
 
