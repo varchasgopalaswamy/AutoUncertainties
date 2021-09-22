@@ -22,7 +22,7 @@ def my_setup():
         package_dir={"": ".\\" if os.name == "nt" else "./"},
         # include_package_data=True,
         python_requires=">=3.8",
-        install_requires=["numpy >= 1.18.1", "hypothesis", "jax"],
+        install_requires=["numpy >= 1.18.1", "hypothesis", "jax", "jaxlib"],
     )
 
 
