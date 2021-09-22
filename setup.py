@@ -15,6 +15,7 @@ def my_setup():
         author="Varchas Gopalaswamy",
         license="GPLv3",
         version=versioneer.get_version(),
+        cmdclass=versioneer.get_cmdclass(),
         author_email="vgop@lle.rochester.edu",
         description="Linear Uncertainty Propagation with Auto-Differentiation",
         url="https://github.com/varchasgopalaswamy/AutoUncertainties",

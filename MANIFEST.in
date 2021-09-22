@@ -1,0 +1,2 @@
+include auto_uncertainties/_version.py
+include versioneer.py
