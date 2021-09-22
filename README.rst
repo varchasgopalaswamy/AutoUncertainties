@@ -15,7 +15,7 @@ AutoUncertainties
 
 AutoUncertainties is a package that makes handling linear uncertainty propagation for scientific applications straightforward. 
 It handles scalar and vector values, and supports a large subset of NumPy functions and ufuncs. 
-While the core behavior is functional, some convencience methods may not work as intended. 
+While the core behavior is functional, some convencience methods (e.g. :code:`u.sum()` instead of :code:`np.sum(u)`) may not work as intended at the moment.
 
 While the standard scalar operators have explicit uncertainty propagation mechanisms, support for NumPy functions is provided through the auto-differentiation library `JAX <https://github.com/google/jax>`_. 
 
