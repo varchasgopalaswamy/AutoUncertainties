@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-import pint
-
-unit_registry = pint.UnitRegistry()
 import hypothesis.strategies as st
 from hypothesis import given, settings
 import numpy as np
