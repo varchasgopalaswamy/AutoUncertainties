@@ -34,6 +34,7 @@ jobs:
       - run:
           name: Run tests
           command: |
+            pip install jaxlib 
             pip install -e .
             pip install pytest
             pytest
