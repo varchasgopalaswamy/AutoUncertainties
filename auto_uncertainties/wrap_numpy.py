@@ -233,8 +233,6 @@ def implement_func(
                     err = np.sqrt(
                         np.sum((e.reshape(val.shape)[np.newaxis, :] * grad) ** 2, axis=-1)
                     )
-                print(val.shape)
-                print(err.shape)
                 return uncert_instance.__class__(val, err)
             else:
                 axis = np.atleast_1d(axis)
