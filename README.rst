@@ -91,8 +91,10 @@ Prerequisites
 For array support:
 
 * jax
-* jaxlib 
+* jaxlib (must be built from source if you are not on Linux machine with AVX instruction)
 * numpy 
+
+sets. 
 
 Installation
 ===============
