@@ -35,4 +35,5 @@ jobs:
           name: Run tests
           command: |
             pip install -e .
+            pip install pytest
             pytest
