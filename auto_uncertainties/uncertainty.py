@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Based on the implementation of pint's Quantity object 
+# Based heavily on the implementation of pint's Quantity object 
 from __future__ import annotations
 
 import numpy as np
@@ -42,14 +42,9 @@ class Uncertainty(object):
         return str(self).encode(locale.getpreferredencoding())
 
     def __iter__(self):
-
-        it_magnitude = iter(zip(self._nom, self._err))
-        def it_outer():
-            for v, e in zip(self._nom, self._err):
-                yield self.__class__(v, e)
-
-        return it_outer()
-
+        for v, e in zip(self._nom, self._err):
+            yield self.__class__(v, e)
+            
     def __copy__(self) -> Uncertainty:
         ret = self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
