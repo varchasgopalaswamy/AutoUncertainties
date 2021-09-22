@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 
 
 def is_iterable(y):
@@ -29,6 +28,11 @@ def is_np_duck_array(cls):
     -------
     bool
     """
+    try:
+        import numpy as np
+    except ImportError:
+        return False
+
     return issubclass(cls, np.ndarray) or (
         not hasattr(cls, "_nom")
         and not hasattr(cls, "_err")

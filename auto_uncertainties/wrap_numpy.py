@@ -1,14 +1,22 @@
 # -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's numpy array function wrapping
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-from jax.config import config as jconf
+try:
+    import numpy as np
+except ImportError:
+    np = None
+try:
+    import jax
+    import jax.numpy as jnp
+    from jax.config import config as jconf
+
+    jconf.update("jax_enable_x64", True)
+except ImportError:
+    jax = None
+    jnp = None
 
 from .util import is_iterable, has_length
 
-jconf.update("jax_enable_x64", True)
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}

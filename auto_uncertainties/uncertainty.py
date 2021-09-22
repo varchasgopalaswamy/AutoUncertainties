@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import jax.numpy as jnp
-import jax
 import locale
 import copy
 import operator
