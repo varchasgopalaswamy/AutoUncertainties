@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-# Based heavily on the implementation of pint's Quantity object 
+# Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
 
 import numpy as np
 import jax.numpy as jnp
 import jax
 import locale
-import copy 
+import copy
 import operator
 import warnings
 
-from .wrap_numpy import wrap_numpy,HANDLED_FUNCTIONS,HANDLED_UFUNCS
+from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from . import NegativeStdDevError
 from .util import is_np_duck_array
 
-class Uncertainty(object):
 
+class Uncertainty(object):
     def __new__(cls, value, err):
         inst = super(Uncertainty, cls).__new__(cls)
         magnitude_nom = value
@@ -44,7 +44,7 @@ class Uncertainty(object):
     def __iter__(self):
         for v, e in zip(self._nom, self._err):
             yield self.__class__(v, e)
-            
+
     def __copy__(self) -> Uncertainty:
         ret = self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
@@ -99,7 +99,7 @@ class Uncertainty(object):
             val[i] = seq_i._nom
             err[i] = seq_i._err
 
-        return cls(val,err)
+        return cls(val, err)
 
     def __float__(self) -> Uncertainty:
         return float(self._nom)
@@ -346,7 +346,6 @@ class Uncertainty(object):
     def __array_function__(self, func, types, args, kwargs):
         return wrap_numpy("function", func, args, kwargs, types)
 
-
     def __array__(self, t=None) -> np.ndarray:
         warnings.warn(
             "The uncertainty is stripped when downcasting to ndarray.", UserWarning, stacklevel=2
@@ -400,7 +399,6 @@ class Uncertainty(object):
     def searchsorted(self, v, side="left", sorter=None):
         return self._nom.searchsorted(v, side)
 
-
     def __len__(self) -> int:
         return len(self._nom)
 
@@ -409,20 +407,16 @@ class Uncertainty(object):
             # Handle array protocol attributes other than `__array__`
             raise AttributeError(f"Array protocol attribute {item} not available.")
         elif item in HANDLED_UFUNCS:
-            val  = self._nom  
+            val = self._nom
 
             try:
                 attr = getattr(val, item)
-                return attr 
+                return attr
             except AttributeError:
-                raise AttributeError(
-                    f"NumPy method {item} not available on {type(val)}"
-                )
+                raise AttributeError(f"NumPy method {item} not available on {type(val)}")
             except TypeError as exc:
                 if "not callable" in str(exc):
-                    raise AttributeError(
-                        f"NumPy method {item} not callable on {type(val)}"
-                    )
+                    raise AttributeError(f"NumPy method {item} not callable on {type(val)}")
                 else:
                     raise exc
 

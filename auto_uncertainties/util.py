@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import numpy as np 
+import numpy as np
+
 
 def is_iterable(y):
     try:
@@ -18,7 +19,7 @@ def has_length(y):
 
 
 def is_np_duck_array(cls):
-    """Check if object is a numpy array-like, but not a Uncertainty 
+    """Check if object is a numpy array-like, but not a Uncertainty
 
     Parameters
     ----------

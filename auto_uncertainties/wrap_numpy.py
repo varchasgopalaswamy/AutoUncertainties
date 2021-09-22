@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Based heavily on the implementation of pint's numpy array function wrapping 
+# Based heavily on the implementation of pint's numpy array function wrapping
 
 import jax
 import jax.numpy as jnp
@@ -369,8 +369,7 @@ bcast_apply_to_both_ufuncs = [
     "ceil",
     "floor",
     "rint",
-    "flatten"
-    "astype"
+    "flatten" "astype",
 ]
 for ufunc in bcast_apply_to_both_ufuncs:
     implement_func("ufunc", ufunc, implement_mode="apply_to_both")
