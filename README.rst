@@ -54,7 +54,6 @@ Scalar uncertainties implement all mathematical and logical `dunder methods <htt
     >>> v = Uncertainty(20.0, 4.0) 
     >>> u + v
     30.0 +/- 5.0
-    1.0 +/- 0.1
     
 Array uncertainties implement a large subset of the numpy ufuncs and methods using :code:`jax.grad` or :code:`jax.jacfwd`, depending on the output shape. 
 
@@ -104,6 +103,6 @@ To install simply run :code:`pip install auto_uncertainties`
 Inspirations
 ================
 
-The class structure of :code:`Uncertainty`, and the NumPy ufunc implementation is heavily inspired by the excellent package _`pint<https://github.com/hgrecco/pint>`_. 
+The class structure of :code:`Uncertainty`, and the NumPy ufunc implementation is heavily inspired by the excellent package `pint <https://github.com/hgrecco/pint>`_. 
 
 
