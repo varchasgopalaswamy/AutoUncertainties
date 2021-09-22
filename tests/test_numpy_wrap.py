@@ -9,7 +9,7 @@ from hypothesis.extra import numpy as hnp
 import numpy as np
 import operator
 
-import uncert 
+import auto_uncertainties 
 
 def op_test(op,*args,**kwargs):
     with_unc = [a for a in args]
@@ -71,9 +71,9 @@ def given_float_2d(func):
 
 @given_float_3d
 def test_same_shape(unom,uerr,vnom,verr):
-    u = uncert.Uncertainty(unom,uerr)
-    v = uncert.Uncertainty(vnom,verr)
-    for op in uncert.wrap_numpy.bcast_same_shape_ufuncs:
+    u = auto_uncertainties.Uncertainty(unom,uerr)
+    v = auto_uncertainties.Uncertainty(vnom,verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_same_shape_ufuncs:
         oper = getattr(np,op)
         try:
             op_test(oper,u)
@@ -82,9 +82,9 @@ def test_same_shape(unom,uerr,vnom,verr):
 
 @given_float_3d
 def test_same_shape(unom,uerr,vnom,verr):
-    u = uncert.Uncertainty(unom,uerr)
-    v = uncert.Uncertainty(vnom,verr)
-    for op in uncert.wrap_numpy.bcast_same_shape_bool_ufuncs:
+    u = auto_uncertainties.Uncertainty(unom,uerr)
+    v = auto_uncertainties.Uncertainty(vnom,verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_same_shape_bool_ufuncs:
         oper = getattr(np,op)
         try:
             w = oper(u)
@@ -94,42 +94,42 @@ def test_same_shape(unom,uerr,vnom,verr):
 
 @given_float_3d
 def test_nograd(unom,uerr,vnom,verr):
-    u = uncert.Uncertainty(unom,uerr)
-    v = uncert.Uncertainty(vnom,verr)
-    for op in uncert.wrap_numpy.bcast_nograd_ufuncs:
+    u = auto_uncertainties.Uncertainty(unom,uerr)
+    v = auto_uncertainties.Uncertainty(vnom,verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_nograd_ufuncs:
         oper = getattr(np,op)
         try:
             w = op_test(oper,u)
         except TypeError:
             w = op_test(oper,u,v)
-        assert not isinstance(w,uncert.Uncertainty)
+        assert not isinstance(w,auto_uncertainties.Uncertainty)
 
 @given_float_3d
 def test_selection(unom,uerr,vnom,verr):
-    u = uncert.Uncertainty(unom,uerr)
-    v = uncert.Uncertainty(vnom,verr)
-    for op in uncert.wrap_numpy.bcast_nograd_ufuncs:
+    u = auto_uncertainties.Uncertainty(unom,uerr)
+    v = auto_uncertainties.Uncertainty(vnom,verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_nograd_ufuncs:
         oper = getattr(np,op)
         try:
             w = op_test(oper,u)
         except TypeError:
             w = op_test(oper,u,v)
-        assert not isinstance(w,uncert.Uncertainty)
+        assert not isinstance(w,auto_uncertainties.Uncertainty)
     
-    for op in uncert.wrap_numpy.bcast_selection_ufuncs:
+    for op in auto_uncertainties.wrap_numpy.bcast_selection_ufuncs:
         oper = getattr(np,op)
         try:
             w = op_test(oper,u)
         except TypeError:
             w = op_test(oper,u,v)
-        assert not isinstance(w,uncert.Uncertainty)
+        assert not isinstance(w,auto_uncertainties.Uncertainty)
 
 @given_float_3d
 @settings(deadline=None)
 def test_unary_reduction(unom,uerr,vnom,verr):
-    u = uncert.Uncertainty(unom,uerr)
-    v = uncert.Uncertainty(vnom,verr)
-    for op in uncert.wrap_numpy.bcast_reduction_unary:
+    u = auto_uncertainties.Uncertainty(unom,uerr)
+    v = auto_uncertainties.Uncertainty(vnom,verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_reduction_unary:
         oper = getattr(np,op)
         try:
             w = op_test(oper,u)

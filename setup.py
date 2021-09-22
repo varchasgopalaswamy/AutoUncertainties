@@ -3,7 +3,7 @@ import os
 import re
 from setuptools import find_packages, setup, Command
 from codecs import open
-
+import versioneer
 # Get the long description from the README file
 
 
@@ -13,6 +13,7 @@ def my_setup():
         packages = ['auto_uncertainties'],
         author="Varchas Gopalaswamy",
         license='GPLv3',
+        version=versioneer.get_version(),
         author_email="vgop@lle.rochester.edu",
         description="Linear Uncertainty Propagation with Auto-Differentiation",
         url = 'https://github.com/varchasgopalaswamy/AutoUncertainties',

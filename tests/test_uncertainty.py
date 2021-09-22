@@ -8,7 +8,7 @@ from hypothesis import given, settings
 import numpy as np
 import operator
 
-from uncert import Uncertainty, NegativeStdDevError
+from auto_uncertainties import Uncertainty, NegativeStdDevError
 
 
 @given(v=st.floats(), e=st.floats())
