@@ -299,7 +299,21 @@ bcast_same_shape_bool_ufuncs = [
 ]
 for ufunc in bcast_same_shape_bool_ufuncs:
     implement_func("ufunc", ufunc, implement_mode="same_shape_bool")
-    implement_func("function", ufunc, implement_mode="same_shape_bool")
+
+# Applies the ufunc to the value and discards the error
+bcast_nograd_ufuncs = [
+    "sign",
+    "floor_divide",
+    "fmod",
+    "mod",
+    "remainder",
+    "copysign",
+    "nextafter",
+    "trunc",
+    "spacing",
+]
+for ufunc in bcast_nograd_ufuncs:
+    implement_func("ufunc", ufunc, implement_mode="nograd")
 # Returns an Uncertainty array of the same shape using the gradient (i.e. elementwise math operations)
 bcast_same_shape_ufuncs = [
     "sqrt",
@@ -340,26 +354,21 @@ bcast_same_shape_ufuncs = [
 ]
 for ufunc in bcast_same_shape_ufuncs:
     implement_func("ufunc", ufunc, implement_mode="same_shape")
-    implement_func("function", ufunc, implement_mode="same_shape")
 
 # Returns the indices of the Uncertainty array by some criteria
-bcast_selection_operator_ufuncs = ["argmax", "argmin"]
+bcast_selection_operator_funcs = ["argmax", "argmin"]
 
-for ufunc in bcast_selection_operator_ufuncs:
-    implement_func("ufunc", ufunc, implement_mode="selection_operator")
+for ufunc in bcast_selection_operator_funcs:
     implement_func("function", ufunc, implement_mode="selection_operator")
 
 # Selects a sub-section of or reshapes the Uncertainty array by some criteria
-bcast_selection_ufuncs = {"max": "argmax", "min": "argmin", "amax": "argmax", "amin": "argmin"}
+bcast_selection_funcs = {"max": "argmax", "min": "argmin", "amax": "argmax", "amin": "argmin"}
 
-for ufunc, sel_op in bcast_selection_ufuncs.items():
-    implement_func("ufunc", ufunc, implement_mode="selection", selection_operator=sel_op)
+for ufunc, sel_op in bcast_selection_funcs.items():
     implement_func("function", ufunc, implement_mode="selection", selection_operator=sel_op)
 
-# Applies ufunc to both the value and error
-bcast_apply_to_both_ufuncs = [
-    "conj",
-    "conjugate",
+# Applies ufunc or func to both the value and error
+bcast_apply_to_both_funcs = [
     "compress",
     "diagonal",
     "ravel",
@@ -369,37 +378,28 @@ bcast_apply_to_both_ufuncs = [
     "swapaxes",
     "take",
     "transpose",
+    "round_",
+    "copy",
+]
+bcast_apply_to_both_ufuncs = [
+    "conj",
+    "conjugate",
     "negative",
     "fabs",
     "round",
     "ceil",
     "floor",
     "rint",
-    "flatten" "astype",
 ]
 for ufunc in bcast_apply_to_both_ufuncs:
     implement_func("ufunc", ufunc, implement_mode="apply_to_both")
+for ufunc in bcast_apply_to_both_funcs:
     implement_func("function", ufunc, implement_mode="apply_to_both")
 
-# Applies the ufunc to the value and discards the error
-bcast_nograd_ufuncs = [
-    "sign",
-    "floor_divide",
-    "fmod",
-    "mod",
-    "remainder",
-    "copysign",
-    "nextafter",
-    "trunc",
-]
-for ufunc in bcast_nograd_ufuncs:
-    implement_func("ufunc", ufunc, implement_mode="nograd")
-    implement_func("function", ufunc, implement_mode="nograd")
 # Applies a reduction
 
 bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp"]
 for ufunc in bcast_reduction_unary:
-    implement_func("ufunc", ufunc, implement_mode="reduction_unary")
     implement_func("function", ufunc, implement_mode="reduction_unary")
 
 # Implement some fun special cases
@@ -410,17 +410,28 @@ def _take_along_axis(a, *args, **kwargs):
     return a.__class__(val, err)
 
 
-def wrap_numpy(func_type, func, args, kwargs, types):
+@implements("ndim", "function")
+def _ndim(a, *args, **kwargs):
+    return a.value.ndim
+
+
+def wrap_numpy(func_type, func, args, kwargs):
     """Return the result from a JAX+NumPy function/ufunc as wrapped by uncert."""
 
     if func_type == "function":
         handled = HANDLED_FUNCTIONS
         # Need to handle functions in submodules
-        name = ".".join(func.__module__.split(".")[1:] + [func.__name__])
+        if isinstance(func, str):
+            name = func
+        else:
+            name = ".".join(func.__module__.split(".")[1:] + [func.__name__])
     elif func_type == "ufunc":
         handled = HANDLED_UFUNCS
         # ufuncs do not have func.__module__
-        name = func.__name__
+        if isinstance(func, str):
+            name = func
+        else:
+            name = func.__name__
     else:
         raise ValueError("Invalid func_type {}".format(func_type))
 

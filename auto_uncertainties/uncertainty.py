@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
+from types import MethodType
 
 import numpy as np
 import locale
@@ -14,17 +15,29 @@ from .util import is_np_duck_array
 
 
 class Uncertainty(object):
-    def __new__(cls, value, err):
-        inst = super(Uncertainty, cls).__new__(cls)
-        magnitude_nom = value
-        magnitude_err = err
-        assert np.shape(value) == np.shape(err)
-        if np.any(np.atleast_1d(err) < 0):
-            raise NegativeStdDevError
-        inst._nom = magnitude_nom
-        inst._err = magnitude_err
+    __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T"]
 
-        return inst
+    def __init__(self, value, err=None):
+        if isinstance(value, self.__class__):
+            magnitude_nom = value.value
+            magnitude_err = value.error
+        elif np.ndim(value) > 0:
+            magnitude_nom = np.asarray(value)
+            if err is None:
+                magnitude_err = np.zeros_like(value)
+            else:
+                magnitude_err = np.asarray(err)
+        else:
+            magnitude_nom = value
+            if err is None:
+                magnitude_err = 0.0
+            else:
+                magnitude_err = err
+        assert np.shape(magnitude_nom) == np.shape(magnitude_err)
+        if np.any(np.atleast_1d(magnitude_err) < 0):
+            raise NegativeStdDevError
+        self._nom = magnitude_nom
+        self._err = magnitude_err
 
     def __str__(self) -> str:
         if self._nom is not None:
@@ -339,10 +352,47 @@ class Uncertainty(object):
             if hasattr(arg, "__array_ufunc__")
         )
 
-        return wrap_numpy("ufunc", ufunc, inputs, kwargs, types)
+        return wrap_numpy("ufunc", ufunc, inputs, kwargs)
 
     def __array_function__(self, func, types, args, kwargs):
-        return wrap_numpy("function", func, args, kwargs, types)
+        # print(func)
+        if func.__name__ not in HANDLED_FUNCTIONS:
+            return NotImplemented
+        elif not all(issubclass(t, self.__class__) for t in types):
+            return NotImplemented
+        else:
+            return wrap_numpy("function", func, args, kwargs)
+
+    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
+        # print(method,ufunc.__name__)
+        if method != "__call__":
+            raise NotImplementedError
+        else:
+            if ufunc.__name__ not in HANDLED_UFUNCS:
+                raise NotImplementedError
+            else:
+                return wrap_numpy("ufunc", ufunc, args, kwargs)
+
+    def __getattr__(self, item):
+        if item.startswith("__array_"):
+            # Handle array protocol attributes other than `__array__`
+            raise AttributeError(f"Array protocol attribute {item} not available.")
+        elif item in self.__apply_to_both_ndarray__:
+            val = getattr(self._nom, item)
+            err = getattr(self._err, item)
+
+            if callable(val):
+                return lambda *args, **kwargs: self.__class__(
+                    val(*args, **kwargs), err(*args, **kwargs)
+                )
+            else:
+                return self.__class__(val, err)
+        elif item in HANDLED_UFUNCS:
+            return lambda *args, **kwargs: wrap_numpy("ufunc", item, [self] + list(args), kwargs)
+        elif item in HANDLED_FUNCTIONS:
+            return lambda *args, **kwargs: wrap_numpy("function", item, [self] + list(args), kwargs)
+        else:
+            raise AttributeError
 
     def __array__(self, t=None) -> np.ndarray:
         warnings.warn(
@@ -364,18 +414,7 @@ class Uncertainty(object):
         else:
             raise ValueError("Can only 'put' Uncertainties into uncertainties!")
 
-    @property
-    def real(self) -> Uncertainty:
-        return self.__class__(self._nom.real, self._err.real)
-
-    @property
-    def imag(self) -> Uncertainty:
-        return self.__class__(self._nom.imag, self._err.imag)
-
-    @property
-    def T(self):
-        return np.transpose(self)
-
+    # Define ndarray properties
     @property
     def flat(self):
         for u, v in (self._nom.flat, self._err.flat):
@@ -384,6 +423,13 @@ class Uncertainty(object):
     @property
     def size(self) -> int:
         return np.prod(self.shape)
+
+    @property
+    def dtype(self):
+        if is_np_duck_array(type(self._nom)):
+            return self._nom.dtype
+        else:
+            return type(self._nom)
 
     @property
     def shape(self):
@@ -399,24 +445,6 @@ class Uncertainty(object):
 
     def __len__(self) -> int:
         return len(self._nom)
-
-    def __getattr__(self, item):
-        if item.startswith("__array_"):
-            # Handle array protocol attributes other than `__array__`
-            raise AttributeError(f"Array protocol attribute {item} not available.")
-        elif item in HANDLED_UFUNCS:
-            val = self._nom
-
-            try:
-                attr = getattr(val, item)
-                return attr
-            except AttributeError:
-                raise AttributeError(f"NumPy method {item} not available on {type(val)}")
-            except TypeError as exc:
-                if "not callable" in str(exc):
-                    raise AttributeError(f"NumPy method {item} not callable on {type(val)}")
-                else:
-                    raise exc
 
     def __getitem__(self, key):
         try:

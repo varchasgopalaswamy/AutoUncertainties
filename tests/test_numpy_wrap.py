@@ -118,6 +118,34 @@ def test_nograd(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+def test_apply_to_both(unom, uerr, vnom, verr):
+    u = auto_uncertainties.Uncertainty(unom, uerr)
+    v = auto_uncertainties.Uncertainty(vnom, verr)
+    for op in auto_uncertainties.wrap_numpy.bcast_apply_to_both_ufuncs:
+        oper = getattr(np, op)
+        try:
+            w = op_test(oper, u)
+        except TypeError:
+            try:
+                w = op_test(oper, u, v)
+            except (ValueError, TypeError):
+                pass
+        except ValueError:
+            pass
+    for op in auto_uncertainties.wrap_numpy.bcast_apply_to_both_funcs:
+        oper = getattr(np, op)
+        try:
+            w = op_test(oper, u)
+        except TypeError:
+            try:
+                w = op_test(oper, u, v)
+            except (ValueError, TypeError):
+                pass
+        except ValueError:
+            pass
+
+
+@given_float_3d
 def test_selection(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -129,7 +157,7 @@ def test_selection(unom, uerr, vnom, verr):
             w = op_test(oper, u, v)
         assert not isinstance(w, auto_uncertainties.Uncertainty)
 
-    for op in auto_uncertainties.wrap_numpy.bcast_selection_ufuncs:
+    for op in auto_uncertainties.wrap_numpy.bcast_selection_funcs:
         oper = getattr(np, op)
         try:
             w = op_test(oper, u)
