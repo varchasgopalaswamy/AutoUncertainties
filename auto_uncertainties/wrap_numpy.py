@@ -410,11 +410,6 @@ def _take_along_axis(a, *args, **kwargs):
     return a.__class__(val, err)
 
 
-@implements("ndim", "function")
-def _ndim(a, *args, **kwargs):
-    return a.value.ndim
-
-
 def wrap_numpy(func_type, func, args, kwargs):
     """Return the result from a JAX+NumPy function/ufunc as wrapped by uncert."""
 

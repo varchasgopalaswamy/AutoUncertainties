@@ -16,6 +16,7 @@ from .util import is_np_duck_array
 
 class Uncertainty(object):
     __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T"]
+    __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
     def __init__(self, value, err=None):
         if isinstance(value, self.__class__):
@@ -33,9 +34,17 @@ class Uncertainty(object):
                 magnitude_err = 0.0
             else:
                 magnitude_err = err
-        assert np.shape(magnitude_nom) == np.shape(magnitude_err)
+
+        # Basic sanity checks
+        if is_np_duck_array(type(magnitude_nom)):
+            for item in self.__ndarray_attributes__ + ["shape"]:
+                if not getattr(magnitude_nom, item) == getattr(magnitude_err, item):
+                    raise ValueError(
+                        f"Attribute {item} does not match for value and error! ({getattr(magnitude_nom,item)} and {getattr(magnitude_err,item)})"
+                    )
         if np.any(np.atleast_1d(magnitude_err) < 0):
             raise NegativeStdDevError
+
         self._nom = magnitude_nom
         self._err = magnitude_err
 
@@ -340,20 +349,6 @@ class Uncertainty(object):
     # NumPy function/ufunc support
     __array_priority__ = 17
 
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        if method != "__call__":
-            # Only handle ufuncs as callables
-            return NotImplemented
-
-        # Replicate types from __array_function__
-        types = set(
-            type(arg)
-            for arg in list(inputs) + list(kwargs.values())
-            if hasattr(arg, "__array_ufunc__")
-        )
-
-        return wrap_numpy("ufunc", ufunc, inputs, kwargs)
-
     def __array_function__(self, func, types, args, kwargs):
         # print(func)
         if func.__name__ not in HANDLED_FUNCTIONS:
@@ -391,6 +386,8 @@ class Uncertainty(object):
             return lambda *args, **kwargs: wrap_numpy("ufunc", item, [self] + list(args), kwargs)
         elif item in HANDLED_FUNCTIONS:
             return lambda *args, **kwargs: wrap_numpy("function", item, [self] + list(args), kwargs)
+        elif item in self.__ndarray_attributes__:
+            return getattr(self._nom, item)
         else:
             raise AttributeError
 
@@ -414,22 +411,10 @@ class Uncertainty(object):
         else:
             raise ValueError("Can only 'put' Uncertainties into uncertainties!")
 
-    # Define ndarray properties
     @property
     def flat(self):
         for u, v in (self._nom.flat, self._err.flat):
             yield self.__class__(u, v)
-
-    @property
-    def size(self) -> int:
-        return np.prod(self.shape)
-
-    @property
-    def dtype(self):
-        if is_np_duck_array(type(self._nom)):
-            return self._nom.dtype
-        else:
-            return type(self._nom)
 
     @property
     def shape(self):
