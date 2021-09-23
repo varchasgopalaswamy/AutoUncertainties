@@ -410,6 +410,16 @@ def _take_along_axis(a, *args, **kwargs):
     return a.__class__(val, err)
 
 
+@implements("concatenate", "function")
+def _concatenate(concat, *args, **kwargs):
+    for a in concat:
+        if not _is_uncertainty(a):
+            raise ValueError
+    val = np.concatenate([a._nom for a in concat], **kwargs)
+    err = np.concatenate([a._err for a in concat], **kwargs)
+    return a.__class__(val, err)
+
+
 def wrap_numpy(func_type, func, args, kwargs):
     """Return the result from a JAX+NumPy function/ufunc as wrapped by uncert."""
 

@@ -6,3 +6,8 @@ class NegativeStdDevError(Exception):
 
 
 from .uncertainty import Uncertainty
+
+try:
+    from .pandas_compat import UncertaintyArray
+except ImportError:
+    pass

@@ -22,6 +22,7 @@ class Uncertainty(object):
         if isinstance(value, self.__class__):
             magnitude_nom = value.value
             magnitude_err = value.error
+
         elif np.ndim(value) > 0:
             magnitude_nom = np.asarray(value)
             if err is None:
@@ -411,6 +412,7 @@ class Uncertainty(object):
         else:
             raise ValueError("Can only 'put' Uncertainties into uncertainties!")
 
+    # Special properties
     @property
     def flat(self):
         for u, v in (self._nom.flat, self._err.flat):
@@ -424,6 +426,10 @@ class Uncertainty(object):
     def shape(self, value):
         self._nom.shape = value
         self._err.shape = value
+
+    @property
+    def nbytes(self):
+        return self._nom.nbytes + self._err.nbytes
 
     def searchsorted(self, v, side="left", sorter=None):
         return self._nom.searchsorted(v, side)
