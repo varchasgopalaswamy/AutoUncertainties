@@ -5,6 +5,12 @@ class NegativeStdDevError(Exception):
     pass
 
 
+class NumpyDowncastWarning(RuntimeWarning):
+    """An exception for when an uncertainties array is downcast to a numpy array"""
+
+    pass
+
+
 from .uncertainty import Uncertainty
 
 try:

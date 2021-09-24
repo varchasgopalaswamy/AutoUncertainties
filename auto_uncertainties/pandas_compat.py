@@ -5,11 +5,11 @@ import numpy as np
 from pandas.api.extensions import ExtensionArray, ExtensionDtype, register_extension_dtype
 from pandas.core.arrays.base import ExtensionOpsMixin
 from pandas.compat import set_function_name
-from auto_uncertainties.util import is_np_duck_array
 import loguru
 import numbers
 
 from .uncertainty import Uncertainty
+from .util import is_np_duck_array, ignore_numpy_downcast_warnings
 
 
 @register_extension_dtype
@@ -87,6 +87,7 @@ class UncertaintyArray(ExtensionArray, ExtensionOpsMixin):
         inst = self.__class__(np.copy(self.data))
         return inst
 
+    @ignore_numpy_downcast_warnings
     def take(self, indices, allow_fill=False, fill_value=None):
         from pandas.api.extensions import take
 
@@ -113,7 +114,7 @@ class UncertaintyArray(ExtensionArray, ExtensionOpsMixin):
         ExtensionArray
         """
         data = np.concatenate([ga.data for ga in to_concat])
-        return UncertaintyArray(data, crs=to_concat[0].crs)
+        return UncertaintyArray(data)
 
     def __getitem__(self, idx):
         if isinstance(idx, numbers.Integral):
@@ -149,9 +150,9 @@ class UncertaintyArray(ExtensionArray, ExtensionOpsMixin):
         """
         return repr
 
-    def __repr__(self):
-        print("B")
-        return ""
+    # def __repr__(self):
+    #     print("B")
+    #     return ""
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False):
@@ -283,11 +284,11 @@ class UncertaintyArray(ExtensionArray, ExtensionOpsMixin):
             res = op(lvalues, rvalues)
 
             if op.__name__ == "divmod":
-                return (cls.from_1darray_quantity(res[0]), cls.from_1darray_quantity(res[1]))
+                return (cls(res[0]), cls(res[1]))
 
             if coerce_to_dtype:
                 try:
-                    res = cls.from_1darray_quantity(res)
+                    res = cls(res)
                 except TypeError:
                     pass
 

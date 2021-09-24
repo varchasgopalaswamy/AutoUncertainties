@@ -10,8 +10,8 @@ import operator
 import warnings
 
 from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
-from . import NegativeStdDevError
-from .util import is_np_duck_array
+from . import NegativeStdDevError, NumpyDowncastWarning
+from .util import is_np_duck_array, ignore_runtime_warnings
 
 
 class Uncertainty(object):
@@ -193,6 +193,7 @@ class Uncertainty(object):
 
     __rmul__ = __mul__
 
+    @ignore_runtime_warnings
     def __itruediv__(self, other):
         new = self / other
         if is_np_duck_array(type(self._nom)):
@@ -202,6 +203,7 @@ class Uncertainty(object):
         else:
             return new
 
+    @ignore_runtime_warnings
     def __truediv__(self, other):
         # Self / Other
         if isinstance(other, Uncertainty):
@@ -212,6 +214,7 @@ class Uncertainty(object):
             new_err = self._err / other
         return self.__class__(new_mag, new_err)
 
+    @ignore_runtime_warnings
     def __rtruediv__(self, other):
         # Other / Self
         if isinstance(other, Uncertainty):
@@ -350,6 +353,7 @@ class Uncertainty(object):
     # NumPy function/ufunc support
     __array_priority__ = 17
 
+    @ignore_runtime_warnings
     def __array_function__(self, func, types, args, kwargs):
         # print(func)
         if func.__name__ not in HANDLED_FUNCTIONS:
@@ -359,6 +363,7 @@ class Uncertainty(object):
         else:
             return wrap_numpy("function", func, args, kwargs)
 
+    @ignore_runtime_warnings
     def __array_ufunc__(self, ufunc, method, *args, **kwargs):
         # print(method,ufunc.__name__)
         if method != "__call__":
@@ -394,7 +399,9 @@ class Uncertainty(object):
 
     def __array__(self, t=None) -> np.ndarray:
         warnings.warn(
-            "The uncertainty is stripped when downcasting to ndarray.", UserWarning, stacklevel=2
+            "The uncertainty is stripped when downcasting to ndarray.",
+            NumpyDowncastWarning,
+            stacklevel=2,
         )
         return np.asarray(self._nom)
 

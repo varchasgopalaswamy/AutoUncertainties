@@ -1,4 +1,55 @@
 # -*- coding: utf-8 -*-
+import warnings
+from functools import wraps
+from . import NumpyDowncastWarning
+
+
+def ignore_runtime_warnings(f):
+    """
+    A decorator to ignore runtime warnings
+    Parameters
+    ----------
+    f: function
+        The wrapped function
+
+    Returns
+    -------
+    wrapped_function: function
+        The wrapped function
+    """
+
+    @wraps(f)
+    def runtime_warn_inner(*args, **kwargs):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            response = f(*args, **kwargs)
+        return response
+
+    return runtime_warn_inner
+
+
+def ignore_numpy_downcast_warnings(f):
+    """
+    A decorator to ignore NumpyDowncastWarning
+    Parameters
+    ----------
+    f: function
+        The wrapped function
+
+    Returns
+    -------
+    wrapped_function: function
+        The wrapped function
+    """
+
+    @wraps(f)
+    def user_warn_inner(*args, **kwargs):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("ignore", category=NumpyDowncastWarning)
+            response = f(*args, **kwargs)
+        return response
+
+    return user_warn_inner
 
 
 def is_iterable(y):
