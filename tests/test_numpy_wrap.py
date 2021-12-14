@@ -78,7 +78,16 @@ def given_float_2d(func):
         ),
     )(func)
 
-
+@given_float_3d
+def test_add(unom, uerr, vnom, verr):
+    u = auto_uncertainties.Uncertainty(unom, uerr)
+    v = auto_uncertainties.Uncertainty(vnom, verr)
+    w = u + v 
+    w_mag = u.value + v.value 
+    w_err = np.sqrt(u.error**2 + v.error**2)
+    np.testing.assert_almost_equal(w_mag, w._nom)
+    np.testing.assert_almost_equal(w_err, w._err)
+    
 @given_float_3d
 def test_same_shape(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
