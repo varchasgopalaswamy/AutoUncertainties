@@ -24,11 +24,29 @@ class Uncertainty(object):
             magnitude_err = value.error
 
         elif np.ndim(value) > 0:
+            mag_units = hasattr(value, "units")
+            err_units = hasattr(err, "units")
+            if mag_units ^ err_units:
+                raise ValueError("Both mag and err need to have units if one of them has units!")
+            if mag_units:
+                if value.units != err.units:
+                    raise ValueError(
+                        f"Value units {value.units} cannot be converted to error units {err.units}"
+                    )
+
             magnitude_nom = np.asarray(value)
             if err is None:
                 magnitude_err = np.zeros_like(value)
             else:
-                magnitude_err = np.asarray(err)
+                if mag_units:
+                    magnitude_err = np.asarray(err.to(value.units))
+                else:
+                    magnitude_err = np.asarray(err)
+
+            if mag_units:
+                magnitude_nom *= value.units
+                magnitude_err *= err.units
+
         else:
             magnitude_nom = value
             if err is None:
@@ -92,11 +110,19 @@ class Uncertainty(object):
         return self.value
 
     @property
+    def n(self):
+        return self.value
+
+    @property
     def error(self):
         return self._err
 
     @property
     def std_dev(self):
+        return self.error
+
+    @property
+    def s(self):
         return self.error
 
     @property
@@ -423,7 +449,7 @@ class Uncertainty(object):
         elif item in self.__ndarray_attributes__:
             return getattr(self._nom, item)
         else:
-            raise AttributeError
+            raise AttributeError(f"Attribute {item} not available.")
 
     def __array__(self, t=None) -> np.ndarray:
         warnings.warn(
@@ -504,3 +530,24 @@ class Uncertainty(object):
                 ]
         except AttributeError:
             raise AttributeError(f"{type(self._nom).__name__}' does not support tolist.")
+
+    # Pint comparibility
+    def to(self, other):
+        if hasattr(self.nominal_value, "units"):
+            return self.__class__(self._nom.to(other), self._err.to(other))
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
+
+    @property
+    def m(self):
+        if hasattr(self.nominal_value, "units"):
+            return self.__class__(self._nom.m, self._err.m)
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
+
+    @property
+    def units(self):
+        if hasattr(self.nominal_value, "units"):
+            return self._nom.units
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
