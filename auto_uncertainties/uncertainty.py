@@ -43,8 +43,13 @@ class Uncertainty(object):
                     raise ValueError(
                         f"Attribute {item} does not match for value and error! ({getattr(magnitude_nom,item)} and {getattr(magnitude_err,item)})"
                     )
-        if np.any(np.atleast_1d(magnitude_err) < 0):
-            raise NegativeStdDevError
+        err_mag = np.atleast_1d(magnitude_err)
+        if np.any(err_mag[np.isfinite(err_mag)] < 0):
+            valid = err_mag[np.isfinite(err_mag)]
+
+            raise NegativeStdDevError(
+                f"Found negatives values for the standard deviation... {valid[valid < 0]}"
+            )
 
         self._nom = magnitude_nom
         self._err = magnitude_err
@@ -96,10 +101,13 @@ class Uncertainty(object):
 
     @property
     def relative(self):
-        if self._nom != 0:
-            return self._err / self._nom
+        if np.ndim(self._nom) == 0:
+            if self._nom != 0:
+                return self._err / self._nom
+            else:
+                return np.NaN
         else:
-            return np.NaN
+            return self._err / self._nom
 
     @property
     def rel(self):
@@ -185,7 +193,7 @@ class Uncertainty(object):
     def __mul__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom * other._nom
-            new_err = new_mag * np.sqrt(self.rel ** 2 + other.rel ** 2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
         else:
             new_mag = self._nom * other
             new_err = self._err * other
@@ -208,7 +216,7 @@ class Uncertainty(object):
         # Self / Other
         if isinstance(other, Uncertainty):
             new_mag = self._nom / other._nom
-            new_err = new_mag * np.sqrt(self.rel ** 2 + other.rel ** 2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
         else:
             new_mag = self._nom / other
             new_err = self._err / other
@@ -221,7 +229,7 @@ class Uncertainty(object):
             raise Exception
         else:
             new_mag = other / self._nom
-            new_err = new_mag * self.rel
+            new_err = np.abs(new_mag) * self.rel
             return self.__class__(new_mag, new_err)
 
     __div__ = __truediv__
@@ -266,15 +274,20 @@ class Uncertainty(object):
     def __mod__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom % other._nom
-            new_err = 0.0
         else:
             new_mag = self._nom % other
+        if np.ndim(new_mag) == 0:
             new_err = 0.0
+        else:
+            new_err = np.zeros_like(new_mag)
         return self.__class__(new_mag, new_err)
 
     def __rmod__(self, other):
         new_mag = other % self._nom
-        new_err = 0.0
+        if np.ndim(new_mag) == 0:
+            new_err = 0.0
+        else:
+            new_err = np.zeros_like(new_mag)
         return self.__class__(new_mag, new_err)
 
     def __divmod__(self, other):
@@ -294,18 +307,33 @@ class Uncertainty(object):
 
     def __pow__(self, other):
         # Self ** other
+        A = self._nom
+        sA = self._err
         if isinstance(other, Uncertainty):
-            new_mag = self._nom % other._nom
-            new_err = 0.0
+            B = other._nom
+            sB = other._err
         else:
-            new_mag = self._nom % other
-            new_err = 0.0
+            B = other
+            sB = 0
+        new_mag = A ** B
+        new_err = new_mag * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+
         return self.__class__(new_mag, new_err)
 
     def __rpow__(self, other):
         # Other ** self
-        new_mag = other % self._nom
-        new_err = 0.0
+        B = self._nom
+        sB = self._err
+        if isinstance(other, Uncertainty):
+            A = other._nom
+            sA = other._err
+        else:
+            A = other
+            sA = 0
+
+        new_mag = A ** B
+        new_err = new_mag * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+
         return self.__class__(new_mag, new_err)
 
     def __abs__(self):
