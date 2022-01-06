@@ -79,6 +79,9 @@ class Uncertainty(object):
             else:
                 return f"{self._nom}"
 
+    def __format__(self, fmt):
+        return f"{self.value:{fmt}} +/- {self.error:{fmt}})"
+
     def __repr__(self) -> str:
         return str(self)
 
