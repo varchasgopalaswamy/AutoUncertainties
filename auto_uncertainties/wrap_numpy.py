@@ -398,7 +398,7 @@ for ufunc in bcast_apply_to_both_funcs:
 
 # Applies a reduction
 
-bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp"]
+bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp", "median"]
 for ufunc in bcast_reduction_unary:
     implement_func("function", ufunc, implement_mode="reduction_unary")
 

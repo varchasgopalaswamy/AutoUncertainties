@@ -11,18 +11,20 @@ import warnings
 
 from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from . import NegativeStdDevError, NumpyDowncastWarning
-from .util import is_np_duck_array, ignore_runtime_warnings
+from .util import is_np_duck_array, ignore_runtime_warnings, ignore_numpy_downcast_warnings
 
 
 class Uncertainty(object):
     __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T"]
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
+    @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
         if isinstance(value, self.__class__):
             magnitude_nom = value.value
             magnitude_err = value.error
-
+        elif isinstance(value, list):
+            return self.__class__.from_list(value)
         elif np.ndim(value) > 0:
             mag_units = hasattr(value, "units")
             err_units = hasattr(err, "units")
@@ -152,7 +154,10 @@ class Uncertainty(object):
         len_seq = len(seq)
         val = np.empty(len_seq)
         err = np.empty(len_seq)
-
+        first_item = seq[0]
+        if hasattr(first_item, "units"):
+            val *= first_item.units
+            err *= first_item.units
         for i, seq_i in enumerate(seq):
             val[i] = seq_i._nom
             err[i] = seq_i._err
