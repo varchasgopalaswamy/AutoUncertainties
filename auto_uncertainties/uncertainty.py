@@ -8,10 +8,44 @@ import locale
 import copy
 import operator
 import warnings
+import jax
 
 from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from . import NegativeStdDevError, NumpyDowncastWarning
 from .util import is_np_duck_array, ignore_runtime_warnings, ignore_numpy_downcast_warnings
+
+
+def _check_units(value, err):
+    mag_units = hasattr(value, "units")
+    err_units = hasattr(err, "units")
+    if mag_units ^ err_units and err is not None:
+        raise ValueError("Both mag and err need to have units if one of them has units!")
+    if mag_units and err is not None:
+        if value.units != err.units:
+            raise ValueError(
+                f"Value units {value.units} cannot be converted to error units {err.units}"
+            )
+    if mag_units:
+        mag_units = value.units
+        ret_val = value.to(mag_units).m
+        if err is not None:
+            ret_err = err.to(mag_units).m
+        else:
+            ret_err = None
+    else:
+        mag_units = 1.0
+        ret_val = value
+        ret_err = err
+
+    return ret_val, ret_err, mag_units
+
+
+def _strip_device_array(value, err):
+    if isinstance(value, jax.xla.DeviceArray):
+        value = value.to_py().copy()
+    if isinstance(err, jax.xla.DeviceArray):
+        err = err.to_py().copy()
+    return value, err
 
 
 class Uncertainty(object):
@@ -20,42 +54,29 @@ class Uncertainty(object):
 
     @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
+
+        value, err, units = _check_units(value, err)
+        value, err = _strip_device_array(value, err)
+
         if isinstance(value, self.__class__):
             magnitude_nom = value.value
             magnitude_err = value.error
         elif isinstance(value, list):
             return self.__class__.from_list(value)
         elif np.ndim(value) > 0:
-            mag_units = hasattr(value, "units")
-            err_units = hasattr(err, "units")
-            if mag_units ^ err_units:
-                raise ValueError("Both mag and err need to have units if one of them has units!")
-            if mag_units:
-                if value.units != err.units:
-                    raise ValueError(
-                        f"Value units {value.units} cannot be converted to error units {err.units}"
-                    )
-
             magnitude_nom = np.asarray(value)
             if err is None:
                 magnitude_err = np.zeros_like(value)
             else:
-                if mag_units:
-                    magnitude_err = np.asarray(err.to(value.units))
-                else:
-                    magnitude_err = np.asarray(err)
-
-            if mag_units:
-                magnitude_nom *= value.units
-                magnitude_err *= err.units
-
+                magnitude_err = np.asarray(err)
         else:
             magnitude_nom = value
             if err is None:
                 magnitude_err = 0.0
             else:
                 magnitude_err = err
-
+        magnitude_nom *= units
+        magnitude_err *= units
         # Basic sanity checks
         if is_np_duck_array(type(magnitude_nom)):
             for item in self.__ndarray_attributes__ + ["shape"]:
@@ -82,7 +103,7 @@ class Uncertainty(object):
                 return f"{self._nom}"
 
     def __format__(self, fmt):
-        return f"{self.value:{fmt}} +/- {self.error:{fmt}})"
+        return f"{self.value:{fmt}} +/- {self.error:{fmt}}"
 
     def __repr__(self) -> str:
         return str(self)
@@ -154,14 +175,15 @@ class Uncertainty(object):
         len_seq = len(seq)
         val = np.empty(len_seq)
         err = np.empty(len_seq)
-        first_item = seq[0]
-        if hasattr(first_item, "units"):
-            val *= first_item.units
-            err *= first_item.units
-        for i, seq_i in enumerate(seq):
-            val[i] = seq_i._nom
-            err[i] = seq_i._err
+        if len_seq > 0:
 
+            first_item = seq[0]
+            if hasattr(first_item, "units"):
+                val *= first_item.units
+                err *= first_item.units
+            for i, seq_i in enumerate(seq):
+                val[i] = seq_i._nom
+                err[i] = seq_i._err
         return cls(val, err)
 
     def __float__(self) -> Uncertainty:
