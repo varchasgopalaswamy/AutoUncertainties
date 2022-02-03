@@ -176,14 +176,17 @@ class Uncertainty(object):
         val = np.empty(len_seq)
         err = np.empty(len_seq)
         if len_seq > 0:
-
             first_item = seq[0]
             if hasattr(first_item, "units"):
                 val *= first_item.units
                 err *= first_item.units
             for i, seq_i in enumerate(seq):
-                val[i] = seq_i._nom
-                err[i] = seq_i._err
+                try:
+                    val[i] = float(seq_i._nom)
+                    err[i] = float(seq_i._err)
+                except AttributeError:
+                    val[i] = float(seq_i)
+                    err[i] = 0
         return cls(val, err)
 
     def __float__(self) -> Uncertainty:
