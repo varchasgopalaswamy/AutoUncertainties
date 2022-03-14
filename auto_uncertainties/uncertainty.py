@@ -288,7 +288,7 @@ class Uncertainty(object):
             raise Exception
         else:
             new_mag = other / self._nom
-            new_err = np.abs(new_mag) * self.rel
+            new_err = np.abs(new_mag) * np.abs(self.rel)
             return self.__class__(new_mag, new_err)
 
     __div__ = __truediv__
