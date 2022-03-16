@@ -9,10 +9,12 @@ import copy
 import operator
 import warnings
 import jax
+from pint import Quantity, DimensionalityError
+from pint.util import SharedRegistryObject
 
 from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from . import NegativeStdDevError, NumpyDowncastWarning
-from .util import is_np_duck_array, ignore_runtime_warnings, ignore_numpy_downcast_warnings
+from .util import is_np_duck_array, ignore_runtime_warnings, ignore_numpy_downcast_warnings, Display
 
 
 def _check_units(value, err):
@@ -48,9 +50,100 @@ def _strip_device_array(value, err):
     return value, err
 
 
-class Uncertainty(object):
+class Uncertainty(Display):
     __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T"]
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
+
+    # Pint comparibility
+    @property
+    def unitless(self) -> bool:
+        """ """
+        return not bool(self.to_root_units()._units)
+
+    @property
+    def dimensionless(self) -> bool:
+        """ """
+        tmp = self.to_root_units()
+
+        return not bool(tmp.dimensionality)
+
+    _dimensionality = None
+
+    @property
+    def dimensionality(self):
+        """
+        Returns
+        -------
+        dict
+            Dimensionality of the Quantity, e.g. ``{length: 1, time: -1}``
+        """
+        if self._dimensionality is None:
+            self._dimensionality = self._REGISTRY._get_dimensionality(self.units)
+
+        return self._dimensionality
+
+    def check(self, dimension) -> bool:
+        """Return true if the quantity's dimension matches passed dimension."""
+        return self.dimensionality == self._REGISTRY.get_dimensionality(dimension)
+
+    def _check(self, other) -> bool:
+        """Check if the other object use a registry and if so that it is the
+        same registry.
+        Parameters
+        ----------
+        other :
+        Returns
+        -------
+        type
+            other don't use a registry and raise ValueError if other don't use the
+            same unit registry.
+        """
+        if self._REGISTRY is getattr(other, "_REGISTRY", None):
+            return True
+
+        elif isinstance(other, SharedRegistryObject):
+            mess = "Cannot operate with {} and {} of different registries."
+            raise ValueError(mess.format(self.__class__.__name__, other.__class__.__name__))
+        else:
+            return False
+
+    def to(self, other):
+        if hasattr(self.nominal_value, "units"):
+            return self.__class__(self._nom.to(other), self._err.to(other))
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
+
+    @property
+    def m(self):
+        if hasattr(self.nominal_value, "units"):
+            return self.__class__(self._nom.m, self._err.m)
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
+
+    @property
+    def units(self):
+        if hasattr(self.nominal_value, "units"):
+            return self._nom.units
+        else:
+            raise AttributeError("Uncertainty has no quantity!")
+
+    @property
+    def _REGISTRY(self):
+        return getattr(self._nom, "_REGISTRY", None)
+
+    def compatible_units(self, *contexts):
+        if contexts:
+            with self._REGISTRY.context(*contexts):
+                return self._REGISTRY.get_compatible_units(self._units)
+
+        return self._REGISTRY.get_compatible_units(self._units)
+
+    def _convert_magnitude_not_inplace(self, other, *contexts, **ctx_kwargs):
+        if contexts:
+            with self._REGISTRY.context(*contexts, **ctx_kwargs):
+                return self._REGISTRY.convert(self._magnitude, self._units, other)
+
+        return self._REGISTRY.convert(self._magnitude, self._units, other)
 
     @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
@@ -58,23 +151,38 @@ class Uncertainty(object):
         value, err, units = _check_units(value, err)
         value, err = _strip_device_array(value, err)
 
+        # If Uncertatity
         if isinstance(value, self.__class__):
             magnitude_nom = value.value
             magnitude_err = value.error
+        # If sequence
         elif isinstance(value, list):
             return self.__class__.from_list(value)
+        # If arrays
         elif np.ndim(value) > 0:
             magnitude_nom = np.asarray(value)
             if err is None:
                 magnitude_err = np.zeros_like(value)
             else:
-                magnitude_err = np.asarray(err)
+                if np.ndim(err) == 0:
+                    magnitude_err = np.ones_like(value) * err
+                else:
+                    magnitude_err = np.asarray(err)
+                    assert magnitude_err.shape == magnitude_nom.shape
+        # If scalar
         else:
             magnitude_nom = value
             if err is None:
                 magnitude_err = 0.0
             else:
                 magnitude_err = err
+
+        # Replace NaNs in errors with zeros
+        if is_np_duck_array(type(magnitude_err)):
+            magnitude_err[~np.isfinite(magnitude_err)] = 0
+        else:
+            if not np.isfinite(magnitude_err):
+                magnitude_err = 0
         magnitude_nom *= units
         magnitude_err *= units
         # Basic sanity checks
@@ -94,19 +202,6 @@ class Uncertainty(object):
 
         self._nom = magnitude_nom
         self._err = magnitude_err
-
-    def __str__(self) -> str:
-        if self._nom is not None:
-            if self._err is not None:
-                return f"{self._nom} +/- {self._err}"
-            else:
-                return f"{self._nom}"
-
-    def __format__(self, fmt):
-        return f"{self.value:{fmt}} +/- {self.error:{fmt}}"
-
-    def __repr__(self) -> str:
-        return str(self)
 
     def __bytes__(self) -> bytes:
         return str(self).encode(locale.getpreferredencoding())
@@ -238,7 +333,7 @@ class Uncertainty(object):
         return self.__class__(new_mag, new_err)
 
     def __rsub__(self, other):
-        -self.__sub__(other)
+        return -self.__sub__(other)
 
     def __imul__(self, other):
         new = self * other
@@ -255,7 +350,8 @@ class Uncertainty(object):
             new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
         else:
             new_mag = self._nom * other
-            new_err = self._err * other
+            new_err = np.abs(self._err * other)
+
         return self.__class__(new_mag, new_err)
 
     __rmul__ = __mul__
@@ -278,7 +374,7 @@ class Uncertainty(object):
             new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
         else:
             new_mag = self._nom / other
-            new_err = self._err / other
+            new_err = np.abs(self._err / other)
         return self.__class__(new_mag, new_err)
 
     @ignore_runtime_warnings
@@ -375,7 +471,10 @@ class Uncertainty(object):
             B = other
             sB = 0
         new_mag = A ** B
-        new_err = new_mag * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+        if sB == 0 and int(B) == B:
+            new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2)
+        else:
+            new_err = np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
 
         return self.__class__(new_mag, new_err)
 
@@ -391,7 +490,7 @@ class Uncertainty(object):
             sA = 0
 
         new_mag = A ** B
-        new_err = new_mag * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+        new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
 
         return self.__class__(new_mag, new_err)
 
@@ -457,7 +556,7 @@ class Uncertainty(object):
             raise NotImplementedError
         else:
             if ufunc.__name__ not in HANDLED_UFUNCS:
-                raise NotImplementedError
+                raise NotImplementedError(f"Ufunc {ufunc.__name__} is not implemented!") from None
             else:
                 return wrap_numpy("ufunc", ufunc, args, kwargs)
 
@@ -481,8 +580,19 @@ class Uncertainty(object):
             return lambda *args, **kwargs: wrap_numpy("function", item, [self] + list(args), kwargs)
         elif item in self.__ndarray_attributes__:
             return getattr(self._nom, item)
+        elif hasattr(Quantity, item):
+            val = getattr(self._nom, item)
+            err = getattr(self._err, item)
+            if callable(val):
+                return lambda *args, **kwargs: self.__class__(
+                    val(*args, **kwargs), err(*args, **kwargs)
+                )
+            else:
+                return self.__class__(val, err)
         else:
-            raise AttributeError(f"Attribute {item} not available.")
+            raise AttributeError(
+                f"Attribute {item} not available in Uncertainty, as method of a Pint Quantity, or as NumPy ufunc or function."
+            ) from None
 
     def __array__(self, t=None) -> np.ndarray:
         warnings.warn(
@@ -505,6 +615,9 @@ class Uncertainty(object):
             self._err.put(indices, values._err, mode)
         else:
             raise ValueError("Can only 'put' Uncertainties into uncertainties!")
+
+    def copy(self):
+        return Uncertainty(self._nom.copy(), self._err.copy())
 
     # Special properties
     @property
@@ -563,24 +676,3 @@ class Uncertainty(object):
                 ]
         except AttributeError:
             raise AttributeError(f"{type(self._nom).__name__}' does not support tolist.")
-
-    # Pint comparibility
-    def to(self, other):
-        if hasattr(self.nominal_value, "units"):
-            return self.__class__(self._nom.to(other), self._err.to(other))
-        else:
-            raise AttributeError("Uncertainty has no quantity!")
-
-    @property
-    def m(self):
-        if hasattr(self.nominal_value, "units"):
-            return self.__class__(self._nom.m, self._err.m)
-        else:
-            raise AttributeError("Uncertainty has no quantity!")
-
-    @property
-    def units(self):
-        if hasattr(self.nominal_value, "units"):
-            return self._nom.units
-        else:
-            raise AttributeError("Uncertainty has no quantity!")

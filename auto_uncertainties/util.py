@@ -91,3 +91,20 @@ def is_np_duck_array(cls):
         and hasattr(cls, "ndim")
         and hasattr(cls, "dtype")
     )
+
+
+class Display(object):
+    default_format: str = ""
+
+    def __str__(self) -> str:
+        if self._nom is not None:
+            if self._err is not None:
+                return f"{self._nom} +/- {self._err}"
+            else:
+                return f"{self._nom}"
+
+    def __format__(self, fmt):
+        return f"{self.value:{fmt}} +/- {self.error:{fmt}}"
+
+    def __repr__(self) -> str:
+        return str(self)
