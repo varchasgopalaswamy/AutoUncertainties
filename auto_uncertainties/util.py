@@ -96,12 +96,91 @@ def is_np_duck_array(cls):
 class Display(object):
     default_format: str = ""
 
+    def _repr_html_(self):
+        if hasattr(self._nom, "units"):
+            val_ = self._nom.m
+            err_ = self._err.m
+            u = self._nom.units
+        else:
+            val_ = self._nom
+            err_ = self._err
+            u = None
+        if is_np_duck_array(type(self._nom)):
+            header = "<table><tbody>"
+            footer = "</tbody></table>"
+            val = f"<tr><th>Magnitude</th><td style='text-align:left;'><pre>{val_}</pre></td></tr>"
+            err = f"<tr><th>Error</th><td style='text-align:left;'><pre>{err_}</pre></td></tr>"
+            if u is None:
+                units = ""
+            else:
+                units = (
+                    f"<tr><th>Units</th><td style='text-align:left;'>{u._repr_html_()}</td></tr>"
+                )
+            return header + val + err + units + footer
+        else:
+            val = f"{val_}"
+            err = f"{err_}"
+            if u is None:
+                units = ""
+            else:
+                units = f"{u}"
+            return f"{val} {chr(0x00B1)} {err} {units}"
+
+    def _repr_latex_(self):
+        if hasattr(self._nom, "units"):
+            val_ = self._nom.m
+            err_ = self._err.m
+            u = self._nom.units
+        else:
+            val_ = self._nom
+            err_ = self._err
+            u = None
+        if is_np_duck_array(type(self._nom)):
+            s = ", ".join([f"{v} \\pm {e}" for v, e in zip(val_.ravel(), err_.ravel())]) + "~"
+            header = "$"
+            footer = "$"
+            if u is None:
+                units = ""
+            else:
+                units = u._repr_latex_()
+            return header + s + units + footer
+        else:
+            val = f"{val_}"
+            err = f"{err_}"
+            if u is None:
+                units = ""
+            else:
+                units = u._repr_latex_()
+            return f"${val} \\pm {err} {units}$"
+
     def __str__(self) -> str:
+        if hasattr(self._nom, "units"):
+            val_ = self._nom.m
+            err_ = self._err.m
+            u = self._nom.units
+        else:
+            val_ = self._nom
+            err_ = self._err
+            u = None
+
+        if u is None:
+            units = ""
+        else:
+            units = f" {u}"
+
         if self._nom is not None:
             if self._err is not None:
-                return f"{self._nom} +/- {self._err}"
+                if is_np_duck_array(type(self._nom)):
+                    return (
+                        "["
+                        + ", ".join([f"{v} +/- {e}" for v, e in zip(val_.ravel(), err_.ravel())])
+                        + "]"
+                        + units
+                    )
+                else:
+                    return f"{self._nom} +/- {self._err}" + units
             else:
-                return f"{self._nom}"
+                return f"{self._nom}" + units
 
     def __format__(self, fmt):
         return f"{self.value:{fmt}} +/- {self.error:{fmt}}"

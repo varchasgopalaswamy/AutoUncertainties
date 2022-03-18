@@ -460,6 +460,7 @@ class Uncertainty(Display):
         else:
             return new
 
+    @ignore_runtime_warnings
     def __pow__(self, other):
         # Self ** other
         A = self._nom
@@ -478,6 +479,7 @@ class Uncertainty(Display):
 
         return self.__class__(new_mag, new_err)
 
+    @ignore_runtime_warnings
     def __rpow__(self, other):
         # Other ** self
         B = self._nom
@@ -584,9 +586,25 @@ class Uncertainty(Display):
             val = getattr(self._nom, item)
             err = getattr(self._err, item)
             if callable(val):
-                return lambda *args, **kwargs: self.__class__(
-                    val(*args, **kwargs), err(*args, **kwargs)
-                )
+
+                def expr(*args, **kwargs):
+                    try:
+                        vexpr = val(*args, **kwargs)
+                        eexpr = err(*args, **kwargs)
+                    except Exception:
+                        raise ValueError(
+                            f"Could not execute method {item} on Uncertainty elements!"
+                        )
+                    try:
+                        ret_instance = self.__class__(vexpr, eexpr)
+                    except Exception:
+                        raise ValueError(
+                            f"Could not execute instantiate Uncertainty class with results from method {item}!"
+                        )
+                    else:
+                        return ret_instance
+
+                return expr
             else:
                 return self.__class__(val, err)
         else:
