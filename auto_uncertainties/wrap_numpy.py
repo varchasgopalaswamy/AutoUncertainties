@@ -8,14 +8,11 @@ except ImportError:
 try:
     import jax
     import jax.numpy as jnp
-    from jax.config import config as jconf
 
-    jconf.update("jax_enable_x64", True)
 except ImportError:
     jax = None
     jnp = None
 
-from pyrsistent import v
 from .util import is_iterable, has_length
 
 
@@ -280,7 +277,7 @@ def implement_func(
                     err = jnp.sqrt(jnp.sum((jnp.asarray(grad) * e) ** 2))
                 else:
                     raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(val, err)
+                return Uncertainty(np.asscalar(val), np.asscalar(err))
             else:
                 raise Exception("Reduction with named axis not yet supported!")
                 axis = np.atleast_1d(axis)
@@ -326,7 +323,7 @@ def implement_func(
                     err = jnp.sqrt(jnp.sum((grad * e) ** 2))
                 else:
                     raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(val, err)
+                return Uncertainty(np.asscalar(val), np.asscalar(err))
             else:
                 raise Exception("Reduction with named axis not yet supported!")
                 axis = np.atleast_1d(axis)
