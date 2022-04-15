@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auto_uncertainties"
-version = "0.3.0"
+version = "0.3.1"
 description = "Linear Uncertainty Propagation with Auto-Differentiation"
 authors = ["Varchas Gopalaswamy <vgop@lle.rochester.edu>"]
 
