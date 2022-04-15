@@ -23,27 +23,42 @@ except ImportError:
 
 
 def nominal_values(x):
+    # Is an Uncertainty
     if hasattr(x, "_nom"):
         return x.value
     else:
-        try:
-            x2 = Uncertainty.from_sequence(x)
-        except Exception:
-            return x
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return x
+            else:
+                return x2.value
         else:
-            return x2.value
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return x
+            else:
+                return x2.value
 
 
 def std_devs(x):
+    # Is an Uncertainty
     if hasattr(x, "_nom"):
         return x.error
     else:
-        try:
-            x2 = Uncertainty(x)
-        except Exception:
-            if np.ndim(x) > 0:
-                return np.zeros_like(x, dtype=float)
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return np.zeros_like(x)
             else:
-                return 0
+                return x2.error
         else:
-            return x2.error
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return 0
+            else:
+                return x2.value

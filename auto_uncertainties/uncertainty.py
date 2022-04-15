@@ -266,12 +266,19 @@ class Uncertainty(Display):
 
     @classmethod
     def from_sequence(cls, seq):
+        _ = iter(seq)
 
         len_seq = len(seq)
         val = np.empty(len_seq)
         err = np.empty(len_seq)
         if len_seq > 0:
             first_item = seq[0]
+            try:
+                first_item + 1
+            except TypeError:
+                raise TypeError(
+                    f"Sequence elements of type {type(first_item)} dont support math operations!"
+                )
             if hasattr(first_item, "units"):
                 val *= first_item.units
                 err *= first_item.units
@@ -282,6 +289,7 @@ class Uncertainty(Display):
                 except AttributeError:
                     val[i] = float(seq_i)
                     err[i] = 0
+
         return cls(val, err)
 
     def __float__(self) -> Uncertainty:
