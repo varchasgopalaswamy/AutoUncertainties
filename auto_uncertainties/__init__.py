@@ -61,4 +61,4 @@ def std_devs(x):
             except Exception:
                 return 0
             else:
-                return x2.value
+                return x2.error
