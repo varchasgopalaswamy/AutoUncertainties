@@ -1,14 +1,14 @@
 [tool.poetry]
 name = "auto_uncertainties"
-version = "0.3.1"
+version = "0.3.2"
 description = "Linear Uncertainty Propagation with Auto-Differentiation"
 authors = ["Varchas Gopalaswamy <vgop@lle.rochester.edu>"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.10"
-numpy = ">1.20"
-jax = "*"
-
+numpy = "1.22.4"
+jax = "0.3.13"
+scipy = ">=1.8.1"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 hypothesis = "*"
