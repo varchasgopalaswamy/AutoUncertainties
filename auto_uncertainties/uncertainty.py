@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
+from re import match
 from types import MethodType
 
 import numpy as np
@@ -187,7 +188,12 @@ class Uncertainty(Display):
         magnitude_err *= units
         # Basic sanity checks
         if is_np_duck_array(type(magnitude_nom)):
-            for item in self.__ndarray_attributes__ + ["shape"]:
+            match_items = self.__ndarray_attributes__ + ["shape"]
+            try:
+                match_items.remove("dtype")
+            except ValueError:
+                pass
+            for item in match_items:
                 if not getattr(magnitude_nom, item) == getattr(magnitude_err, item):
                     raise ValueError(
                         f"Attribute {item} does not match for value and error! ({getattr(magnitude_nom,item)} and {getattr(magnitude_err,item)})"
