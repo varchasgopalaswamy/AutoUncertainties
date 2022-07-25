@@ -78,6 +78,14 @@ python-versions = ">=3.7"
 test = ["pytest (>=6)"]
 
 [[package]]
+name = "flatbuffers"
+version = "2.0"
+description = "The FlatBuffers serialization format for Python"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "hypothesis"
 version = "6.53.0"
 description = "A library for property-based testing"
@@ -123,7 +131,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 
 [[package]]
 name = "jax"
-version = "0.3.15"
+version = "0.3.14"
 description = "Differentiate, compile, and transform Numpy code."
 category = "main"
 optional = false
@@ -138,17 +146,17 @@ scipy = ">=1.5"
 typing_extensions = "*"
 
 [package.extras]
-ci = ["jaxlib (==0.3.14)"]
-cpu = ["jaxlib (==0.3.15)"]
-cuda = ["jaxlib (==0.3.15+cuda11.cudnn82)"]
-cuda11_cudnn805 = ["jaxlib (==0.3.15+cuda11.cudnn805)"]
-cuda11_cudnn82 = ["jaxlib (==0.3.15+cuda11.cudnn82)"]
-minimum-jaxlib = ["jaxlib (==0.3.14)"]
-tpu = ["jaxlib (==0.3.15)", "libtpu-nightly (==0.1.dev20220722)", "requests"]
+ci = ["jaxlib (==0.3.10)"]
+cpu = ["jaxlib (==0.3.14)"]
+cuda = ["jaxlib (==0.3.14+cuda11.cudnn82)"]
+cuda11_cudnn805 = ["jaxlib (==0.3.14+cuda11.cudnn805)"]
+cuda11_cudnn82 = ["jaxlib (==0.3.14+cuda11.cudnn82)"]
+minimum-jaxlib = ["jaxlib (==0.3.7)"]
+tpu = ["jaxlib (==0.3.14)", "libtpu-nightly (==0.1.dev20220627)", "requests"]
 
 [[package]]
 name = "jaxlib"
-version = "0.3.15"
+version = "0.3.14"
 description = "XLA library for JAX"
 category = "main"
 optional = false
@@ -156,6 +164,7 @@ python-versions = ">=3.7"
 
 [package.dependencies]
 absl-py = "*"
+flatbuffers = ">=1.12,<3.0"
 numpy = ">=1.19"
 scipy = ">=1.5"
 
@@ -303,7 +312,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.10"
-content-hash = "a2df7023901ff3530a1dc52a2f08400c7813d1089b69fb35e8bda42f6e1b493b"
+content-hash = "dd95af1763521e73517274e40dd70aa2f9ce0e64d6cc75e9ea6201f45e460869"
 
 [metadata.files]
 absl-py = []
@@ -320,6 +329,10 @@ etils = []
 exceptiongroup = [
     {file = "exceptiongroup-1.0.0rc8-py3-none-any.whl", hash = "sha256:ab0a968e1ef769e55d9a596f4a89f7be9ffedbc9fdefdb77cc68cf5c33ce1035"},
     {file = "exceptiongroup-1.0.0rc8.tar.gz", hash = "sha256:6990c24f06b8d33c8065cfe43e5e8a4bfa384e0358be036af9cc60b6321bd11a"},
+]
+flatbuffers = [
+    {file = "flatbuffers-2.0-py2.py3-none-any.whl", hash = "sha256:3751954f0604580d3219ae49a85fafec9d85eec599c0b96226e1bc0b48e57474"},
+    {file = "flatbuffers-2.0.tar.gz", hash = "sha256:12158ab0272375eab8db2d663ae97370c33f152b27801fa6024e1d6105fd4dd2"},
 ]
 hypothesis = []
 importlib-resources = []
