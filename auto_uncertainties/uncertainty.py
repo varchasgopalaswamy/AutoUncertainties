@@ -1,21 +1,27 @@
 # -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
+
+import copy
+import locale
+import operator
+import warnings
 from re import match
 from types import MethodType
 
-import numpy as np
-import locale
-import copy
-import operator
-import warnings
 import jax
-from pint import Quantity, DimensionalityError
+import numpy as np
+from pint import DimensionalityError, Quantity
 from pint.util import SharedRegistryObject
 
-from .wrap_numpy import wrap_numpy, HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from . import NegativeStdDevError, NumpyDowncastWarning
-from .util import is_np_duck_array, ignore_runtime_warnings, ignore_numpy_downcast_warnings, Display
+from .util import (
+    Display,
+    ignore_numpy_downcast_warnings,
+    ignore_runtime_warnings,
+    is_np_duck_array,
+)
+from .wrap_numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
 
 def _check_units(value, err):
@@ -320,7 +326,7 @@ class Uncertainty(Display):
     def __add__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom + other._nom
-            new_err = np.sqrt(self._err ** 2 + other._err ** 2)
+            new_err = np.sqrt(self._err**2 + other._err**2)
         else:
             new_mag = self._nom + other
             new_err = self._err
@@ -340,7 +346,7 @@ class Uncertainty(Display):
     def __sub__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom - other._nom
-            new_err = np.sqrt(self._err ** 2 + other._err ** 2)
+            new_err = np.sqrt(self._err**2 + other._err**2)
         else:
             new_mag = self._nom - other
             new_err = self._err
@@ -361,7 +367,7 @@ class Uncertainty(Display):
     def __mul__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom * other._nom
-            new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel**2 + other.rel**2)
         else:
             new_mag = self._nom * other
             new_err = np.abs(self._err * other)
@@ -385,7 +391,7 @@ class Uncertainty(Display):
         # Self / Other
         if isinstance(other, Uncertainty):
             new_mag = self._nom / other._nom
-            new_err = np.abs(new_mag) * np.sqrt(self.rel ** 2 + other.rel ** 2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel**2 + other.rel**2)
         else:
             new_mag = self._nom / other
             new_err = np.abs(self._err / other)
@@ -466,7 +472,7 @@ class Uncertainty(Display):
         return other // self, other % self
 
     def __ipow__(self, other):
-        new = self ** other
+        new = self**other
         if is_np_duck_array(type(self._nom)):
             self._err = new._err
             self._nom = new._nom
@@ -485,11 +491,8 @@ class Uncertainty(Display):
         else:
             B = other
             sB = 0
-        new_mag = A ** B
-        if sB == 0 and int(B) == B:
-            new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2)
-        else:
-            new_err = np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+        new_mag = A**B
+        new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2)
 
         return self.__class__(new_mag, new_err)
 
@@ -505,7 +508,7 @@ class Uncertainty(Display):
             A = other
             sA = 0
 
-        new_mag = A ** B
+        new_mag = A**B
         new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
 
         return self.__class__(new_mag, new_err)
