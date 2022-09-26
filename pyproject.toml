@@ -7,16 +7,22 @@ authors = ["Varchas Gopalaswamy <vgop@lle.rochester.edu>"]
 [tool.poetry.dependencies]
 python = ">=3.8,<3.10"
 numpy = "1.22.4"
-jax = "0.3.14"
-jaxlib = [
-    {url = "https://storage.googleapis.com/jax-releases/mac/jaxlib-0.3.14-cp39-none-macosx_10_14_x86_64.whl",  markers="platform_system == \"Darwin\""},
-    {url = "https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.3.14+cuda11.cudnn82-cp39-none-manylinux2014_x86_64.whl", markers="platform_system == \"Linux\""},
-    {url = "https://whls.blob.core.windows.net/unstable/cpu/jaxlib-0.3.14-cp39-none-win_amd64.whl", markers="platform_system == \"Windows\""},
+"jaxlib" = [
+    {markers="platform_system != 'Windows'", version="0.3.14"},
+    {markers="platform_system == 'Windows'", url="https://whls.blob.core.windows.net/unstable/cpu/jaxlib-0.3.14-cp39-none-win_amd64.whl"},
 ]
+"jax" = "0.3.14"
 scipy = ">=1.8.1"
+
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 hypothesis = "*"
+
+#[[tool.poetry.source]]
+#name = "jaxlib"
+#url = "https://whls.blob.core.windows.net/unstable/index.html"
+#default = false
+#secondary = true
 
 
 [tool.black]

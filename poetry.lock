@@ -167,9 +167,6 @@ flatbuffers = ">=1.12,<3.0"
 numpy = ">=1.19"
 scipy = ">=1.5"
 
-[package.source]
-type = "url"
-url = "https://storage.googleapis.com/jax-releases/mac/jaxlib-0.3.14-cp39-none-macosx_10_14_x86_64.whl"
 [[package]]
 name = "jaxlib"
 version = "0.3.14"
@@ -187,23 +184,6 @@ scipy = "*"
 [package.source]
 type = "url"
 url = "https://whls.blob.core.windows.net/unstable/cpu/jaxlib-0.3.14-cp39-none-win_amd64.whl"
-[[package]]
-name = "jaxlib"
-version = "0.3.14+cuda11.cudnn82"
-description = "XLA library for JAX"
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[package.dependencies]
-absl-py = "*"
-flatbuffers = ">=1.12,<3.0"
-numpy = ">=1.19"
-scipy = ">=1.5"
-
-[package.source]
-type = "url"
-url = "https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.3.14+cuda11.cudnn82-cp39-none-manylinux2014_x86_64.whl"
 [[package]]
 name = "more-itertools"
 version = "8.14.0"
@@ -348,7 +328,7 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=6)", "pytest-black (>=
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.10"
-content-hash = "8ab3eef73efeebe1ae5d446cabe936988f8cf94f70422a9342d5a043d3c9383a"
+content-hash = "01d3ccb7a03e7986c40016470c386fc88f6786f52d49ba386128847a33ca5aab"
 
 [metadata.files]
 absl-py = [
@@ -389,7 +369,19 @@ importlib-resources = [
 jax = [
     {file = "jax-0.3.14.tar.gz", hash = "sha256:d5f7695ce43b7345b4a095f4733dd46336945057dbfb63e0a28eafa74c41fe62"},
 ]
-jaxlib = []
+jaxlib = [
+    {file = "jaxlib-0.3.14-cp310-none-macosx_10_14_x86_64.whl", hash = "sha256:7ae200d31fb8e46dc884c818c76ee9829e26e1ccedf02cd5d1a3c5113d669aa1"},
+    {file = "jaxlib-0.3.14-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:f47d1becc3831192a8ae672c0ffc99dd268ffd6d3e21a343cf7f204df7e87b90"},
+    {file = "jaxlib-0.3.14-cp310-none-manylinux2014_x86_64.whl", hash = "sha256:90379befaff3ec86f08c5d1283b9c62c39c5145ef782052c3a716ae59e920f57"},
+    {file = "jaxlib-0.3.14-cp37-none-macosx_10_14_x86_64.whl", hash = "sha256:1a730c4a617bd5faeb91d1a73b62ae04119b2734f5d50822521cc290a98f0868"},
+    {file = "jaxlib-0.3.14-cp37-none-manylinux2014_x86_64.whl", hash = "sha256:7d9a380c34c2b8e917716b355b283177c68de7b070242d145cbd729f12270968"},
+    {file = "jaxlib-0.3.14-cp38-none-macosx_10_14_x86_64.whl", hash = "sha256:1592d6f7f8718b52b04dfb6ef907e91de922ad3430204f11a7e00c8ab6652d8f"},
+    {file = "jaxlib-0.3.14-cp38-none-macosx_11_0_arm64.whl", hash = "sha256:1d46992f2d12d5d005b49f6e918855e86520291e98363dc99c1f9dd77b8adf45"},
+    {file = "jaxlib-0.3.14-cp38-none-manylinux2014_x86_64.whl", hash = "sha256:e7b3865855799cb94bf74e43b24577446da293b47403e8af144ffd5d241e87de"},
+    {file = "jaxlib-0.3.14-cp39-none-macosx_10_14_x86_64.whl", hash = "sha256:8a946a35d439a8936b570a51423116fe8ab6575be79f1746455b02448d2296cb"},
+    {file = "jaxlib-0.3.14-cp39-none-macosx_11_0_arm64.whl", hash = "sha256:cb123ee94d3efefe290af28ce18ee01f4eb2e6435f075ac9a311731706390575"},
+    {file = "jaxlib-0.3.14-cp39-none-manylinux2014_x86_64.whl", hash = "sha256:45d7f9b089a724c41cc855ac9df75807db352146fe97037dd96538058e6ce304"},
+]
 more-itertools = [
     {file = "more-itertools-8.14.0.tar.gz", hash = "sha256:c09443cd3d5438b8dafccd867a6bc1cb0894389e90cb53d227456b0b0bccb750"},
     {file = "more_itertools-8.14.0-py3-none-any.whl", hash = "sha256:1bc4f91ee5b1b31ac7ceacc17c09befe6a40a503907baf9c839c229b5095cfd2"},
