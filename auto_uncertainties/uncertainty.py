@@ -28,11 +28,15 @@ def _check_units(value, err):
     mag_units = hasattr(value, "units")
     err_units = hasattr(err, "units")
     if mag_units ^ err_units and err is not None:
-        raise ValueError("Both mag and err need to have units if one of them has units!")
+        raise DimensionalityError(
+            "", "", extra_msg="...Both mag and err need to have units if one of them has units!"
+        )
     if mag_units and err is not None:
         if value.units != err.units:
-            raise ValueError(
-                f"Value units {value.units} cannot be converted to error units {err.units}"
+            raise DimensionalityError(
+                value.units,
+                err.units,
+                extra_msg=f"Value units {value.units} cannot be converted to error units {err.units}",
             )
     if mag_units:
         mag_units = value.units
@@ -42,7 +46,7 @@ def _check_units(value, err):
         else:
             ret_err = None
     else:
-        mag_units = 1.0
+        mag_units = None
         ret_val = value
         ret_err = err
 
@@ -155,34 +159,34 @@ class Uncertainty(Display):
     @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
 
-        value, err, units = _check_units(value, err)
-        value, err = _strip_device_array(value, err)
+        value_, err_, units = _check_units(value, err)
+        value_, err_ = _strip_device_array(value_, err_)
 
         # If Uncertatity
-        if isinstance(value, self.__class__):
-            magnitude_nom = value.value
-            magnitude_err = value.error
+        if isinstance(value_, self.__class__):
+            magnitude_nom = value_.value
+            magnitude_err = value_.error
         # If sequence
-        elif isinstance(value, list):
-            return self.__class__.from_list(value)
+        elif isinstance(value_, list):
+            return self.__class__.from_list(value_)
         # If arrays
-        elif np.ndim(value) > 0:
-            magnitude_nom = np.asarray(value)
-            if err is None:
-                magnitude_err = np.zeros_like(value)
+        elif np.ndim(value_) > 0:
+            magnitude_nom = np.asarray(value_)
+            if err_ is None:
+                magnitude_err = np.zeros_like(value_)
             else:
-                if np.ndim(err) == 0:
-                    magnitude_err = np.ones_like(value) * err
+                if np.ndim(err_) == 0:
+                    magnitude_err = np.ones_like(value_) * err_
                 else:
-                    magnitude_err = np.asarray(err)
+                    magnitude_err = np.asarray(err_)
                     assert magnitude_err.shape == magnitude_nom.shape
         # If scalar
         else:
-            magnitude_nom = value
-            if err is None:
+            magnitude_nom = value_
+            if err_ is None:
                 magnitude_err = 0.0
             else:
-                magnitude_err = err
+                magnitude_err = err_
 
         # Replace NaNs in errors with zeros
         if is_np_duck_array(type(magnitude_err)):
@@ -190,8 +194,10 @@ class Uncertainty(Display):
         else:
             if not np.isfinite(magnitude_err):
                 magnitude_err = 0
-        magnitude_nom *= units
-        magnitude_err *= units
+
+        if units is not None:
+            magnitude_nom *= units
+            magnitude_err *= units
         # Basic sanity checks
         if is_np_duck_array(type(magnitude_nom)):
             match_items = self.__ndarray_attributes__ + ["shape"]
@@ -261,9 +267,11 @@ class Uncertainty(Display):
     @property
     def relative(self):
         if np.ndim(self._nom) == 0:
-            if self._nom != 0:
+            try:
                 return self._err / self._nom
-            else:
+            except (OverflowError):
+                return np.inf
+            except ZeroDivisionError:
                 return np.NaN
         else:
             return self._err / self._nom
@@ -271,6 +279,13 @@ class Uncertainty(Display):
     @property
     def rel(self):
         return self.relative
+
+    @property
+    def rel2(self):
+        try:
+            return self.relative**2
+        except OverflowError:
+            return np.inf
 
     @classmethod
     def from_list(cls, u_list):
@@ -367,7 +382,7 @@ class Uncertainty(Display):
     def __mul__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom * other._nom
-            new_err = np.abs(new_mag) * np.sqrt(self.rel**2 + other.rel**2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel2 + other.rel2)
         else:
             new_mag = self._nom * other
             new_err = np.abs(self._err * other)
@@ -391,7 +406,7 @@ class Uncertainty(Display):
         # Self / Other
         if isinstance(other, Uncertainty):
             new_mag = self._nom / other._nom
-            new_err = np.abs(new_mag) * np.sqrt(self.rel**2 + other.rel**2)
+            new_err = np.abs(new_mag) * np.sqrt(self.rel2 + other.rel2)
         else:
             new_mag = self._nom / other
             new_err = np.abs(self._err / other)
