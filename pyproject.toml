@@ -6,7 +6,7 @@ authors = ["Varchas Gopalaswamy <vgop@lle.rochester.edu>"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.10"
-numpy = "1.22.4"
+numpy = "^1.23.0"
 "jaxlib" = [
     {markers="platform_system != 'Windows'", version="0.3.14"},
     {markers="platform_system == 'Windows'", url="https://whls.blob.core.windows.net/unstable/cpu/jaxlib-0.3.14-cp39-none-win_amd64.whl"},

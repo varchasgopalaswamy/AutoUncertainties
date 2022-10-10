@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 import warnings
 from functools import wraps
+
+import jax
+import numpy as np
+
 from . import NumpyDowncastWarning
 
 
@@ -178,12 +182,40 @@ class Display(object):
                         + units
                     )
                 else:
-                    return f"{self._nom} +/- {self._err}" + units
+                    return f"{val_} +/- {err_}" + units
             else:
-                return f"{self._nom}" + units
+                return f"{val_}" + units
 
     def __format__(self, fmt):
-        return f"{self.value:{fmt}} +/- {self.error:{fmt}}"
+        if hasattr(self._nom, "units"):
+            val_ = self._nom.m
+            err_ = self._err.m
+            u = self._nom.units
+        else:
+            val_ = self._nom
+            err_ = self._err
+            u = None
+
+        if u is None:
+            units = ""
+        else:
+            units = f" {u}"
+        str_rep = f"{val_:{fmt}} +/- {err_:{fmt}}"
+        if u is not None:
+            str_rep += " " + units
+        return
 
     def __repr__(self) -> str:
         return str(self)
+
+
+def strip_device_array(value):
+    if isinstance(value, jax.xla.DeviceArray):
+        v = value.to_py().copy()
+    else:
+        v = value
+    return v
+
+
+def ndarray_to_scalar(value):
+    return np.ndarray.item(strip_device_array(value))

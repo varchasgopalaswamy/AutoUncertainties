@@ -20,6 +20,7 @@ from .util import (
     ignore_numpy_downcast_warnings,
     ignore_runtime_warnings,
     is_np_duck_array,
+    strip_device_array,
 )
 from .wrap_numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
@@ -51,14 +52,6 @@ def _check_units(value, err):
         ret_err = err
 
     return ret_val, ret_err, mag_units
-
-
-def _strip_device_array(value, err):
-    if isinstance(value, jax.xla.DeviceArray):
-        value = value.to_py().copy()
-    if isinstance(err, jax.xla.DeviceArray):
-        err = err.to_py().copy()
-    return value, err
 
 
 class Uncertainty(Display):
@@ -160,7 +153,8 @@ class Uncertainty(Display):
     def __init__(self, value, err=None):
 
         value_, err_, units = _check_units(value, err)
-        value_, err_ = _strip_device_array(value_, err_)
+        value_ = strip_device_array(value_)
+        err_ = strip_device_array(err_)
 
         # If Uncertatity
         if isinstance(value_, self.__class__):

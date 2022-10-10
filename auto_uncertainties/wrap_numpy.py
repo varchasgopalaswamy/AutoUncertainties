@@ -13,8 +13,7 @@ except ImportError:
     jax = None
     jnp = None
 
-from .util import is_iterable, has_length
-
+from .util import has_length, is_iterable, ndarray_to_scalar
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
@@ -208,9 +207,12 @@ def implement_func(
     def implementation(*args, **kwargs):
         from auto_uncertainties import Uncertainty
 
-        uncert_argnums, uncert_arg_nom, uncert_arg_err, uncert_kwarg_nom = classify_and_split_args_and_kwargs(
-            *args, **kwargs
-        )
+        (
+            uncert_argnums,
+            uncert_arg_nom,
+            uncert_arg_err,
+            uncert_kwarg_nom,
+        ) = classify_and_split_args_and_kwargs(*args, **kwargs)
 
         # Determine result through base numpy function on stripped arguments
         if implement_mode == "same_shape":
@@ -277,7 +279,7 @@ def implement_func(
                     err = jnp.sqrt(jnp.sum((jnp.asarray(grad) * e) ** 2))
                 else:
                     raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(np.asscalar(val), np.asscalar(err))
+                return Uncertainty(ndarray_to_scalar(val), ndarray_to_scalar(err))
             else:
                 raise Exception("Reduction with named axis not yet supported!")
                 axis = np.atleast_1d(axis)
@@ -323,7 +325,7 @@ def implement_func(
                     err = jnp.sqrt(jnp.sum((grad * e) ** 2))
                 else:
                     raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(np.asscalar(val), np.asscalar(err))
+                return Uncertainty(ndarray_to_scalar(val), ndarray_to_scalar(err))
             else:
                 raise Exception("Reduction with named axis not yet supported!")
                 axis = np.atleast_1d(axis)
