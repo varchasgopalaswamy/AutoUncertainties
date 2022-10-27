@@ -166,3 +166,5 @@ lpf_reader\.cpython-36m-darwin\.so\.dSYM/
 
 # vim
 *.swp
+
+core.*
