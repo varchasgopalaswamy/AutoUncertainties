@@ -203,7 +203,7 @@ class Display(object):
         str_rep = f"{val_:{fmt}} +/- {err_:{fmt}}"
         if u is not None:
             str_rep += " " + units
-        return
+        return str_rep
 
     def __repr__(self) -> str:
         return str(self)
