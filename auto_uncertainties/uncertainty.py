@@ -55,7 +55,7 @@ def _check_units(value, err):
 
 
 class Uncertainty(Display):
-    __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T"]
+    __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T", "reshape"]
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
     # Pint comparibility
