@@ -720,3 +720,7 @@ class Uncertainty(Display):
                 ]
         except AttributeError:
             raise AttributeError(f"{type(self._nom).__name__}' does not support tolist.")
+
+    @property
+    def ndim(self):
+        return np.ndim(self._nom)
