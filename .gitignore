@@ -168,3 +168,5 @@ lpf_reader\.cpython-36m-darwin\.so\.dSYM/
 *.swp
 
 core.*
+
+auto_uncertainties/_version.py

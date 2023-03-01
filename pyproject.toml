@@ -1,25 +1,35 @@
-[tool.poetry]
+[project]
 name = "auto_uncertainties"
-version = "0.3.3"
-description = "Linear Uncertainty Propagation with Auto-Differentiation"
-authors = ["Varchas Gopalaswamy <vgop@lle.rochester.edu>"]
-
-[tool.poetry.dependencies]
-python = ">=3.8,<3.12"
-numpy = "^1.23.0"
-"jaxlib" = [
-    {markers="platform_system != 'Windows'", version="0.3.14"},
-    {markers="platform_system == 'Windows'", url="https://whls.blob.core.windows.net/unstable/cpu/jaxlib-0.3.14-cp39-none-win_amd64.whl"},
+authors = [
+    {name = "Varchas Gopalaswamy", email = "vgop@lle.rochester.edu"},
 ]
-"jax" = "0.3.14"
-scipy = ">=1.8.1"
+description = "Linear Uncertainty Propagation with Auto-Differentiation"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "h5py >= 1.23.0",
+    "jax >= 0.3.14",
+    "scipy >= 1.8.1",
+]
+dynamic = ["version"]
 
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
-hypothesis = "*"
+[project.optional-dependencies]
+CI = ["pytest", "pytest-cov","hypothesis","pylint"]
+
+[build-system]
+requires = ["setuptools >= 67.0.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "auto_uncertainties/_version.py"
+
 
 [tool.black]
-line-length = 100
+line-length = 79
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -34,7 +44,32 @@ exclude = '''
   | dist
 )/
 '''
+
+
 [tool.isort]
 profile = "black"
-skip_glob = ["*/__init__.py"]
 line_length = 79
+force_alphabetical_sort_within_sections = true
+add_imports = ["from __future__ import annotations"]
+
+[tool.pylint]
+#Enforced by black
+max-line-length = 1000
+
+disable = """
+line-too-long,
+missing-module-docstring,
+missing-function-docstring,
+broad-exception-caught,
+too-many-branches,
+invalid-name,
+protected-access,
+import-outside-toplevel,
+wrong-import-position,
+missing-class-docstring,
+too-many-locals,
+redefined-builtin,
+too-few-public-methods,
+global-statement
+"""
+ignore = "tests"
