@@ -15,7 +15,7 @@ dependencies = [
     "jax >= 0.3.14",
     "jaxlib >= 0.3.14",
     "scipy >= 1.8.1",
-    "pint = >= 0.20",
+    "pint >= 0.20",
     "pandas >= 1.5.1",
 ]
 dynamic = ["version"]
