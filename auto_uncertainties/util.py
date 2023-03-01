@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import warnings
 from functools import wraps
 
@@ -117,9 +119,7 @@ class Display(object):
             if u is None:
                 units = ""
             else:
-                units = (
-                    f"<tr><th>Units</th><td style='text-align:left;'>{u._repr_html_()}</td></tr>"
-                )
+                units = f"<tr><th>Units</th><td style='text-align:left;'>{u._repr_html_()}</td></tr>"
             return header + val + err + units + footer
         else:
             val = f"{val_}"
@@ -140,7 +140,15 @@ class Display(object):
             err_ = self._err
             u = None
         if is_np_duck_array(type(self._nom)):
-            s = ", ".join([f"{v} \\pm {e}" for v, e in zip(val_.ravel(), err_.ravel())]) + "~"
+            s = (
+                ", ".join(
+                    [
+                        f"{v} \\pm {e}"
+                        for v, e in zip(val_.ravel(), err_.ravel())
+                    ]
+                )
+                + "~"
+            )
             header = "$"
             footer = "$"
             if u is None:
@@ -177,7 +185,12 @@ class Display(object):
                 if is_np_duck_array(type(self._nom)):
                     return (
                         "["
-                        + ", ".join([f"{v} +/- {e}" for v, e in zip(val_.ravel(), err_.ravel())])
+                        + ", ".join(
+                            [
+                                f"{v} +/- {e}"
+                                for v, e in zip(val_.ravel(), err_.ravel())
+                            ]
+                        )
                         + "]"
                         + units
                     )

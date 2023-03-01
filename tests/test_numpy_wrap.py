@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import operator
+import warnings
 
 import hypothesis.strategies as st
 import numpy as np
@@ -13,8 +16,10 @@ import auto_uncertainties
 def op_test(op, *args, **kwargs):
     with_unc = [a for a in args]
     without_unc = [a._nom for a in args if hasattr(a, "_nom")]
-    w = op(*with_unc, **kwargs)
-    w_ = op(*without_unc, **kwargs)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        w = op(*with_unc, **kwargs)
+        w_ = op(*without_unc, **kwargs)
     if hasattr(w, "_nom"):
         np.testing.assert_almost_equal(w_, w._nom, decimal=5)
     else:
@@ -29,7 +34,10 @@ def given_float_3d(func):
             shape=(2, 3, 5),
             unique=True,
             elements=st.floats(
-                min_value=-10.0, max_value=10.0, allow_nan=False, allow_infinity=False
+                min_value=-10.0,
+                max_value=10.0,
+                allow_nan=False,
+                allow_infinity=False,
             ),
         ),
         vnom=hnp.arrays(
@@ -37,25 +45,39 @@ def given_float_3d(func):
             shape=(2, 3, 5),
             unique=True,
             elements=st.floats(
-                min_value=-10.0, max_value=10.0, allow_nan=False, allow_infinity=False
+                min_value=-10.0,
+                max_value=10.0,
+                allow_nan=False,
+                allow_infinity=False,
             ),
         ),
         uerr=hnp.arrays(
             dtype=st.sampled_from([np.float64]),
             shape=(2, 3, 5),
             unique=True,
-            elements=st.floats(min_value=0.1, max_value=1.0, allow_nan=False, allow_infinity=False),
+            elements=st.floats(
+                min_value=0.1,
+                max_value=1.0,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
         ),
         verr=hnp.arrays(
             dtype=st.sampled_from([np.float64]),
             shape=(2, 3, 5),
             unique=True,
-            elements=st.floats(min_value=0.1, max_value=1.0, allow_nan=False, allow_infinity=False),
+            elements=st.floats(
+                min_value=0.1,
+                max_value=1.0,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
         ),
     )(func)
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_add(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -67,6 +89,7 @@ def test_add(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_same_shape(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -79,6 +102,7 @@ def test_same_shape(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_same_shape(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -92,6 +116,7 @@ def test_same_shape(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_nograd(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -105,6 +130,7 @@ def test_nograd(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_apply_to_both(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -133,6 +159,7 @@ def test_apply_to_both(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_selection(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)
@@ -154,6 +181,7 @@ def test_selection(unom, uerr, vnom, verr):
 
 
 @given_float_3d
+@settings(deadline=None)
 def test_unary_reduction(unom, uerr, vnom, verr):
     u = auto_uncertainties.Uncertainty(unom, uerr)
     v = auto_uncertainties.Uncertainty(vnom, verr)

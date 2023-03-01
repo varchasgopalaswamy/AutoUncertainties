@@ -70,6 +70,8 @@ missing-class-docstring,
 too-many-locals,
 redefined-builtin,
 too-few-public-methods,
-global-statement
+global-statement,
+no-member,
+no-else-return
 """
 ignore = "tests"

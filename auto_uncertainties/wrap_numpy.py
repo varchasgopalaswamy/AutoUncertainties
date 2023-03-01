@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's numpy array function wrapping
 
+from __future__ import annotations
+
 try:
     import numpy as np
 except ImportError:
@@ -99,7 +101,9 @@ def classify_and_split_args_and_kwargs(*args, **kwargs):
     """
 
     uncert_argnums = tuple(
-        idx for idx, arg in enumerate(args) if convert_arg(arg, "_nom") is not None
+        idx
+        for idx, arg in enumerate(args)
+        if convert_arg(arg, "_nom") is not None
     )
     uncert_arg_nom = tuple(convert_arg(arg, "_nom") for arg in args)
     uncert_arg_err = []
@@ -110,7 +114,9 @@ def classify_and_split_args_and_kwargs(*args, **kwargs):
         else:
             uncert_arg_err.append(jnp.zeros_like(uncert_arg_nom[aidx]))
     uncert_arg_err = tuple(uncert_arg_err)
-    uncert_kwarg_nom = {key: convert_arg(arg, "_nom") for key, arg in kwargs.items()}
+    uncert_kwarg_nom = {
+        key: convert_arg(arg, "_nom") for key, arg in kwargs.items()
+    }
     return uncert_argnums, uncert_arg_nom, uncert_arg_err, uncert_kwarg_nom
 
 
@@ -218,9 +224,13 @@ def implement_func(
         if implement_mode == "same_shape":
             # Check if the gradient argnums is overidden
             if grad_argnum_override is not None:
-                valid_argnums = [a for a in uncert_argnums if a in grad_argnum_override]
+                valid_argnums = [
+                    a for a in uncert_argnums if a in grad_argnum_override
+                ]
                 valid_uncert_arg_err = [
-                    e for a, e in enumerate(uncert_arg_err) if a in grad_argnum_override
+                    e
+                    for a, e in enumerate(uncert_arg_err)
+                    if a in grad_argnum_override
                 ]
             else:
                 valid_argnums = uncert_argnums
@@ -230,9 +240,13 @@ def implement_func(
             # Check which of the arguments need to be mapped over
             map_args, composite_shape = get_mappable_dims(*flattened)
             map_kwargs = [None for x in range(len(uncert_kwarg_nom))]
-            flattened = [f if map_args[i] is not None else f[0] for i, f in enumerate(flattened)]
+            flattened = [
+                f if map_args[i] is not None else f[0]
+                for i, f in enumerate(flattened)
+            ]
             val, grad = jax.vmap(
-                jax.value_and_grad(func, valid_argnums), in_axes=map_args + map_kwargs
+                jax.value_and_grad(func, valid_argnums),
+                in_axes=map_args + map_kwargs,
             )(*flattened, **uncert_kwarg_nom)
             # Reshape the output
             val = val.reshape(composite_shape)
@@ -261,7 +275,10 @@ def implement_func(
                 return np.ravel(uncert_arg_nom[0])[idx]
             else:
                 idxs = np.expand_dims(
-                    sel_func_np(*uncert_arg_nom, axis=axis, **uncert_kwarg_nom), axis=axis
+                    sel_func_np(
+                        *uncert_arg_nom, axis=axis, **uncert_kwarg_nom
+                    ),
+                    axis=axis,
                 )
                 return np.take_along_axis(uncert_arg_nom[0], idxs, axis=axis)
         elif implement_mode in ["apply_to_both"]:
@@ -275,43 +292,49 @@ def implement_func(
                 val = func(*uncert_arg_nom, **uncert_kwarg_nom)
                 output_rank = val.ndim
                 if output_rank == 0:
-                    grad = jax.grad(func, uncert_argnums)(*uncert_arg_nom, **uncert_kwarg_nom)
+                    grad = jax.grad(func, uncert_argnums)(
+                        *uncert_arg_nom, **uncert_kwarg_nom
+                    )
                     err = jnp.sqrt(jnp.sum((jnp.asarray(grad) * e) ** 2))
                 else:
-                    raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(ndarray_to_scalar(val), ndarray_to_scalar(err))
+                    raise Exception(
+                        "Reduction with no axis should result in a scalar quantity!"
+                    )
+                return Uncertainty(
+                    ndarray_to_scalar(val), ndarray_to_scalar(err)
+                )
             else:
                 raise Exception("Reduction with named axis not yet supported!")
-                axis = np.atleast_1d(axis)
-                # Get the sizes for the collapse + reshape
-                sz = u.size
-                reduction_dims = [u.shape[d] for d in axis]
-                reduction_sz = np.prod(reduction_dims)
-                collapsed_shape = (sz // reduction_sz, reduction_sz)
-                final_shape = [s for i, s in enumerate(u.shape) if i not in axis]
-                # reshape the arrays, and map the val+grad operation across the a
-                # first, move the axes that will be reduced to the end
-                # then collapse the array
-                # then map val+grad operation over the first index
-                # then reshape
-                reduction_final_loc = list(range(u.ndim - len(axis), u.ndim))
-                uu = np.moveaxis(u, axis, reduction_final_loc).reshape(collapsed_shape)
-                ee = np.moveaxis(e, axis, reduction_final_loc).reshape(collapsed_shape)
-                val = jax.vmap(func, 0)(uu)
-                output_rank = val.ndim - 1
-                if output_rank == 0:
-                    grad = jax.vmap(jax.grad(func, 0), 0)(uu)
-                    val = val.reshape(final_shape)
-                    err = np.sqrt(np.sum((grad * ee) ** 2, axis=-1)).reshape(final_shape)
-                else:
-                    new_rank_size = val.shape[-1]
-                    final_shape += [new_rank_size]
-                    grad = jax.vmap(jax.jacfwd(jnp.cumsum, 0), 0)(uu)
-                    err = np.sqrt(np.sum((ee[:, np.newaxis, :] * grad) ** 2, axis=-1))
+                # axis = np.atleast_1d(axis)
+                # # Get the sizes for the collapse + reshape
+                # sz = u.size
+                # reduction_dims = [u.shape[d] for d in axis]
+                # reduction_sz = np.prod(reduction_dims)
+                # collapsed_shape = (sz // reduction_sz, reduction_sz)
+                # final_shape = [s for i, s in enumerate(u.shape) if i not in axis]
+                # # reshape the arrays, and map the val+grad operation across the a
+                # # first, move the axes that will be reduced to the end
+                # # then collapse the array
+                # # then map val+grad operation over the first index
+                # # then reshape
+                # reduction_final_loc = list(range(u.ndim - len(axis), u.ndim))
+                # uu = np.moveaxis(u, axis, reduction_final_loc).reshape(collapsed_shape)
+                # ee = np.moveaxis(e, axis, reduction_final_loc).reshape(collapsed_shape)
+                # val = jax.vmap(func, 0)(uu)
+                # output_rank = val.ndim - 1
+                # if output_rank == 0:
+                #     grad = jax.vmap(jax.grad(func, 0), 0)(uu)
+                #     val = val.reshape(final_shape)
+                #     err = np.sqrt(np.sum((grad * ee) ** 2, axis=-1)).reshape(final_shape)
+                # else:
+                #     new_rank_size = val.shape[-1]
+                #     final_shape += [new_rank_size]
+                #     grad = jax.vmap(jax.jacfwd(jnp.cumsum, 0), 0)(uu)
+                #     err = np.sqrt(np.sum((ee[:, np.newaxis, :] * grad) ** 2, axis=-1))
 
-                    val = val.reshape(final_shape)
-                    err = err.reshape(final_shape)
-                return Uncertainty(val, err)
+                #     val = val.reshape(final_shape)
+                #     err = err.reshape(final_shape)
+                # return Uncertainty(val, err)
 
         elif implement_mode == "reduction_unary":
             axis = uncert_kwarg_nom.pop("axis", None)
@@ -321,11 +344,17 @@ def implement_func(
                 val = func(u, **uncert_kwarg_nom)
                 output_rank = val.ndim
                 if output_rank == 0:
-                    grad = jax.grad(func, uncert_argnums)(u, **uncert_kwarg_nom)
+                    grad = jax.grad(func, uncert_argnums)(
+                        u, **uncert_kwarg_nom
+                    )
                     err = jnp.sqrt(jnp.sum((grad * e) ** 2))
                 else:
-                    raise Exception("Reduction with no axis should result in a scalar quantity!")
-                return Uncertainty(ndarray_to_scalar(val), ndarray_to_scalar(err))
+                    raise Exception(
+                        "Reduction with no axis should result in a scalar quantity!"
+                    )
+                return Uncertainty(
+                    ndarray_to_scalar(val), ndarray_to_scalar(err)
+                )
             else:
                 raise Exception("Reduction with named axis not yet supported!")
                 axis = np.atleast_1d(axis)
@@ -334,26 +363,36 @@ def implement_func(
                 reduction_dims = [u.shape[d] for d in axis]
                 reduction_sz = np.prod(reduction_dims)
                 collapsed_shape = (sz // reduction_sz, reduction_sz)
-                final_shape = [s for i, s in enumerate(u.shape) if i not in axis]
+                final_shape = [
+                    s for i, s in enumerate(u.shape) if i not in axis
+                ]
                 # reshape the arrays, and map the val+grad operation across the a
                 # first, move the axes that will be reduced to the end
                 # then collapse the array
                 # then map val+grad operation over the first index
                 # then reshape
                 reduction_final_loc = list(range(u.ndim - len(axis), u.ndim))
-                uu = np.moveaxis(u, axis, reduction_final_loc).reshape(collapsed_shape)
-                ee = np.moveaxis(e, axis, reduction_final_loc).reshape(collapsed_shape)
+                uu = np.moveaxis(u, axis, reduction_final_loc).reshape(
+                    collapsed_shape
+                )
+                ee = np.moveaxis(e, axis, reduction_final_loc).reshape(
+                    collapsed_shape
+                )
                 val = jax.vmap(func, 0)(uu)
                 output_rank = val.ndim - 1
                 if output_rank == 0:
                     grad = jax.vmap(jax.grad(func, 0), 0)(uu)
                     val = val.reshape(final_shape)
-                    err = np.sqrt(np.sum((grad * ee) ** 2, axis=-1)).reshape(final_shape)
+                    err = np.sqrt(np.sum((grad * ee) ** 2, axis=-1)).reshape(
+                        final_shape
+                    )
                 else:
                     new_rank_size = val.shape[-1]
                     final_shape += [new_rank_size]
                     grad = jax.vmap(jax.jacfwd(jnp.cumsum, 0), 0)(uu)
-                    err = np.sqrt(np.sum((ee[:, np.newaxis, :] * grad) ** 2, axis=-1))
+                    err = np.sqrt(
+                        np.sum((ee[:, np.newaxis, :] * grad) ** 2, axis=-1)
+                    )
 
                     val = val.reshape(final_shape)
                     err = err.reshape(final_shape)
@@ -364,9 +403,17 @@ def implement_func(
 bcast_same_shape_override_grad = {"ldexp": [0]}
 
 for ufunc, valid_argnums in bcast_same_shape_override_grad.items():
-    implement_func("ufunc", ufunc, implement_mode="same_shape", grad_argnum_override=valid_argnums)
     implement_func(
-        "function", ufunc, implement_mode="same_shape", grad_argnum_override=valid_argnums
+        "ufunc",
+        ufunc,
+        implement_mode="same_shape",
+        grad_argnum_override=valid_argnums,
+    )
+    implement_func(
+        "function",
+        ufunc,
+        implement_mode="same_shape",
+        grad_argnum_override=valid_argnums,
     )
 
 # Returns a bool array of the same shape (i.e. elementwise conditionals)
@@ -450,10 +497,20 @@ for ufunc in bcast_selection_operator_funcs:
     implement_func("function", ufunc, implement_mode="selection_operator")
 
 # Selects a sub-section of or reshapes the Uncertainty array by some criteria
-bcast_selection_funcs = {"max": "argmax", "min": "argmin", "amax": "argmax", "amin": "argmin"}
+bcast_selection_funcs = {
+    "max": "argmax",
+    "min": "argmin",
+    "amax": "argmax",
+    "amin": "argmin",
+}
 
 for ufunc, sel_op in bcast_selection_funcs.items():
-    implement_func("function", ufunc, implement_mode="selection", selection_operator=sel_op)
+    implement_func(
+        "function",
+        ufunc,
+        implement_mode="selection",
+        selection_operator=sel_op,
+    )
 
 # Applies ufunc or func to both the value and error
 bcast_apply_to_both_funcs = [

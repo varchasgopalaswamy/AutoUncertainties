@@ -30,7 +30,9 @@ def _check_units(value, err):
     err_units = hasattr(err, "units")
     if mag_units ^ err_units and err is not None:
         raise DimensionalityError(
-            "", "", extra_msg="...Both mag and err need to have units if one of them has units!"
+            "",
+            "",
+            extra_msg="...Both mag and err need to have units if one of them has units!",
         )
     if mag_units and err is not None:
         if value.units != err.units:
@@ -55,7 +57,14 @@ def _check_units(value, err):
 
 
 class Uncertainty(Display):
-    __apply_to_both_ndarray__ = ["flatten", "real", "imag", "astype", "T", "reshape"]
+    __apply_to_both_ndarray__ = [
+        "flatten",
+        "real",
+        "imag",
+        "astype",
+        "T",
+        "reshape",
+    ]
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
     # Pint comparibility
@@ -82,13 +91,17 @@ class Uncertainty(Display):
             Dimensionality of the Quantity, e.g. ``{length: 1, time: -1}``
         """
         if self._dimensionality is None:
-            self._dimensionality = self._REGISTRY._get_dimensionality(self.units)
+            self._dimensionality = self._REGISTRY._get_dimensionality(
+                self.units
+            )
 
         return self._dimensionality
 
     def check(self, dimension) -> bool:
         """Return true if the quantity's dimension matches passed dimension."""
-        return self.dimensionality == self._REGISTRY.get_dimensionality(dimension)
+        return self.dimensionality == self._REGISTRY.get_dimensionality(
+            dimension
+        )
 
     def _check(self, other) -> bool:
         """Check if the other object use a registry and if so that it is the
@@ -107,7 +120,9 @@ class Uncertainty(Display):
 
         elif isinstance(other, SharedRegistryObject):
             mess = "Cannot operate with {} and {} of different registries."
-            raise ValueError(mess.format(self.__class__.__name__, other.__class__.__name__))
+            raise ValueError(
+                mess.format(self.__class__.__name__, other.__class__.__name__)
+            )
         else:
             return False
 
@@ -145,7 +160,9 @@ class Uncertainty(Display):
     def _convert_magnitude_not_inplace(self, other, *contexts, **ctx_kwargs):
         if contexts:
             with self._REGISTRY.context(*contexts, **ctx_kwargs):
-                return self._REGISTRY.convert(self._magnitude, self._units, other)
+                return self._REGISTRY.convert(
+                    self._magnitude, self._units, other
+                )
 
         return self._REGISTRY.convert(self._magnitude, self._units, other)
 
@@ -162,7 +179,9 @@ class Uncertainty(Display):
             magnitude_err = value_.error
         # If sequence
         elif isinstance(value_, list):
-            return self.__class__.from_list(value_)
+            inst = self.__class__.from_list(value_)
+            magnitude_nom = inst.value
+            magnitude_err = inst.error
         # If arrays
         elif np.ndim(value_) > 0:
             magnitude_nom = np.asarray(value_)
@@ -200,7 +219,9 @@ class Uncertainty(Display):
             except ValueError:
                 pass
             for item in match_items:
-                if not getattr(magnitude_nom, item) == getattr(magnitude_err, item):
+                if not getattr(magnitude_nom, item) == getattr(
+                    magnitude_err, item
+                ):
                     raise ValueError(
                         f"Attribute {item} does not match for value and error! ({getattr(magnitude_nom,item)} and {getattr(magnitude_err,item)})"
                     )
@@ -228,7 +249,9 @@ class Uncertainty(Display):
         return ret
 
     def __deepcopy__(self, memo) -> Uncertainty:
-        ret = self.__class__(copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo))
+        ret = self.__class__(
+            copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo)
+        )
         return ret
 
     def __hash__(self) -> int:
@@ -518,7 +541,9 @@ class Uncertainty(Display):
             sA = 0
 
         new_mag = A**B
-        new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2 + (np.log(A) * sB) ** 2)
+        new_err = np.abs(new_mag) * np.sqrt(
+            (B / A * sA) ** 2 + (np.log(A) * sB) ** 2
+        )
 
         return self.__class__(new_mag, new_err)
 
@@ -584,14 +609,18 @@ class Uncertainty(Display):
             raise NotImplementedError
         else:
             if ufunc.__name__ not in HANDLED_UFUNCS:
-                raise NotImplementedError(f"Ufunc {ufunc.__name__} is not implemented!") from None
+                raise NotImplementedError(
+                    f"Ufunc {ufunc.__name__} is not implemented!"
+                ) from None
             else:
                 return wrap_numpy("ufunc", ufunc, args, kwargs)
 
     def __getattr__(self, item):
         if item.startswith("__array_"):
             # Handle array protocol attributes other than `__array__`
-            raise AttributeError(f"Array protocol attribute {item} not available.")
+            raise AttributeError(
+                f"Array protocol attribute {item} not available."
+            )
         elif item in self.__apply_to_both_ndarray__:
             val = getattr(self._nom, item)
             err = getattr(self._err, item)
@@ -603,9 +632,13 @@ class Uncertainty(Display):
             else:
                 return self.__class__(val, err)
         elif item in HANDLED_UFUNCS:
-            return lambda *args, **kwargs: wrap_numpy("ufunc", item, [self] + list(args), kwargs)
+            return lambda *args, **kwargs: wrap_numpy(
+                "ufunc", item, [self] + list(args), kwargs
+            )
         elif item in HANDLED_FUNCTIONS:
-            return lambda *args, **kwargs: wrap_numpy("function", item, [self] + list(args), kwargs)
+            return lambda *args, **kwargs: wrap_numpy(
+                "function", item, [self] + list(args), kwargs
+            )
         elif item in self.__ndarray_attributes__:
             return getattr(self._nom, item)
         elif hasattr(Quantity, item):
@@ -648,7 +681,9 @@ class Uncertainty(Display):
 
     def clip(self, min=None, max=None, out=None, **kwargs):
 
-        return self.__class__(self._nom.clip(min, max, out, **kwargs), self._err)
+        return self.__class__(
+            self._nom.clip(min, max, out, **kwargs), self._err
+        )
 
     def fill(self, value) -> None:
         return self._nom.fill(value)
@@ -658,7 +693,9 @@ class Uncertainty(Display):
             self._nom.put(indices, values._nom, mode)
             self._err.put(indices, values._err, mode)
         else:
-            raise ValueError("Can only 'put' Uncertainties into uncertainties!")
+            raise ValueError(
+                "Can only 'put' Uncertainties into uncertainties!"
+            )
 
     def copy(self):
         return Uncertainty(self._nom.copy(), self._err.copy())
@@ -702,7 +739,9 @@ class Uncertainty(Display):
         try:
             _ = self._nom[key]
         except ValueError as exc:
-            raise ValueError(f"Object {type(self._nom)} does not support indexing") from exc
+            raise ValueError(
+                f"Object {type(self._nom)} does not support indexing"
+            ) from exc
 
         self._nom[key] = value._nom
         self._err[key] = value._err
@@ -715,11 +754,15 @@ class Uncertainty(Display):
                 return self.__class__(nom, err)
             else:
                 return [
-                    self.__class__(n, e).tolist() if isinstance(n, list) else self.__class__(n, e)
+                    self.__class__(n, e).tolist()
+                    if isinstance(n, list)
+                    else self.__class__(n, e)
                     for n, e in (nom, err)
                 ]
         except AttributeError:
-            raise AttributeError(f"{type(self._nom).__name__}' does not support tolist.")
+            raise AttributeError(
+                f"{type(self._nom).__name__}' does not support tolist."
+            )
 
     @property
     def ndim(self):
