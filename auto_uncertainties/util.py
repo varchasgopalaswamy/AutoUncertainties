@@ -223,11 +223,7 @@ class Display(object):
 
 
 def strip_device_array(value):
-    if isinstance(value, jax.xla.DeviceArray):
-        v = value.to_py().copy()
-    else:
-        v = value
-    return v
+    return np.array(value)
 
 
 def ndarray_to_scalar(value):
