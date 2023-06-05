@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import numpy as np
 
 
@@ -25,7 +27,7 @@ except ImportError:
 def nominal_values(x):
     # Is an Uncertainty
     if hasattr(x, "_nom"):
-        return x.value
+        return x._nom
     else:
         if np.ndim(x) > 0:
             try:
@@ -45,8 +47,8 @@ def nominal_values(x):
 
 def std_devs(x):
     # Is an Uncertainty
-    if hasattr(x, "_nom"):
-        return x.error
+    if hasattr(x, "_err"):
+        return x._err
     else:
         if np.ndim(x) > 0:
             try:

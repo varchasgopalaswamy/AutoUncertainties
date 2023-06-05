@@ -8,6 +8,7 @@ import operator
 import warnings
 
 import numpy as np
+import pint
 from pint import DimensionalityError
 
 from . import NegativeStdDevError, NumpyDowncastWarning
@@ -68,7 +69,7 @@ class Uncertainty(Display):
     @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
         if hasattr(value, "units") or hasattr(err, "units"):
-            raise ValueError(
+            raise NotImplementedError(
                 "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
             )
 
@@ -240,15 +241,6 @@ class Uncertainty(Display):
         return int(self._nom)
 
     # Math Operators
-    def __iadd__(self, other):
-        new = self + other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
-
     def __add__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom + other._nom
@@ -256,18 +248,12 @@ class Uncertainty(Display):
         else:
             new_mag = self._nom + other
             new_err = self._err
-        return self.__class__(new_mag, new_err)
+        try:
+            return self.__class__(new_mag, new_err)
+        except NotImplementedError:
+            return NotImplemented
 
     __radd__ = __add__
-
-    def __isub__(self, other):
-        new = self - other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
 
     def __sub__(self, other):
         if isinstance(other, Uncertainty):
@@ -276,19 +262,13 @@ class Uncertainty(Display):
         else:
             new_mag = self._nom - other
             new_err = self._err
-        return self.__class__(new_mag, new_err)
+        try:
+            return self.__class__(new_mag, new_err)
+        except NotImplementedError:
+            return NotImplemented
 
     def __rsub__(self, other):
         return -self.__sub__(other)
-
-    def __imul__(self, other):
-        new = self * other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
 
     def __mul__(self, other):
         if isinstance(other, Uncertainty):
@@ -297,31 +277,25 @@ class Uncertainty(Display):
         else:
             new_mag = self._nom * other
             new_err = np.abs(self._err * other)
-
-        return self.__class__(new_mag, new_err)
+        try:
+            return self.__class__(new_mag, new_err)
+        except NotImplementedError:
+            return NotImplemented
 
     __rmul__ = __mul__
 
     @ignore_runtime_warnings
-    def __itruediv__(self, other):
-        new = self / other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
-
-    @ignore_runtime_warnings
     def __truediv__(self, other):
-        # Self / Other
         if isinstance(other, Uncertainty):
             new_mag = self._nom / other._nom
             new_err = np.abs(new_mag) * np.sqrt(self.rel2 + other.rel2)
         else:
             new_mag = self._nom / other
             new_err = np.abs(self._err / other)
-        return self.__class__(new_mag, new_err)
+        try:
+            return self.__class__(new_mag, new_err)
+        except NotImplementedError:
+            return NotImplemented
 
     @ignore_runtime_warnings
     def __rtruediv__(self, other):
@@ -331,20 +305,13 @@ class Uncertainty(Display):
         else:
             new_mag = other / self._nom
             new_err = np.abs(new_mag) * np.abs(self.rel)
+        try:
             return self.__class__(new_mag, new_err)
+        except NotImplementedError:
+            return NotImplemented
 
     __div__ = __truediv__
     __rdiv__ = __rtruediv__
-    __idiv__ = __itruediv__
-
-    def __ifloordiv__(self, other):
-        new = self // other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
 
     def __floordiv__(self, other):
         if isinstance(other, Uncertainty):
@@ -362,15 +329,6 @@ class Uncertainty(Display):
             new_mag = other // self._nom
             new_err = 0.0
             return self.__class__(new_mag, new_err)
-
-    def __imod__(self, other):
-        new = self % other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
 
     def __mod__(self, other):
         if isinstance(other, Uncertainty):
@@ -396,15 +354,6 @@ class Uncertainty(Display):
 
     def __rdivmod__(self, other):
         return other // self, other % self
-
-    def __ipow__(self, other):
-        new = self**other
-        if is_np_duck_array(type(self._nom)):
-            self._err = new._err
-            self._nom = new._nom
-            return self
-        else:
-            return new
 
     @ignore_runtime_warnings
     def __pow__(self, other):
@@ -452,7 +401,6 @@ class Uncertainty(Display):
 
     def __neg__(self):
         return self.__class__(operator.neg(self._nom), self._err)
-        return self.__class__(operator.neg(self._nom), self._err)
 
     def __eq__(self, other):
         if isinstance(other, Uncertainty):
@@ -486,7 +434,6 @@ class Uncertainty(Display):
     # NumPy function/ufunc support
     @ignore_runtime_warnings
     def __array_function__(self, func, types, args, kwargs):
-        # print(func)
         if func.__name__ not in HANDLED_FUNCTIONS:
             return NotImplemented
         elif not all(issubclass(t, self.__class__) for t in types):
@@ -496,7 +443,6 @@ class Uncertainty(Display):
 
     @ignore_runtime_warnings
     def __array_ufunc__(self, ufunc, method, *args, **kwargs):
-        # print(method,ufunc.__name__)
         if method != "__call__":
             raise NotImplementedError
         else:
