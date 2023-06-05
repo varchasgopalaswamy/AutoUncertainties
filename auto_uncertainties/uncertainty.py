@@ -6,13 +6,9 @@ import copy
 import locale
 import operator
 import warnings
-from re import match
-from types import MethodType
 
-import jax
 import numpy as np
-from pint import DimensionalityError, Quantity
-from pint.util import SharedRegistryObject
+from pint import DimensionalityError
 
 from . import NegativeStdDevError, NumpyDowncastWarning
 from .util import (
@@ -67,111 +63,20 @@ class Uncertainty(Display):
     ]
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
-    # Pint comparibility
-    @property
-    def unitless(self) -> bool:
-        """ """
-        return not bool(self.to_root_units()._units)
-
-    @property
-    def dimensionless(self) -> bool:
-        """ """
-        tmp = self.to_root_units()
-
-        return not bool(tmp.dimensionality)
-
-    _dimensionality = None
-
-    @property
-    def dimensionality(self):
-        """
-        Returns
-        -------
-        dict
-            Dimensionality of the Quantity, e.g. ``{length: 1, time: -1}``
-        """
-        if self._dimensionality is None:
-            self._dimensionality = self._REGISTRY._get_dimensionality(
-                self.units
-            )
-
-        return self._dimensionality
-
-    def check(self, dimension) -> bool:
-        """Return true if the quantity's dimension matches passed dimension."""
-        return self.dimensionality == self._REGISTRY.get_dimensionality(
-            dimension
-        )
-
-    def _check(self, other) -> bool:
-        """Check if the other object use a registry and if so that it is the
-        same registry.
-        Parameters
-        ----------
-        other :
-        Returns
-        -------
-        type
-            other don't use a registry and raise ValueError if other don't use the
-            same unit registry.
-        """
-        if self._REGISTRY is getattr(other, "_REGISTRY", None):
-            return True
-
-        elif isinstance(other, SharedRegistryObject):
-            mess = "Cannot operate with {} and {} of different registries."
-            raise ValueError(
-                mess.format(self.__class__.__name__, other.__class__.__name__)
-            )
-        else:
-            return False
-
-    def to(self, other):
-        if hasattr(self.nominal_value, "units"):
-            return self.__class__(self._nom.to(other), self._err.to(other))
-        else:
-            raise AttributeError("Uncertainty has no quantity!")
-
-    @property
-    def m(self):
-        if hasattr(self.nominal_value, "units"):
-            return self.__class__(self._nom.m, self._err.m)
-        else:
-            raise AttributeError("Uncertainty has no quantity!")
-
-    @property
-    def units(self):
-        if hasattr(self.nominal_value, "units"):
-            return self._nom.units
-        else:
-            raise AttributeError("Uncertainty has no quantity!")
-
-    @property
-    def _REGISTRY(self):
-        return getattr(self._nom, "_REGISTRY", None)
-
-    def compatible_units(self, *contexts):
-        if contexts:
-            with self._REGISTRY.context(*contexts):
-                return self._REGISTRY.get_compatible_units(self._units)
-
-        return self._REGISTRY.get_compatible_units(self._units)
-
-    def _convert_magnitude_not_inplace(self, other, *contexts, **ctx_kwargs):
-        if contexts:
-            with self._REGISTRY.context(*contexts, **ctx_kwargs):
-                return self._REGISTRY.convert(
-                    self._magnitude, self._units, other
-                )
-
-        return self._REGISTRY.convert(self._magnitude, self._units, other)
+    __array_priority__ = 18
 
     @ignore_numpy_downcast_warnings
     def __init__(self, value, err=None):
+        if hasattr(value, "units") or hasattr(err, "units"):
+            raise ValueError(
+                "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
+            )
 
-        value_, err_, units = _check_units(value, err)
-        value_ = strip_device_array(value_)
-        err_ = strip_device_array(err_)
+        value_ = strip_device_array(value)
+        if err is not None:
+            err_ = strip_device_array(err)
+        else:
+            err_ = None
 
         # If Uncertatity
         if isinstance(value_, self.__class__):
@@ -208,9 +113,6 @@ class Uncertainty(Display):
             if not np.isfinite(magnitude_err):
                 magnitude_err = 0
 
-        if units is not None:
-            magnitude_nom *= units
-            magnitude_err *= units
         # Basic sanity checks
         if is_np_duck_array(type(magnitude_nom)):
             match_items = self.__ndarray_attributes__ + ["shape"]
@@ -262,31 +164,15 @@ class Uncertainty(Display):
         return self._nom
 
     @property
-    def nominal_value(self):
-        return self.value
-
-    @property
-    def n(self):
-        return self.value
-
-    @property
     def error(self):
         return self._err
-
-    @property
-    def std_dev(self):
-        return self.error
-
-    @property
-    def s(self):
-        return self.error
 
     @property
     def relative(self):
         if np.ndim(self._nom) == 0:
             try:
                 return self._err / self._nom
-            except (OverflowError):
+            except OverflowError:
                 return np.inf
             except ZeroDivisionError:
                 return np.NaN
@@ -303,6 +189,14 @@ class Uncertainty(Display):
             return self.relative**2
         except OverflowError:
             return np.inf
+
+    @classmethod
+    def from_quantities(cls, value, err):
+        value_, err_, units = _check_units(value, err)
+        inst = cls(value_, err_)
+        if units is not None:
+            inst *= units
+        return inst
 
     @classmethod
     def from_list(cls, u_list):
@@ -590,8 +484,6 @@ class Uncertainty(Display):
     __nonzero__ = __bool__
 
     # NumPy function/ufunc support
-    __array_priority__ = 17
-
     @ignore_runtime_warnings
     def __array_function__(self, func, types, args, kwargs):
         # print(func)
@@ -641,34 +533,9 @@ class Uncertainty(Display):
             )
         elif item in self.__ndarray_attributes__:
             return getattr(self._nom, item)
-        elif hasattr(Quantity, item):
-            val = getattr(self._nom, item)
-            err = getattr(self._err, item)
-            if callable(val):
-
-                def expr(*args, **kwargs):
-                    try:
-                        vexpr = val(*args, **kwargs)
-                        eexpr = err(*args, **kwargs)
-                    except Exception:
-                        raise ValueError(
-                            f"Could not execute method {item} on Uncertainty elements!"
-                        )
-                    try:
-                        ret_instance = self.__class__(vexpr, eexpr)
-                    except Exception:
-                        raise ValueError(
-                            f"Could not execute instantiate Uncertainty class with results from method {item}!"
-                        )
-                    else:
-                        return ret_instance
-
-                return expr
-            else:
-                return self.__class__(val, err)
         else:
             raise AttributeError(
-                f"Attribute {item} not available in Uncertainty, as method of a Pint Quantity, or as NumPy ufunc or function."
+                f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
             ) from None
 
     def __array__(self, t=None) -> np.ndarray:
@@ -680,7 +547,6 @@ class Uncertainty(Display):
         return np.asarray(self._nom)
 
     def clip(self, min=None, max=None, out=None, **kwargs):
-
         return self.__class__(
             self._nom.clip(min, max, out, **kwargs), self._err
         )

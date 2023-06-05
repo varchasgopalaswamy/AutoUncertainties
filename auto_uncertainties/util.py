@@ -103,42 +103,22 @@ class Display(object):
     default_format: str = ""
 
     def _repr_html_(self):
-        if hasattr(self._nom, "units"):
-            val_ = self._nom.m
-            err_ = self._err.m
-            u = self._nom.units
-        else:
-            val_ = self._nom
-            err_ = self._err
-            u = None
+        val_ = self._nom
+        err_ = self._err
         if is_np_duck_array(type(self._nom)):
             header = "<table><tbody>"
             footer = "</tbody></table>"
             val = f"<tr><th>Magnitude</th><td style='text-align:left;'><pre>{val_}</pre></td></tr>"
             err = f"<tr><th>Error</th><td style='text-align:left;'><pre>{err_}</pre></td></tr>"
-            if u is None:
-                units = ""
-            else:
-                units = f"<tr><th>Units</th><td style='text-align:left;'>{u._repr_html_()}</td></tr>"
-            return header + val + err + units + footer
+            return header + val + err + footer
         else:
             val = f"{val_}"
             err = f"{err_}"
-            if u is None:
-                units = ""
-            else:
-                units = f"{u}"
-            return f"{val} {chr(0x00B1)} {err} {units}"
+            return f"{val} {chr(0x00B1)} {err}"
 
     def _repr_latex_(self):
-        if hasattr(self._nom, "units"):
-            val_ = self._nom.m
-            err_ = self._err.m
-            u = self._nom.units
-        else:
-            val_ = self._nom
-            err_ = self._err
-            u = None
+        val_ = self._nom
+        err_ = self._err
         if is_np_duck_array(type(self._nom)):
             s = (
                 ", ".join(
@@ -151,34 +131,15 @@ class Display(object):
             )
             header = "$"
             footer = "$"
-            if u is None:
-                units = ""
-            else:
-                units = u._repr_latex_()
-            return header + s + units + footer
+            return header + s + footer
         else:
             val = f"{val_}"
             err = f"{err_}"
-            if u is None:
-                units = ""
-            else:
-                units = u._repr_latex_()
-            return f"${val} \\pm {err} {units}$"
+            return f"${val} \\pm {err}$"
 
     def __str__(self) -> str:
-        if hasattr(self._nom, "units"):
-            val_ = self._nom.m
-            err_ = self._err.m
-            u = self._nom.units
-        else:
-            val_ = self._nom
-            err_ = self._err
-            u = None
-
-        if u is None:
-            units = ""
-        else:
-            units = f" {u}"
+        val_ = self._nom
+        err_ = self._err
 
         if self._nom is not None:
             if self._err is not None:
@@ -192,30 +153,16 @@ class Display(object):
                             ]
                         )
                         + "]"
-                        + units
                     )
                 else:
-                    return f"{val_} +/- {err_}" + units
+                    return f"{val_} +/- {err_}"
             else:
-                return f"{val_}" + units
+                return f"{val_}"
 
     def __format__(self, fmt):
-        if hasattr(self._nom, "units"):
-            val_ = self._nom.m
-            err_ = self._err.m
-            u = self._nom.units
-        else:
-            val_ = self._nom
-            err_ = self._err
-            u = None
-
-        if u is None:
-            units = ""
-        else:
-            units = f" {u}"
+        val_ = self._nom
+        err_ = self._err
         str_rep = f"{val_:{fmt}} +/- {err_:{fmt}}"
-        if u is not None:
-            str_rep += " " + units
         return str_rep
 
     def __repr__(self) -> str:

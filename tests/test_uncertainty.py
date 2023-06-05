@@ -7,7 +7,6 @@ from typing import Type
 
 import hypothesis.strategies as st
 import numpy as np
-import pint
 import pytest
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
@@ -23,31 +22,14 @@ BINARY_OPS = [
     operator.ge,
 ]
 UNARY_OPS = [operator.not_, operator.abs]
-unit_registry = pint.UnitRegistry()
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    unit_registry.Quantity([])
-warnings.filterwarnings("ignore", category=pint.UnitStrippedWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-unit_registry.enable_contexts("boltzmann")
-unit_registry.default_format = "0.8g~P"
-unit_registry.default_system = "cgs"
-UNITS = [None, unit_registry(""), unit_registry("m"), unit_registry("s")]
+UNITS = [None]
 
 
 def check_units_and_mag(unc, units, mag, err):
-    if units is not None and not hasattr(unc, "units"):
-        raise ValueError
-    if units is None:
-        assert unc.value == mag
-        assert unc.error == err
-    else:
-        assert unc.units.is_compatible_with(units)
-        assert unc.value.units.is_compatible_with(units)
-        assert unc.value.to(units).m == mag
-        assert unc.error.units.is_compatible_with(units)
-        assert unc.error.to(units).m == err
+    assert unc.value == mag
+    assert unc.error == err
 
 
 @given(
@@ -60,30 +42,15 @@ def test_scalar_creation(v, e, units):
         if np.isfinite(e):
             with pytest.raises(NegativeStdDevError):
                 u = Uncertainty(v, e)
-            if units is not None:
-                with pytest.raises(NegativeStdDevError):
-                    u = Uncertainty(v * units, e * units)
     else:
         u = Uncertainty(v, e)
         if np.isfinite(v) and np.isfinite(e):
-            assert u.nominal_value == v
+            assert u.value == v
             assert u.error == e
             if v > 0:
                 assert u.relative == e / v
             elif v == 0:
                 assert not np.isfinite(u.relative)
-
-            if units is not None:
-                u = Uncertainty(v * units, e * units)
-                check_units_and_mag(u, units, v, e)
-
-                u = Uncertainty(v, e) * units
-                check_units_and_mag(u, units, v, e)
-
-                with pytest.raises(pint.DimensionalityError):
-                    u = Uncertainty(v * units, e)
-                with pytest.raises(pint.DimensionalityError):
-                    u = Uncertainty(v, e * units)
 
 
 @given(
