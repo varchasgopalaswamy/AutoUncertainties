@@ -27,7 +27,7 @@ except ImportError:
 def nominal_values(x):
     # Is an Uncertainty
     if hasattr(x, "_nom"):
-        return x._nom
+        return x.value
     else:
         if np.ndim(x) > 0:
             try:
@@ -48,7 +48,7 @@ def nominal_values(x):
 def std_devs(x):
     # Is an Uncertainty
     if hasattr(x, "_err"):
-        return x._err
+        return x.error
     else:
         if np.ndim(x) > 0:
             try:
