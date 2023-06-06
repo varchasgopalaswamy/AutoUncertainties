@@ -25,7 +25,7 @@ unit_registry.default_format = "0.8g~P"
 unit_registry.default_system = "cgs"
 
 
-UNITS = [None, unit_registry("s")]
+UNITS = [None]
 
 
 def op_test(op, *args, **kwargs):
