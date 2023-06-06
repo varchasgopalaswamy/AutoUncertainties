@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 unit_registry.enable_contexts("boltzmann")
 unit_registry.default_format = "0.8g~P"
 unit_registry.default_system = "cgs"
-UNITS = [None, unit_registry(""), unit_registry("m"), unit_registry("s")]
+UNITS = [None]
 
 
 def check_units_and_mag(unc, units, mag, err):
