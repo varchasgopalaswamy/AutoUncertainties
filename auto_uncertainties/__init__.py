@@ -21,7 +21,7 @@ from .uncertainty import Uncertainty
 try:
     from .pandas_compat import UncertaintyArray
 except ImportError:
-    pass
+    UncertaintyArray = None
 
 
 def nominal_values(x):

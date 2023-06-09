@@ -9,8 +9,14 @@ import warnings
 
 import joblib
 import numpy as np
-import pint
-from pint import DimensionalityError
+
+try:
+    from pint import DimensionalityError
+except ImportError:
+
+    class DimensionalityError(Exception):
+        pass
+
 
 from . import NegativeStdDevError, NumpyDowncastWarning
 from .util import (

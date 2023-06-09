@@ -11,18 +11,18 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "h5py >= 1.23.0",
+    "numpy >= 1.23.0",
     "jax >= 0.3.14",
     "jaxlib >= 0.3.14",
-    "scipy >= 1.8.1",
-    "pint >= 0.20",
-    "pandas >= 1.5.1",
     "joblib >= 1.2.0",
+    "loguru >= 0.6.0",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 CI = ["pytest", "pytest-cov","hypothesis","pylint"]
+pint = ["pint >= 0.21"]
+pandas = ["pandas >= 1.5.1"]
 
 [build-system]
 requires = ["setuptools >= 67.0.0", "setuptools_scm[toml]>=6.2"]
