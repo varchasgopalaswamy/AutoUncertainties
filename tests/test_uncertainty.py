@@ -7,12 +7,15 @@ from typing import Type
 
 import hypothesis.strategies as st
 import numpy as np
-import pint
 import pytest
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
 
-from auto_uncertainties import NegativeStdDevError, Uncertainty
+from auto_uncertainties import (
+    DimensionalityError,
+    NegativeStdDevError,
+    Uncertainty,
+)
 
 BINARY_OPS = [
     operator.lt,
@@ -23,16 +26,8 @@ BINARY_OPS = [
     operator.ge,
 ]
 UNARY_OPS = [operator.not_, operator.abs]
-unit_registry = pint.UnitRegistry()
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    unit_registry.Quantity([])
-warnings.filterwarnings("ignore", category=pint.UnitStrippedWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-unit_registry.enable_contexts("boltzmann")
-unit_registry.default_format = "0.8g~P"
-unit_registry.default_system = "cgs"
 UNITS = [None]
 
 
@@ -84,9 +79,9 @@ def test_scalar_creation(v, e, units):
                 u = Uncertainty(v, e) * units
                 check_units_and_mag(u, units, v, e)
 
-                with pytest.raises(pint.DimensionalityError):
+                with pytest.raises(DimensionalityError):
                     u = Uncertainty.from_quantities(v * units, e)
-                with pytest.raises(pint.DimensionalityError):
+                with pytest.raises(DimensionalityError):
                     u = Uncertainty.from_quantities(v, e * units)
 
 

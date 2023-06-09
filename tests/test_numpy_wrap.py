@@ -6,23 +6,15 @@ import warnings
 
 import hypothesis.strategies as st
 import numpy as np
-import pint
 import pytest
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
 
 import auto_uncertainties
+from auto_uncertainties import DimensionalityError
 
-unit_registry = pint.UnitRegistry()
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    unit_registry.Quantity([])
-warnings.filterwarnings("ignore", category=pint.UnitStrippedWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-unit_registry.enable_contexts("boltzmann")
-unit_registry.default_format = "0.8g~P"
-unit_registry.default_system = "cgs"
 
 
 UNITS = [None]
@@ -37,7 +29,7 @@ def op_test(op, *args, **kwargs):
         warnings.simplefilter("ignore", category=RuntimeWarning)
         try:
             w_ = op(*without_unc, **kwargs)
-        except pint.DimensionalityError:
+        except DimensionalityError:
             with_unc = [a.m for a in args]
             without_unc = [a.value.m for a in args if hasattr(a, "_nom")]
             units = None
