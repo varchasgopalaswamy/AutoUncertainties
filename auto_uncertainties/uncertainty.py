@@ -7,6 +7,7 @@ import locale
 import operator
 import warnings
 
+import joblib
 import numpy as np
 import pint
 from pint import DimensionalityError
@@ -158,7 +159,8 @@ class Uncertainty(Display):
         return ret
 
     def __hash__(self) -> int:
-        return hash((self.__class__, self._nom, self._err))
+        digest = joblib.hash((self._nom, self._err), hash_name="sha1")
+        return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
     @property
     def value(self):

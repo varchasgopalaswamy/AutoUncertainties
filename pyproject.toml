@@ -17,6 +17,7 @@ dependencies = [
     "scipy >= 1.8.1",
     "pint >= 0.20",
     "pandas >= 1.5.1",
+    "joblib >+ 1.2.0"
 ]
 dynamic = ["version"]
 
