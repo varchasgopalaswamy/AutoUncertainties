@@ -16,7 +16,7 @@ class NumpyDowncastWarning(RuntimeWarning):
     pass
 
 
-from .uncertainty import DimensionalityError, Uncertainty
+from .uncertainty import Uncertainty
 
 try:
     from .pandas_compat import UncertaintyArray

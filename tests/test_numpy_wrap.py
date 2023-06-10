@@ -11,7 +11,14 @@ from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
 
 import auto_uncertainties
-from auto_uncertainties import DimensionalityError
+
+try:
+    from pint import DimensionalityError
+except ImportError:
+
+    class DimensionalityError(Exception):
+        pass
+
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)

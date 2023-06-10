@@ -10,14 +10,6 @@ import warnings
 import joblib
 import numpy as np
 
-try:
-    from pint import DimensionalityError
-except ImportError:
-
-    class DimensionalityError(Exception):
-        pass
-
-
 from . import NegativeStdDevError, NumpyDowncastWarning
 from .util import (
     Display,
@@ -30,34 +22,32 @@ from .wrap_numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
 
 def _check_units(value, err):
-    mag_units = hasattr(value, "units")
-    err_units = hasattr(err, "units")
-    if mag_units ^ err_units and err is not None:
-        raise DimensionalityError(
-            "",
-            "",
-            extra_msg="...Both mag and err need to have units if one of them has units!",
-        )
-    if mag_units and err is not None:
-        if value.units != err.units:
-            raise DimensionalityError(
-                value.units,
-                err.units,
-                extra_msg=f"Value units {value.units} cannot be converted to error units {err.units}",
-            )
-    if mag_units:
-        mag_units = value.units
-        ret_val = value.to(mag_units).m
+    mag_has_units = hasattr(value, "units")
+    mag_units = getattr(value, "units", None)
+    err_has_units = hasattr(err, "units")
+    err_units = getattr(err, "units", None)
+
+    if mag_has_units and mag_units is not None:
+        Q = mag_units._REGISTRY.Quantity
+        ret_val = Q(value).to(mag_units).m
         if err is not None:
-            ret_err = err.to(mag_units).m
+            ret_err = Q(err).to(mag_units).m
         else:
             ret_err = None
+        ret_units = mag_units
+    # This branch will never actually work, but its here
+    # to raise a Dimensionality error without needing to import pint
+    elif err_has_units:
+        Q = err_units._REGISTRY.Quantity
+        ret_val = Q(value).to(err_units).m
+        ret_err = Q(err).to(err_units).m
+        ret_units = err_units
     else:
-        mag_units = None
+        ret_units = None
         ret_val = value
         ret_err = err
 
-    return ret_val, ret_err, mag_units
+    return ret_val, ret_err, ret_units
 
 
 class Uncertainty(Display):
@@ -198,6 +188,13 @@ class Uncertainty(Display):
             return self.relative**2
         except OverflowError:
             return np.inf
+
+    def plus_minus(self, err: float):
+        val = self._nom
+        old_err = self._err
+        new_err = np.sqrt(old_err**2 + err**2)
+
+        return self.__class__(val, new_err)
 
     @classmethod
     def from_quantities(cls, value, err):

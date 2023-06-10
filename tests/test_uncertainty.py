@@ -11,11 +11,15 @@ import pytest
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
 
-from auto_uncertainties import (
-    DimensionalityError,
-    NegativeStdDevError,
-    Uncertainty,
-)
+from auto_uncertainties import NegativeStdDevError, Uncertainty
+
+try:
+    from pint import DimensionalityError
+except ImportError:
+
+    class DimensionalityError(Exception):
+        pass
+
 
 BINARY_OPS = [
     operator.lt,
