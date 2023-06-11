@@ -197,6 +197,16 @@ class Uncertainty(Display):
         return self.__class__(val, new_err)
 
     @classmethod
+    def from_string(cls, string: str):
+        new_str = string.replace("+/-", "±")
+        new_str = new_str.replace("+-", "±")
+        if "±" not in new_str:
+            return Uncertainty(float(string))
+        else:
+            u1, u2 = new_str.split("±")
+            return cls(float(u1), float(u2))
+
+    @classmethod
     def from_quantities(cls, value, err):
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
