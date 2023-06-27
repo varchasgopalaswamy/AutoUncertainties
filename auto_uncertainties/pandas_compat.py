@@ -3,20 +3,16 @@ from __future__ import annotations
 
 import copy
 import re
-import warnings
-from collections import OrderedDict
 from typing import Any, Sequence, Union
 
 import numpy as np
 import pandas as pd
-import pint
 from pandas import DataFrame, Series
 from pandas.api.extensions import (
     ExtensionArray,
     ExtensionDtype,
     register_dataframe_accessor,
     register_extension_dtype,
-    register_series_accessor,
 )
 from pandas.api.types import (
     is_integer,
@@ -25,7 +21,6 @@ from pandas.api.types import (
     is_string_dtype,
 )
 from pandas.compat import set_function_name
-from pandas.core import nanops
 from pandas.core.arrays.base import ExtensionOpsMixin
 from pandas.core.indexers import check_array_indexer
 

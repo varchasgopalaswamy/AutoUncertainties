@@ -16,7 +16,7 @@ class NumpyDowncastWarning(RuntimeWarning):
     pass
 
 
-from .uncertainty import Uncertainty
+from .uncertainty import Uncertainty  # noqa: E402
 
 try:
     from .pandas_compat import UncertaintyArray

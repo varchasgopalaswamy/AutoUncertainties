@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import operator
 import warnings
 
 import hypothesis.strategies as st
 import numpy as np
-import pytest
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
 
@@ -151,7 +149,7 @@ def test_apply_to_both(unom, uerr, units, op):
         u *= units
         v *= units
     oper = getattr(np, op)
-    w = op_test(oper, u, units=units)
+    op_test(oper, u, units=units)
 
 
 @given_float_3d(auto_uncertainties.wrap_numpy.bcast_reduction_unary)
@@ -165,4 +163,4 @@ def test_unary_reduction(unom, uerr, units, op):
         u *= units
         v *= units
     oper = getattr(np, op)
-    w = op_test(oper, u, units=units)
+    op_test(oper, u, units=units)

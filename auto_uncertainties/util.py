@@ -4,7 +4,6 @@ from __future__ import annotations
 import warnings
 from functools import wraps
 
-import jax
 import numpy as np
 
 from . import NumpyDowncastWarning
@@ -26,7 +25,7 @@ def ignore_runtime_warnings(f):
 
     @wraps(f)
     def runtime_warn_inner(*args, **kwargs):
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("ignore", category=RuntimeWarning)
             response = f(*args, **kwargs)
         return response
@@ -50,7 +49,7 @@ def ignore_numpy_downcast_warnings(f):
 
     @wraps(f)
     def user_warn_inner(*args, **kwargs):
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("ignore", category=NumpyDowncastWarning)
             response = f(*args, **kwargs)
         return response

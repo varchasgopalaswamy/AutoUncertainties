@@ -377,10 +377,8 @@ class Uncertainty(Display):
         sA = self._err
         if isinstance(other, Uncertainty):
             B = other._nom
-            sB = other._err
         else:
             B = other
-            sB = 0
         new_mag = A**B
         new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2)
 
@@ -436,10 +434,18 @@ class Uncertainty(Display):
         else:
             return op(self._nom, other)
 
-    __lt__ = lambda self, other: self.compare(other, op=operator.lt)
-    __le__ = lambda self, other: self.compare(other, op=operator.le)
-    __ge__ = lambda self, other: self.compare(other, op=operator.ge)
-    __gt__ = lambda self, other: self.compare(other, op=operator.gt)
+    __lt__ = lambda self, other: self.compare(  # noqa: E731
+        other, op=operator.lt
+    )
+    __le__ = lambda self, other: self.compare(  # noqa: E731
+        other, op=operator.le
+    )
+    __ge__ = lambda self, other: self.compare(  # noqa: E731
+        other, op=operator.ge
+    )
+    __gt__ = lambda self, other: self.compare(  # noqa: E731
+        other, op=operator.gt
+    )
 
     def __bool__(self) -> bool:
         return bool(self._nom)

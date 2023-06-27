@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import operator
-from os.path import dirname, join
 
 import numpy as np
 import pandas as pd
@@ -14,8 +13,7 @@ from pandas.tests.extension.conftest import fillna_method  # noqa: F401
 from pandas.tests.extension.conftest import groupby_apply_op  # noqa: F401
 from pandas.tests.extension.conftest import use_numpy  # noqa: F401
 
-from auto_uncertainties import Uncertainty
-from auto_uncertainties.pandas_compat import UncertaintyArray, UncertaintyType
+from auto_uncertainties.pandas_compat import UncertaintyArray
 
 
 @pytest.fixture
