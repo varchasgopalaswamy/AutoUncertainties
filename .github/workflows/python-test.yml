@@ -20,7 +20,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pylint pytest pytest-cov hypothesis
-          pip install .
+          pip install .[pint,pandas]
       - name: Lint with pylint
         run: |
           pylint --fail-under=8 auto_uncertainties
