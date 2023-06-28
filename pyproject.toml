@@ -21,7 +21,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 CI = ["pytest", "pytest-cov","hypothesis","pylint"]
-pint = ["pint >= 0.21"]
+pint = ["pint @ git+https://github.com/varchasgopalaswamy/pint.git"]
 pandas = ["pandas >= 1.5.1"]
 
 [build-system]
