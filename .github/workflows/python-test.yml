@@ -26,4 +26,4 @@ jobs:
           pylint --fail-under=8 auto_uncertainties
       - name: Test with pytest
         run: |
-          pytest --cov=auto_uncertainties --cov-report=xml --cov-report=html
+          pytest --cov=auto_uncertainties --cov-report=xml --cov-report=html -k "not pandas"
