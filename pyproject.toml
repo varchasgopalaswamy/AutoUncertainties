@@ -21,7 +21,6 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 CI = ["pytest", "pytest-cov","hypothesis","pylint"]
-pint = ["pint @ git+https://github.com/varchasgopalaswamy/pint.git"]
 pandas = ["pandas >= 1.5.1"]
 
 [build-system]
@@ -88,3 +87,19 @@ no-member,
 no-else-return
 """
 ignore = "tests"
+
+[tool.pyright]
+pythonVersion = "3.11"
+pythonPlatform = "Linux"
+stubPath = "typings"
+typeCheckingMode = "basic"
+reportUnusedImport = "none"
+reportUnusedClass = "none"
+reportUnusedFunction = "none"
+reportUnusedVariable = "none"
+reportDuplicateImport = "none"
+reportPrivateImportUsage = "none"
+reportUntypedFunctionDecorator = true
+reportUntypedClassDecorator = true
+reportMissingImports = false
+exclude = ["install*", "public*", "**/tests*", "**/resources*"]
