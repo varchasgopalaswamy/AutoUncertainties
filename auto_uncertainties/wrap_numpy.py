@@ -404,7 +404,6 @@ bcast_apply_to_both_funcs = [
     "swapaxes",
     "take",
     "transpose",
-    "round_",
 ]
 bcast_apply_to_both_ufuncs = [
     "conj",
@@ -428,6 +427,13 @@ implement_func("function", "trapz", implement_mode="reduction_binary")
 bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp", "median"]
 for ufunc in bcast_reduction_unary:
     implement_func("function", ufunc, implement_mode="reduction_unary")
+
+
+@implements("round", "function")
+def _round(a, *args, **kwargs):
+    val = np.round(a._nom, *args, **kwargs).squeeze()
+    err = a._err + 0.5 * np.sign(a._err)
+    return a.__class__(val, err)
 
 
 @implements("take_along_axis", "function")
