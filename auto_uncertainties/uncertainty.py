@@ -6,6 +6,7 @@ import copy
 import locale
 import operator
 import warnings
+from typing import Generic, TypeVar
 
 import joblib
 import numpy as np
@@ -50,7 +51,10 @@ def _check_units(value, err):
     return ret_val, ret_err, ret_units
 
 
-class Uncertainty(Display):
+T = TypeVar("T")
+
+
+class Uncertainty(Display, Generic[T]):
     __apply_to_both_ndarray__ = [
         "flatten",
         "real",
@@ -63,8 +67,11 @@ class Uncertainty(Display):
 
     __array_priority__ = 18
 
+    _nom: T
+    _err: T
+
     @ignore_numpy_downcast_warnings
-    def __init__(self, value, err=None):
+    def __init__(self, value: T, err: T | None = None):
         if hasattr(value, "units") or hasattr(err, "units"):
             raise NotImplementedError(
                 "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
@@ -143,12 +150,12 @@ class Uncertainty(Display):
         for v, e in zip(self._nom, self._err):
             yield self.__class__(v, e)
 
-    def __copy__(self) -> Uncertainty:
+    def __copy__(self) -> Uncertainty[T]:
         ret = self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
         return ret
 
-    def __deepcopy__(self, memo) -> Uncertainty:
+    def __deepcopy__(self, memo) -> Uncertainty[T]:
         ret = self.__class__(
             copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo)
         )
@@ -176,7 +183,10 @@ class Uncertainty(Display):
             except ZeroDivisionError:
                 return np.NaN
         else:
-            return self._err / self._nom
+            rel = np.zeros_like(self._nom)
+            valid = np.isfinite(self._nom) & (self._nom > 0)
+            rel[valid] = self._err[valid] / self._nom[valid]
+            return rel
 
     @property
     def rel(self):
@@ -246,13 +256,13 @@ class Uncertainty(Display):
 
         return cls(val, err)
 
-    def __float__(self) -> Uncertainty:
+    def __float__(self) -> Uncertainty[float]:
         return float(self._nom)
 
-    def __complex__(self) -> Uncertainty:
+    def __complex__(self) -> Uncertainty[complex]:
         return complex(self._nom)
 
-    def __int__(self) -> Uncertainty:
+    def __int__(self) -> Uncertainty[int]:
         return int(self._nom)
 
     # Math Operators

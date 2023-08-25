@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import warnings
 from functools import wraps
+from typing import TypeGuard, TypeVar
 
 import numpy as np
+from jax import Array
+from numpy.typing import ArrayLike, NDArray
 
 from . import NumpyDowncastWarning
+
+T = TypeVar("T", bound=np.generic, covariant=True)
 
 
 def ignore_runtime_warnings(f):
@@ -73,7 +78,7 @@ def has_length(y):
     return True
 
 
-def is_np_duck_array(cls):
+def is_np_duck_array(cls: ArrayLike) -> TypeGuard[ArrayLike]:
     """Check if object is a numpy array-like, but not a Uncertainty
 
     Parameters
@@ -168,9 +173,9 @@ class Display(object):
         return str(self)
 
 
-def strip_device_array(value):
-    return np.array(value)
-
-
-def ndarray_to_scalar(value):
+def ndarray_to_scalar(value: NDArray[T]) -> T:
     return np.ndarray.item(strip_device_array(value))
+
+
+def strip_device_array(value: Array | NDArray) -> NDArray:
+    return np.array(value)
