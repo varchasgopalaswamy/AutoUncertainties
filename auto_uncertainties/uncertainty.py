@@ -6,10 +6,10 @@ import copy
 import locale
 import operator
 import warnings
-from typing import Generic, TypeVar
 
 import joblib
 import numpy as np
+from typing_extensions import Generic, TypeVar
 
 from . import NegativeStdDevError, NumpyDowncastWarning
 from .util import (
