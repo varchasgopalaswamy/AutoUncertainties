@@ -467,7 +467,7 @@ class Uncertainty(Display, Generic[T]):
     def __array_function__(self, func, types, args, kwargs):
         if func.__name__ not in HANDLED_FUNCTIONS:
             return NotImplemented
-        elif not all(issubclass(t, self.__class__) for t in types):
+        elif not any(issubclass(t, self.__class__) for t in types):
             return NotImplemented
         else:
             return wrap_numpy("function", func, args, kwargs)
@@ -597,9 +597,11 @@ class Uncertainty(Display, Generic[T]):
                 return self.__class__(nom, err)
             else:
                 return [
-                    self.__class__(n, e).tolist()
-                    if isinstance(n, list)
-                    else self.__class__(n, e)
+                    (
+                        self.__class__(n, e).tolist()
+                        if isinstance(n, list)
+                        else self.__class__(n, e)
+                    )
                     for n, e in (nom, err)
                 ]
         except AttributeError:
