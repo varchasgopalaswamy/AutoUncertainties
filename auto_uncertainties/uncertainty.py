@@ -9,17 +9,24 @@ import warnings
 
 import joblib
 import numpy as np
-from typing_extensions import Generic, TypeVar
+from numpy.typing import NDArray
+from typing_extensions import Generic, Type, TypeVar
 
 from . import NegativeStdDevError, NumpyDowncastWarning
+from .display_format import ScalarDisplay, VectorDisplay
 from .util import (
-    Display,
     ignore_numpy_downcast_warnings,
     ignore_runtime_warnings,
-    is_np_duck_array,
     strip_device_array,
 )
 from .wrap_numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
+
+ERROR_ON_DOWNCAST = False
+
+
+def set_downcast_error(val: bool):
+    global ERROR_ON_DOWNCAST
+    ERROR_ON_DOWNCAST = val
 
 
 def _check_units(value, err):
@@ -51,119 +58,87 @@ def _check_units(value, err):
     return ret_val, ret_err, ret_units
 
 
-T = TypeVar("T")
+ST = TypeVar("ST", float, int)
+T = TypeVar("T", NDArray, float, int)
 
 
-class Uncertainty(Display, Generic[T]):
-    __apply_to_both_ndarray__ = [
-        "flatten",
-        "real",
-        "imag",
-        "astype",
-        "T",
-        "reshape",
-    ]
-    __ndarray_attributes__ = ["dtype", "ndim", "size"]
-
-    __array_priority__ = 18
-
+class Uncertainty(Generic[T]):
     _nom: T
     _err: T
 
     @ignore_numpy_downcast_warnings
-    def __init__(self, value: T, err: T | None = None):
+    def __new__(cls: Type[Uncertainty], value: T | Uncertainty, err=None):
+        # If instantiated with an Uncertainty subclass
+        if isinstance(value, cls):
+            value = value.value
+            err = value.error
+        # If instantiated with a list or tuple of uncertainties
+        elif isinstance(value, (list, tuple)):
+            inst = cls.from_list(value)
+            value = inst.value
+            err = inst.error
+
+        value = strip_device_array(value)
+        if err is not None:
+            err = strip_device_array(err)
+
+        # Numpy arrays
+        if np.ndim(value) > 0:
+            vector = True
+            value = np.asarray(value)
+            # Zero error
+            if err is None:
+                err = np.zeros_like(value)
+            else:
+                # Constant error
+                if np.ndim(err) == 0:
+                    err = np.ones_like(value) * err
+                else:
+                    assert np.ndim(value) == np.ndim(err)
+                    assert np.shape(value) == np.shape(err)
+                    err = np.asarray(err)
+
+            # replace NaN with zero in errors
+            err[~np.isfinite(err)] = 0
+
+            if np.any(err < 0):
+                raise NegativeStdDevError(
+                    f"Found {np.count_nonzero(err < 0)} negative values for the standard deviation!"
+                )
+        else:
+            vector = False
+            if err is None or not np.isfinite(err):
+                err = 0.0
+            elif err < 0:
+                raise NegativeStdDevError(
+                    f"Found negative value ({err}) for the standard deviation!"
+                )
+
+        if vector:
+            inst = object.__new__(VectorUncertainty)
+        else:
+            inst = object.__new__(ScalarUncertainty)
+        inst.__init__(value, err)
+        return inst
+
+    def __init__(self, value: T, err: T | None):
         if hasattr(value, "units") or hasattr(err, "units"):
             raise NotImplementedError(
                 "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
             )
-
-        value_ = strip_device_array(value)
-        if err is not None:
-            err_ = strip_device_array(err)
-        else:
-            err_ = None
-
-        # If Uncertatity
-        if isinstance(value_, self.__class__):
-            magnitude_nom = value_.value
-            magnitude_err = value_.error
-        # If sequence
-        elif isinstance(value_, list):
-            inst = self.__class__.from_list(value_)
-            magnitude_nom = inst.value
-            magnitude_err = inst.error
-        # If arrays
-        elif np.ndim(value_) > 0:
-            magnitude_nom = np.asarray(value_)
-            if err_ is None:
-                magnitude_err = np.zeros_like(value_)
-            else:
-                if np.ndim(err_) == 0:
-                    magnitude_err = np.ones_like(value_) * err_
-                else:
-                    magnitude_err = np.asarray(err_)
-                    assert magnitude_err.shape == magnitude_nom.shape
-        # If scalar
-        else:
-            magnitude_nom = value_
-            if err_ is None:
-                magnitude_err = 0.0
-            else:
-                magnitude_err = err_
-
-        # Replace NaNs in errors with zeros
-        if is_np_duck_array(type(magnitude_err)):
-            magnitude_err[~np.isfinite(magnitude_err)] = 0
-        else:
-            if not np.isfinite(magnitude_err):
-                magnitude_err = 0
-
-        # Basic sanity checks
-        if is_np_duck_array(type(magnitude_nom)):
-            match_items = self.__ndarray_attributes__ + ["shape"]
-            try:
-                match_items.remove("dtype")
-            except ValueError:
-                pass
-            for item in match_items:
-                if not getattr(magnitude_nom, item) == getattr(
-                    magnitude_err, item
-                ):
-                    raise ValueError(
-                        f"Attribute {item} does not match for value and error! ({getattr(magnitude_nom,item)} and {getattr(magnitude_err,item)})"
-                    )
-        err_mag = np.atleast_1d(magnitude_err)
-        if np.any(err_mag[np.isfinite(err_mag)] < 0):
-            valid = err_mag[np.isfinite(err_mag)]
-
-            raise NegativeStdDevError(
-                f"Found negatives values for the standard deviation... {valid[valid < 0]}"
-            )
-
-        self._nom = magnitude_nom
-        self._err = magnitude_err
-
-    def __bytes__(self) -> bytes:
-        return str(self).encode(locale.getpreferredencoding())
-
-    def __iter__(self):
-        for v, e in zip(self._nom, self._err):
-            yield self.__class__(v, e)
+        self._nom = value
+        self._err = err
 
     def __copy__(self) -> Uncertainty[T]:
         ret = self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
-        return ret
+        return ret  # type: ignore
 
     def __deepcopy__(self, memo) -> Uncertainty[T]:
         ret = self.__class__(
             copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo)
         )
-        return ret
-
-    def __hash__(self) -> int:
-        digest = joblib.hash((self._nom, self._err), hash_name="sha1")
-        return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
+        return ret  # type: ignore
 
     @property
     def value(self):
@@ -173,33 +148,23 @@ class Uncertainty(Display, Generic[T]):
     def error(self):
         return self._err
 
+    def __hash__(self) -> int:
+        digest = joblib.hash((self._nom, self._err), hash_name="sha1")
+        return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
+
     @property
-    def relative(self):
-        if np.ndim(self._nom) == 0:
-            try:
-                return self._err / self._nom
-            except OverflowError:
-                return np.inf
-            except ZeroDivisionError:
-                return np.NaN
-        else:
-            rel = np.zeros_like(self._nom)
-            valid = np.isfinite(self._nom) & (self._nom > 0)
-            rel[valid] = self._err[valid] / self._nom[valid]
-            return rel
+    def relative(self) -> T:
+        raise NotImplementedError
 
     @property
     def rel(self):
         return self.relative
 
     @property
-    def rel2(self):
-        try:
-            return self.relative**2
-        except OverflowError:
-            return np.inf
+    def rel2(self) -> T:
+        raise NotImplementedError
 
-    def plus_minus(self, err: float):
+    def plus_minus(self, err: T):
         val = self._nom
         old_err = self._err
         new_err = np.sqrt(old_err**2 + err**2)
@@ -255,15 +220,6 @@ class Uncertainty(Display, Generic[T]):
                     err[i] = 0
 
         return cls(val, err)
-
-    def __float__(self) -> Uncertainty[float]:
-        return float(self._nom)
-
-    def __complex__(self) -> Uncertainty[complex]:
-        return complex(self._nom)
-
-    def __int__(self) -> Uncertainty[int]:
-        return int(self._nom)
 
     # Math Operators
     def __add__(self, other):
@@ -416,9 +372,6 @@ class Uncertainty(Display, Generic[T]):
     def __abs__(self):
         return self.__class__(abs(self._nom), self._err)
 
-    def __round__(self, ndigits):
-        return self.__class__(round(self._nom, ndigits=ndigits), self._err)
-
     def __pos__(self):
         return self.__class__(operator.pos(self._nom), self._err)
 
@@ -430,13 +383,6 @@ class Uncertainty(Display, Generic[T]):
             return self._nom == other._nom
         else:
             return self._nom == other
-
-    def __ne__(self, other):
-        out = self.__eq__(other)
-        if is_np_duck_array(type(out)):
-            return np.logical_not(out)
-        else:
-            return not out
 
     def compare(self, other, op):
         if isinstance(other, Uncertainty):
@@ -461,6 +407,52 @@ class Uncertainty(Display, Generic[T]):
         return bool(self._nom)
 
     __nonzero__ = __bool__
+
+
+class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
+    __apply_to_both_ndarray__ = [
+        "flatten",
+        "real",
+        "imag",
+        "astype",
+        "T",
+        "reshape",
+    ]
+    __ndarray_attributes__ = ["dtype", "ndim", "size"]
+
+    __array_priority__ = 18
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if np.ndim(self._nom) == 0:
+            raise ValueError(
+                "VectorUncertainty must have a dimension greater than 0!"
+            )
+
+    def __ne__(self, other):
+        out = self.__eq__(other)
+        return np.logical_not(out)
+
+    def __bytes__(self) -> bytes:
+        return str(self).encode(locale.getpreferredencoding())
+
+    def __iter__(self):
+        for v, e in zip(self._nom, self._err):
+            yield self.__class__(v, e)
+
+    @property
+    def relative(self):
+        rel = np.zeros_like(self._nom)
+        valid = np.isfinite(self._nom) & (self._nom > 0)
+        rel[valid] = self._err[valid] / self._nom[valid]
+        return rel
+
+    @property
+    def rel2(self):
+        return self.relative**2
+
+    def __round__(self, ndigits):
+        return self.__class__(np.round(self._nom, decimals=ndigits), self._err)
 
     # NumPy function/ufunc support
     @ignore_runtime_warnings
@@ -516,12 +508,17 @@ class Uncertainty(Display, Generic[T]):
             ) from None
 
     def __array__(self, t=None) -> np.ndarray:
-        warnings.warn(
-            "The uncertainty is stripped when downcasting to ndarray.",
-            NumpyDowncastWarning,
-            stacklevel=2,
-        )
-        return np.asarray(self._nom)
+        if ERROR_ON_DOWNCAST:
+            raise Exception(
+                "The uncertainty is stripped when downcasting to ndarray."
+            )
+        else:
+            warnings.warn(
+                "The uncertainty is stripped when downcasting to ndarray.",
+                NumpyDowncastWarning,
+                stacklevel=2,
+            )
+            return np.asarray(self._nom)
 
     def clip(self, min=None, max=None, out=None, **kwargs):
         return self.__class__(
@@ -570,12 +567,12 @@ class Uncertainty(Display, Generic[T]):
 
     def __getitem__(self, key):
         try:
-            return self.__class__(self._nom[key], self._err[key])
+            return Uncertainty(self._nom[key], self._err[key])
         except TypeError:
             raise TypeError(f"Index {key} not supported!")
 
     def __setitem__(self, key, value):
-        if not isinstance(value, self.__class__):
+        if not isinstance(value, Uncertainty):
             raise ValueError(
                 f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
             )
@@ -586,8 +583,12 @@ class Uncertainty(Display, Generic[T]):
                 f"Object {type(self._nom)} does not support indexing"
             ) from exc
 
-        self._nom[key] = value._nom
-        self._err[key] = value._err
+        if np.size(value._nom) == 1 and np.ndim(value._nom) > 0:
+            self._nom[key] = value._nom[0]
+            self._err[key] = value._err[0]
+        else:
+            self._nom[key] = value._nom
+            self._err[key] = value._err
 
     def tolist(self):
         try:
@@ -612,3 +613,37 @@ class Uncertainty(Display, Generic[T]):
     @property
     def ndim(self):
         return np.ndim(self._nom)
+
+    def view(self):
+        return self.__class__(self._nom.view(), self._err.view())
+
+
+class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
+    @property
+    def relative(self):
+        try:
+            return self._err / self._nom
+        except OverflowError:
+            return np.inf
+        except ZeroDivisionError:
+            return np.NaN
+
+    def __float__(self) -> ScalarUncertainty:
+        return ScalarUncertainty(float(self.value), float(self.error))
+
+    def __int__(self) -> ScalarUncertainty[int]:
+        return ScalarUncertainty(int(self.value), int(self.error))
+
+    def __round__(self, ndigits):
+        return self.__class__(round(self._nom, ndigits=ndigits), self._err)
+
+    @property
+    def rel2(self):
+        try:
+            return self.relative**2
+        except OverflowError:
+            return np.inf
+
+    def __ne__(self, other):
+        out = self.__eq__(other)
+        return not out

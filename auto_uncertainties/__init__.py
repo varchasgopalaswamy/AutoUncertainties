@@ -19,9 +19,13 @@ class NumpyDowncastWarning(RuntimeWarning):
 from .uncertainty import Uncertainty  # noqa: E402
 
 try:
-    from .pandas_compat import UncertaintyArray
+    from .pandas_ext_array import (  # noqa: E402
+        UncertaintyArray,
+        UncertaintyDtype,
+    )
 except ImportError:
     UncertaintyArray = None
+    UncertaintyDtype = None
 
 
 def nominal_values(x):

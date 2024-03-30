@@ -436,6 +436,12 @@ def _round(a, *args, **kwargs):
     return a.__class__(val, err)
 
 
+@implements("sort", "function")
+def _sort(a, *args, **kwargs):
+    ind = np.argsort(a=a._nom, *args, **kwargs)
+    return np.take_along_axis(a, ind, *args, **kwargs).squeeze()
+
+
 @implements("take_along_axis", "function")
 def _take_along_axis(a, *args, **kwargs):
     val = np.take_along_axis(a._nom, *args, **kwargs).squeeze()

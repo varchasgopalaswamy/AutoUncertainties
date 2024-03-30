@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import warnings
 from functools import wraps
-from typing import TypeGuard, TypeVar
+from typing import TypeVar
 
 import numpy as np
 from jax import Array
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 from . import NumpyDowncastWarning
 
@@ -78,104 +78,9 @@ def has_length(y):
     return True
 
 
-def is_np_duck_array(cls: ArrayLike) -> TypeGuard[ArrayLike]:
-    """Check if object is a numpy array-like, but not a Uncertainty
-
-    Parameters
-    ----------
-    cls : class
-
-    Returns
-    -------
-    bool
-    """
-    try:
-        import numpy as np
-    except ImportError:
-        return False
-
-    return issubclass(cls, np.ndarray) or (
-        not hasattr(cls, "_nom")
-        and not hasattr(cls, "_err")
-        and hasattr(cls, "__array_function__")
-        and hasattr(cls, "ndim")
-        and hasattr(cls, "dtype")
-    )
-
-
-class Display(object):
-    default_format: str = ""
-
-    def _repr_html_(self):
-        val_ = self._nom
-        err_ = self._err
-        if is_np_duck_array(type(self._nom)):
-            header = "<table><tbody>"
-            footer = "</tbody></table>"
-            val = f"<tr><th>Magnitude</th><td style='text-align:left;'><pre>{val_}</pre></td></tr>"
-            err = f"<tr><th>Error</th><td style='text-align:left;'><pre>{err_}</pre></td></tr>"
-            return header + val + err + footer
-        else:
-            val = f"{val_}"
-            err = f"{err_}"
-            return f"{val} {chr(0x00B1)} {err}"
-
-    def _repr_latex_(self):
-        val_ = self._nom
-        err_ = self._err
-        if is_np_duck_array(type(self._nom)):
-            s = (
-                ", ".join(
-                    [
-                        f"{v} \\pm {e}"
-                        for v, e in zip(val_.ravel(), err_.ravel())
-                    ]
-                )
-                + "~"
-            )
-            header = "$"
-            footer = "$"
-            return header + s + footer
-        else:
-            val = f"{val_}"
-            err = f"{err_}"
-            return f"${val} \\pm {err}$"
-
-    def __str__(self) -> str:
-        val_ = self._nom
-        err_ = self._err
-
-        if self._nom is not None:
-            if self._err is not None:
-                if is_np_duck_array(type(self._nom)):
-                    return (
-                        "["
-                        + ", ".join(
-                            [
-                                f"{v} +/- {e}"
-                                for v, e in zip(val_.ravel(), err_.ravel())
-                            ]
-                        )
-                        + "]"
-                    )
-                else:
-                    return f"{val_} +/- {err_}"
-            else:
-                return f"{val_}"
-
-    def __format__(self, fmt):
-        val_ = self._nom
-        err_ = self._err
-        str_rep = f"{val_:{fmt}} +/- {err_:{fmt}}"
-        return str_rep
-
-    def __repr__(self) -> str:
-        return str(self)
-
-
 def ndarray_to_scalar(value: NDArray[T]) -> T:
     return np.ndarray.item(strip_device_array(value))
 
 
-def strip_device_array(value: Array | NDArray) -> NDArray:
+def strip_device_array(value: Array | NDArray | float) -> NDArray:
     return np.array(value)
