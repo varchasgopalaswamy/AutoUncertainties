@@ -1,14 +1,3 @@
-.. image:: https://img.shields.io/pypi/v/auto-uncertainties.svg
-    :target: https://pypi.org/project/auto-uncertainties/
-    :alt: Latest Version
-
-.. image:: https://img.shields.io/pypi/l/auto-uncertainties.svg
-    :target: https://pypi.org/project/auto-uncertainties/
-    :alt: License
-
-.. image:: https://github.com/varchasgopalaswamy/AutoUncertainties/actions/workflows/python-app.yml/badge.svg
-    :target: https://github.com/varchasgopalaswamy/AutoUncertainties/actions?query=workflow
-    :alt: Tests
 
 AutoUncertainties
 ========================
@@ -29,29 +18,29 @@ Usage
 
 Creating a scalar Uncertainty variable is relatively simple:
 
-.. code-block:: python
-
+```python
     >>> from auto_uncertainties import Uncertainty
     >>> value = 1.0
     >>> error = 0.1
     >>> u = Uncertainty(value,error)
     >>> u
     1.0 +/- 0.1
+```
 
 as is creating a numpy array of  Uncertainties:
 
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import Uncertainty
     >>> import numpy as np
     >>> value = np.linspace(start=0,stop=10,num=5)
     >>> error = np.ones_like(value)*0.1
     >>> u = Uncertainty(value,error)
-
+```
 
 (though, they are actually different classes!)
 
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import Uncertainty
     >>> value = 1.0
@@ -67,21 +56,21 @@ as is creating a numpy array of  Uncertainties:
     >>> u = Uncertainty(value,error)
     >>> u
     auto_uncertainties.uncertainty.VectorUncertainty
-
+```
 
 Scalar uncertainties implement all mathematical and logical `dunder methods <https://docs.python.org/3/reference/datamodel.html#object.__repr__>`_ explicitly.
 
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import Uncertainty
     >>> u = Uncertainty(10.0, 3.0)
     >>> v = Uncertainty(20.0, 4.0)
     >>> u + v
     30.0 +/- 5.0
-
+```
 Array uncertainties implement a large subset of the numpy ufuncs and methods using :code:`jax.grad` or :code:`jax.jacfwd`, depending on the output shape.
 
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import Uncertainty
     >>> import numpy as np
@@ -102,10 +91,10 @@ Array uncertainties implement a large subset of the numpy ufuncs and methods usi
     25.0 +/- 0.22
     >>> np.sqrt(np.sum(error**2))
     0.223606797749979
-
+```
 The mean value and the standard deviation (the measurements are assumed to be normally distributed) can be accessed via
 
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import Uncertainty
     >>> u = Uncertainty(10.0, 3.0)
@@ -113,10 +102,10 @@ The mean value and the standard deviation (the measurements are assumed to be no
     10.0
     >>> u.error
     3.0
-
+```
 
 Displayed values are automatically rounded according to the Particle Data Group standard. This can be turned off using `set_display_rounding`
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import set_display_rounding
     >>> set_display_rounding(False)
@@ -127,9 +116,9 @@ Displayed values are automatically rounded according to the Particle Data Group 
     >>> u = Uncertainty(value,error)
     >>> np.sum(u)
     25.0 +/- 0.223606797749979
-
+```
 If `np.array` is called on an `Uncertainty` object, it will automatically get cast down to a numpy array (and lose uncertainty information!), and emit a warning. To make this an error, use `set_downcast_error`
-.. code-block:: python
+```python
 
     >>> from auto_uncertainties import set_downcast_error
     >>> set_downcast_error(False)
@@ -141,7 +130,7 @@ If `np.array` is called on an `Uncertainty` object, it will automatically get ca
     >>> np.array(u)
 
     Exception: The uncertainty is stripped when downcasting to ndarray.
-
+```
 
 
 
