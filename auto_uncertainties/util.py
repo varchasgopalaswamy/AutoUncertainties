@@ -9,7 +9,7 @@ import numpy as np
 from jax import Array
 from numpy.typing import NDArray
 
-from auto_uncertainties import NumpyDowncastWarning
+from . import NumpyDowncastWarning
 
 T = TypeVar("T", bound=np.generic, covariant=True)
 

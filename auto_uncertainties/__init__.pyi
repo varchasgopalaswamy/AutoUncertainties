@@ -1,21 +1,19 @@
-from __future__ import annotations
-
 from . import display_format, exceptions, numpy, pandas, uncertainty, util
-from .display_format import ScalarDisplay, set_display_rounding, VectorDisplay
+from .display_format import ScalarDisplay, VectorDisplay, set_display_rounding
 from .exceptions import (
     NegativeStdDevError,
     NumpyDowncastError,
     NumpyDowncastWarning,
 )
-from .pandas import pandas_ext_array, UncertaintyArray, UncertaintyDtype
+from .pandas import UncertaintyArray, UncertaintyDtype, pandas_ext_array
 from .uncertainty import (
-    nominal_values,
     ScalarUncertainty,
+    Uncertainty,
+    VectorUncertainty,
+    nominal_values,
     set_downcast_error,
     std_devs,
-    Uncertainty,
     uncertainty_containers,
-    VectorUncertainty,
 )
 
 __all__ = [

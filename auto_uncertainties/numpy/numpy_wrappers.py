@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
+from ..util import has_length, is_iterable, ndarray_to_scalar
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}

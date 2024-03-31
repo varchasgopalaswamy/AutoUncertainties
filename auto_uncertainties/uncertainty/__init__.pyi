@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 from . import uncertainty_containers
 from .uncertainty_containers import (
-    nominal_values,
     ScalarUncertainty,
-    set_downcast_error,
-    std_devs,
     Uncertainty,
     VectorUncertainty,
+    nominal_values,
+    set_downcast_error,
+    std_devs,
 )
 
 __all__ = [

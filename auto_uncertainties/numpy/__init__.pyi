@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from . import numpy_wrappers
 from .numpy_wrappers import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
