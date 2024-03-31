@@ -12,63 +12,59 @@ from __future__ import annotations
 
 import sys
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import cast, Self, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import scipy.stats
-from pandas.api.extensions import register_extension_dtype
 from pandas.api.types import is_list_like
 from pandas.compat import set_function_name
 from pandas.core.arrays import ExtensionArray, ExtensionScalarOpsMixin
-from pandas.core.dtypes.base import ExtensionDtype
 from pandas.core.dtypes.common import is_integer
-from pandas.core.dtypes.generic import ABCDataFrame, ABCIndex, ABCSeries
 from pandas.core.indexers import check_array_indexer
 
 from ..uncertainty import ScalarUncertainty, Uncertainty, VectorUncertainty
+from .unc_dtype import UncertaintyDtype
 
 if TYPE_CHECKING:
-    from pandas._typing import type_t
+    pass
 
-__all__ = ["UncertaintyDtype", "UncertaintyArray"]
-
-
-@register_extension_dtype
-class UncertaintyDtype(ExtensionDtype):
-    type = Uncertainty
-    name = "Uncertainty"
-
-    def __init__(self, dtype):
-        self.value_dtype = dtype
-
-    @property
-    def na_value(self):
-        return ScalarUncertainty(np.nan, 0)
-
-    def __repr__(self) -> str:
-        return f"Uncertainty[{self.value_dtype}]"
-
-    @classmethod
-    def construct_array_type(cls) -> type_t[Uncertainty]:
-        """
-        Return the array type associated with this dtype.
-
-        Returns
-        -------
-        type
-        """
-        return VectorUncertainty
-
-    @property
-    def _is_numeric(self) -> bool:
-        return True
+__all__ = ["UncertaintyArray"]
 
 
 class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
     """Abstract base class for custom 1-D array types."""
 
     __array_priority__ = VectorUncertainty.__array_priority__
+    __pandas_priority__ = 1999
+
+    ####################################################
+    #### Construction ##################################
+    ####################################################
+    @classmethod
+    def _from_sequence(cls, scalars, dtype=None, copy=False):
+        """Construct a new ExtensionArray from a sequence of scalars."""
+        return cls(scalars, dtype=dtype)
+
+    @classmethod
+    def _from_sequence_of_strings(
+        cls,
+        strings,
+        *,
+        dtype: UncertaintyDtype | None = None,
+        copy: bool = False,
+    ):
+        vals = []
+        for s in strings:
+            if not isinstance(s, str):
+                raise ValueError("not all strings are of dtype str")
+            vals.append(Uncertainty.from_string(s))
+
+        return cls(vals, dtype=dtype, copy=copy)
+
+    @classmethod
+    def _from_factorized(cls, values, original):
+        """Reconstruct an ExtensionArray after factorization."""
+        return cls(values)
 
     def __init__(
         self,
@@ -93,24 +89,41 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             # Passed some kind of list-like
             elif is_list_like(values):
                 # If its got anything in it
+                # The only valid kinds of objects are
+                # 1. All a seq of UArrays
+                # Or any combination of
+                # 2. Uncertainties
+                # 3. tuples of value/error pairs
+                # 4. floats (in which case error will be zero)
+
                 if len(values) > 0:
                     # If its a sequence of Uarrays
                     if all(isinstance(x, UncertaintyArray) for x in values):
                         errors = np.concatenate([x._data._err for x in values])
                         values = np.concatenate([x._data._nom for x in values])
-                    # If its a sequence of Uncertainties
-                    elif all(isinstance(x, Uncertainty) for x in values):
-                        errors = [x._err for x in values]
-                        values = [x._nom for x in values]
-                    # If its a sequence of tuples of value/error paris
-                    elif all(len(x) == 2 for x in values):
-                        errors = [x[1] for x in values]
-                        values = [x[0] for x in values]
                     else:
-                        unique_types = set(type(x) for x in values)
-                        raise ValueError(
-                            f"values must be only UncertaintyArray or Uncertainty. Instead got {unique_types}"
-                        )
+                        vals = []
+                        errs = []
+                        for x in values:
+                            if isinstance(x, VectorUncertainty):
+                                errs += x._err.tolist()
+                                vals += x._nom.tolist()
+                            elif isinstance(x, ScalarUncertainty):
+                                errs.append(x._err)
+                                vals.append(x._nom)
+                            elif hasattr(x, "__len__") and len(x) == 2:
+                                errs.append(x[1])
+                                vals.append(x[0])
+                            elif isinstance(x, float):
+                                errs.append(0.0)
+                                vals.append(x)
+                            else:
+                                raise ValueError(
+                                    f"values must be only UncertaintyArray, Uncertainty, (float,float), float or sequences of these. Instead got {type(x)}"
+                                )
+                        values = vals
+                        errors = errs
+                    # If its a sequence of Uncertainties
                 else:
                     errors = np.array([])
                     values = np.array([])
@@ -147,6 +160,7 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         """An instance of 'ExtensionDtype'."""
         return self._dtype
 
+    @property
     def array(self):
         return self._data
 
@@ -169,9 +183,24 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         Length: 3, dtype: Int64
         """
 
-        return self.__class__(self._data, copy=True)
+        return self.__class__(self._data, dtype=self.dtype, copy=True)
 
-    _HANDLED_TYPES = (np.ndarray, Uncertainty)
+    ##########################
+    ###### NaN handling ######
+    ##########################
+    def __contains__(self, item: Uncertainty | float) -> bool | np.bool_:
+        if isinstance(item, float) and pd.isna(item):
+            return cast(np.ndarray, self.isna()).any()
+        elif not isinstance(item, Uncertainty):
+            return False
+        else:
+            return super().__contains__(item)
+
+    ##########################
+    ######## Numpy ###########
+    ##########################
+
+    _HANDLED_TYPES = (np.ndarray, Uncertainty, float, int)
 
     def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs, **kwargs):
         #
@@ -181,39 +210,46 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         ):
             return NotImplemented
         if method != "__call__":
-            raise NotImplementedError
+            return NotImplemented
         inputs = tuple(
             x._data if isinstance(x, UncertaintyArray) else x for x in inputs
         )
-        raise ValueError
-        return getattr(ufunc, method)(*inputs, **kwargs)
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+        if all(isinstance(x, (bool, np.bool_)) for x in result):
+            if len(result) == 1:
+                retval = result[0]
+            else:
+                retval = np.asarray(result, dtype=bool)
+        elif ufunc.nout > 1:
+            retval = tuple(self.__class__(x) for x in result)
+        else:
+            retval = self.__class__(result)
 
-        # def reconstruct(x):
-        #     if isinstance(x, (decimal.Decimal, numbers.Number)):
-        #         return x
-        #     else:
-        #         return type(self)._from_sequence(x, dtype=self.dtype)
+        return retval
 
-        # if ufunc.nout > 1:
-        #     return tuple(reconstruct(x) for x in result)
-        # else:
-        #     return reconstruct(result)
+    def __pos__(self):
+        return self.__class__(+self._data)
 
-    @classmethod
-    def _from_sequence(cls, scalars, dtype=None, copy=False):
-        """Construct a new ExtensionArray from a sequence of scalars."""
-        return cls(scalars, dtype=dtype)
+    def __neg__(self):
+        return self.__class__(-self._data)
 
-    @classmethod
-    def _from_factorized(cls, values, original):
-        """Reconstruct an ExtensionArray after factorization."""
-        return cls(values)
+    def __abs__(self):
+        return self.__class__(abs(self._data))
+
+    def __invert__(self):
+        raise TypeError
+
+    ##############################
+    #### List-like ###############
+    ##############################
 
     def __getitem__(self, item):
         """Select a subset of self."""
         if is_integer(item):
             return self._data[item]
-        return UncertaintyArray(self._data[item])
+
+        key = check_array_indexer(self, item)
+        return UncertaintyArray(self._data[key])
 
     def __setitem__(self, key, value):
         """Set the value of a subset of self."""
@@ -230,6 +266,8 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             return
         elif isinstance(value, Uncertainty):
             v = value
+        elif not np.any(np.isfinite(value)):
+            v = self.dtype.na_value
         else:
             raise ValueError
 
@@ -242,6 +280,59 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             return 0
         else:
             return len(self._data)
+
+    @classmethod
+    def _concat_same_type(cls, to_concat):
+        """Concatenate multiple arrays."""
+        return cls(
+            np.concatenate([x._data for x in to_concat]),
+        )
+
+    def take(
+        self,
+        indexer,
+        allow_fill=False,
+        fill_value: (
+            float | Tuple[float, float] | ScalarUncertainty | None
+        ) = None,
+    ):
+        """Take elements from an array.
+
+        Relies on the take method defined in pandas:
+        https://github.com/pandas-dev/pandas/blob/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/core/algorithms.py#L1483
+        """
+        from pandas.api.extensions import take
+
+        if allow_fill:
+            if fill_value is None:
+                fill_value = self.dtype.na_value
+                fval = fill_value
+                ferr = 0
+
+            elif isinstance(fill_value, tuple):
+                fval = fill_value[0]
+                ferr = fill_value[1]
+            elif isinstance(fill_value, ScalarUncertainty):
+                fval = fill_value.value
+                ferr = fill_value.error
+            else:
+                fval = fill_value
+                ferr = 0
+        else:
+            fval = ferr = None
+        v = take(
+            self._data._nom,
+            indexer,
+            fill_value=fval,
+            allow_fill=allow_fill,
+        )
+        e = take(
+            self._data._err,
+            indexer,
+            fill_value=ferr,
+            allow_fill=allow_fill,
+        )
+        return self._from_sequence(list(zip(v, e)))
 
     def __eq__(
         self, other: pd.DataFrame | pd.Series | pd.Index | UncertaintyArray
@@ -261,50 +352,18 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             or isinstance(other, pd.Index)
         ):
             return NotImplemented
-        # rely on Quantity comparison that will return a boolean array
+
         return self._data == other._data
 
     def isna(self):
         """A 1-D array indicating if each value is missing."""
         return np.isnan(self._data._nom)
 
-    def take(self, indexer, allow_fill=False, fill_value=None):
-        """Take elements from an array.
-
-        Relies on the take method defined in pandas:
-        https://github.com/pandas-dev/pandas/blob/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/core/algorithms.py#L1483
-        """
-        from pandas.api.extensions import take
-
-        if allow_fill and fill_value is None:
-            fill_value = self.dtype.na_value
-
-        v = take(
-            self._data._nom,
-            indexer,
-            fill_value=fill_value,
-            allow_fill=allow_fill,
-        )
-        e = take(
-            self._data._err,
-            indexer,
-            fill_value=fill_value,
-            allow_fill=allow_fill,
-        )
-        return self._from_sequence(list(zip(v, e)))
-
     def _formatter(self, boxed=False):
         def formatter(x):
             return f"{x}"
 
         return formatter
-
-    @classmethod
-    def _concat_same_type(cls, to_concat):
-        """Concatenate multiple arrays."""
-        return cls(
-            np.concatenate([x._data for x in to_concat]),
-        )
 
     @property
     def _na_value(self):
@@ -334,6 +393,18 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Note: this is used in `ExtensionArray.argsort`.
         return self._data._nom
 
+    _supported_reductions = [
+        "min",
+        "max",
+        "sum",
+        "mean",
+        "median",
+        "prod",
+        "std",
+        "var",
+        "sem",
+    ]
+
     def _reduce(
         self,
         name: str,
@@ -343,8 +414,6 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         **kwargs,
     ):
         functions = {
-            "all": np.all,
-            "any": np.any,
             "min": np.min,
             "max": np.max,
             "sum": np.sum,
@@ -354,18 +423,14 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             "std": lambda x: np.std(x, ddof=1),
             "var": lambda x: np.var(x, ddof=1),
             "sem": lambda x: np.std(x, ddof=0),
-            "kurt": lambda x: scipy.stats.kurtosis(x, bias=False),
-            "skew": lambda x: scipy.stats.skew(x, bias=False),
         }
         if name not in functions:
             raise TypeError(f"cannot perform {name} with type {self.dtype}")
-
         if skipna:
-            quantity = self.dropna()._data
+            quantity = self.dropna().array
         else:
-            quantity = self._data
-
-        result = functions[name](quantity)
+            quantity = self.array
+        result = cast(Uncertainty, functions[name](quantity))
 
         if keepdims:
             return self.__class__(result)
@@ -397,12 +462,6 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         )
 
         return value_counts(self._data._nom, dropna=dropna)
-
-    # We override fillna here to simulate a 3rd party EA that has done so. This
-    #  lets us test a 3rd-party EA that has not yet updated to include a "copy"
-    #  keyword in its fillna method.
-    def fillna(self, value=None, limit=None):
-        return super().fillna(value=value, limit=limit)
 
     @classmethod
     def _create_method(
@@ -446,29 +505,38 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         of the underlying elements of the ExtensionArray
         """
 
-        def _binop(self, other):
-            def convert_values(param):
-                if isinstance(param, ExtensionArray) or is_list_like(param):
-                    ovalues = param
-                else:  # Assume its an object
-                    ovalues = [param] * len(self)
-                return ovalues
-
-            if isinstance(other, (ABCSeries, ABCIndex, ABCDataFrame)):
+        def _binop(self: Self, other):
+            if isinstance(other, (pd.DataFrame, pd.Series, pd.Index)):
                 # rely on pandas to unbox and dispatch to us
                 return NotImplemented
 
-            lvalues = self
+            def convert_values(param):
+                if isinstance(param, UncertaintyArray):
+                    return param
+                elif is_list_like(param):
+                    ovalues = UncertaintyArray._from_sequence(param)
+                else:
+                    ovalues = param
+                return ovalues
+
+            lvalues = self._data
             rvalues = convert_values(other)
 
+            real_op = op
             # If the operator is not defined for the underlying objects,
             # a TypeError should be raised
-            if isinstance(rvalues, UncertaintyArray):
-                res = op(lvalues._data, rvalues._data)
-            else:
-                res = op(lvalues._data, rvalues)
+            if op.__name__ in ["divmod", "rdivmod", "__invert__"]:
+                raise TypeError
 
-            return res
+            if isinstance(rvalues, UncertaintyArray):
+                res = real_op(lvalues, rvalues._data)
+            else:
+                res = real_op(lvalues, rvalues)
+
+            if all(isinstance(x, (bool, np.bool_)) for x in res):
+                return res
+
+            return UncertaintyArray._from_sequence(res)
 
         op_name = f"__{op.__name__}__"
         return set_function_name(_binop, op_name, cls)
@@ -476,4 +544,3 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
 
 UncertaintyArray._add_arithmetic_ops()
 UncertaintyArray._add_comparison_ops()
-# UncertaintyArray._add_logical_ops()

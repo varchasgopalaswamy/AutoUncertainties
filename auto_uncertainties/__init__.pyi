@@ -5,7 +5,7 @@ from .exceptions import (
     NumpyDowncastError,
     NumpyDowncastWarning,
 )
-from .pandas import UncertaintyArray, UncertaintyDtype, pandas_ext_array
+from .pandas import UncertaintyArray, UncertaintyDtype, unc_array
 from .uncertainty import (
     ScalarUncertainty,
     Uncertainty,
@@ -32,7 +32,7 @@ __all__ = [
     "nominal_values",
     "numpy",
     "pandas",
-    "pandas_ext_array",
+    "unc_array",
     "set_display_rounding",
     "set_downcast_error",
     "std_devs",

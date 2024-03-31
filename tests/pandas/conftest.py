@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from pandas import Series
 
-from auto_uncertainties import UncertaintyArray, UncertaintyDtype
+from auto_uncertainties import Uncertainty, UncertaintyArray, UncertaintyDtype
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def data_for_twos(dtype):
 @pytest.fixture
 def data_missing():
     """Length-2 array with [NA, Valid]"""
-    return UncertaintyArray([np.nan, 1], [np.nan, 0.1])
+    return UncertaintyArray([np.nan, 1], [0, 0.1])
 
 
 @pytest.fixture(params=["data", "data_missing"])
@@ -122,7 +122,21 @@ def na_cmp():
 
     By default, uses ``operator.is_``
     """
-    return operator.is_
+
+    def na_compare(x, y):
+        if isinstance(x, Uncertainty):
+            xval = x.value
+        else:
+            xval = x
+        if isinstance(y, Uncertainty):
+            yval = y.value
+        else:
+            yval = y
+        if np.isnan(xval) and np.isnan(yval):
+            return True
+        return operator.is_(xval, yval)
+
+    return na_compare
 
 
 @pytest.fixture
@@ -156,6 +170,112 @@ def box_in_series(request):
     return request.param
 
 
+_all_arithmetic_operators = [
+    "__add__",
+    "__radd__",
+    "__sub__",
+    "__rsub__",
+    "__mul__",
+    "__rmul__",
+    "__floordiv__",
+    "__rfloordiv__",
+    "__truediv__",
+    "__rtruediv__",
+    "__pow__",
+    "__rpow__",
+    "__mod__",
+    "__rmod__",
+]
+
+
+@pytest.fixture(params=_all_arithmetic_operators)
+def all_arithmetic_operators(request):
+    """
+    Fixture for dunder names for common arithmetic operations
+    """
+    return request.param
+
+
+@pytest.fixture(
+    params=["__eq__", "__ne__", "__le__", "__lt__", "__ge__", "__gt__"]
+)
+def all_compare_operators(request):
+    """
+    Fixture for dunder names for common compare operations
+
+    * >=
+    * >
+    * ==
+    * !=
+    * <
+    * <=
+    """
+    return request.param
+
+
+# commented functions aren't implemented in numpy/pandas
+_all_numeric_reductions = [
+    "sum",
+    "max",
+    "min",
+    "mean",
+    # "prod",
+    "std",
+    "var",
+    "median",
+    "sem",
+    "kurt",
+    "skew",
+]
+
+
+@pytest.fixture(params=_all_numeric_reductions)
+def all_numeric_reductions(request):
+    """
+    Fixture for numeric reduction names.
+    """
+    return request.param
+
+
+_all_boolean_reductions = []
+
+
+@pytest.fixture(params=_all_boolean_reductions)
+def all_boolean_reductions(request):
+    """
+    Fixture for boolean reduction names.
+    """
+    return request.param
+
+
+_all_numeric_accumulations = ["cumsum", "cumprod", "cummin", "cummax"]
+
+
+@pytest.fixture(params=_all_numeric_accumulations)
+def all_numeric_accumulations(request):
+    """
+    Fixture for numeric accumulation names
+    """
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        operator.ge,
+        operator.gt,
+        operator.le,
+        operator.lt,
+        operator.eq,
+        operator.ne,
+    ],
+)
+def comparison_op(request):
+    """
+    Functions to test groupby.apply().
+    """
+    return request.param
+
+
 @pytest.fixture(
     params=[
         lambda x: 1,
@@ -168,6 +288,15 @@ def box_in_series(request):
 def groupby_apply_op(request):
     """
     Functions to test groupby.apply().
+    """
+    return request.param
+
+
+@pytest.fixture(params=[None, lambda x: x])
+def sort_by_key(request):
+    """
+    Simple fixture for testing keys in sorting methods.
+    Tests None (no key) and the identity key.
     """
     return request.param
 

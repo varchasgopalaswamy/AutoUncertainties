@@ -10,7 +10,11 @@ import pytest
 from hypothesis import given
 from hypothesis.extra import numpy as hnp
 
-from auto_uncertainties import NegativeStdDevError, Uncertainty
+from auto_uncertainties import (
+    NegativeStdDevError,
+    ScalarUncertainty,
+    Uncertainty,
+)
 
 try:
     from pint import DimensionalityError
@@ -48,22 +52,43 @@ def check_units_and_mag(unc, units, mag, err):
         assert unc.error.to(units).m == err
 
 
+general_float_strategy = dict(
+    allow_nan=False,
+    allow_infinity=False,
+    allow_subnormal=False,
+    min_value=-1e3,
+    max_value=1e3,
+)
+
+
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v=st.floats(allow_subnormal=False),
-    e=st.floats(allow_subnormal=False),
+    v=st.floats(),
+    e=st.floats(),
     units=st.sampled_from(UNITS),
+    call_super=st.sampled_from([True, False]),
 )
-def test_scalar_creation(v, e, units):
-    if e < 0:
-        if np.isfinite(e):
-            with pytest.raises(NegativeStdDevError):
-                u = Uncertainty(v, e)
-            if units is not None:
-                with pytest.raises(NegativeStdDevError):
-                    u = Uncertainty.from_quantities(v * units, e * units)
+def test_scalar_creation(v, e, units, call_super):
+    if call_super:
+        const = Uncertainty
     else:
-        u = Uncertainty(v, e)
+        const = ScalarUncertainty
+
+    if not np.isfinite(v):
+        u = const(v, e)
+        assert isinstance(u, float)
+        assert not np.isfinite(v)
+    elif not np.isfinite(e):
+        u = const(v, e)
+        assert u.error == 0
+    elif e < 0:
+        with pytest.raises(NegativeStdDevError):
+            u = const(v, e)
+        if units is not None:
+            with pytest.raises(NegativeStdDevError):
+                u = const.from_quantities(v * units, e * units)
+    else:
+        u = const(v, e)
         if np.isfinite(v) and np.isfinite(e):
             assert u.value == v
             assert u.error == e
@@ -74,24 +99,24 @@ def test_scalar_creation(v, e, units):
 
             if units is not None:
                 with pytest.raises(NotImplementedError):
-                    u = Uncertainty(v * units, e * units)
+                    u = const(v * units, e * units)
 
-                u = Uncertainty.from_quantities(v * units, e * units)
+                u = const.from_quantities(v * units, e * units)
                 check_units_and_mag(u, units, v, e)
 
-                u = Uncertainty(v, e) * units
+                u = const(v, e) * units
                 check_units_and_mag(u, units, v, e)
 
                 with pytest.raises(DimensionalityError):
-                    u = Uncertainty.from_quantities(v * units, e)
+                    u = const.from_quantities(v * units, e)
                 with pytest.raises(DimensionalityError):
-                    u = Uncertainty.from_quantities(v, e * units)
+                    u = const.from_quantities(v, e * units)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v1=st.floats(allow_subnormal=False),
-    e1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    v1=st.floats(**general_float_strategy),
+    e1=st.floats(min_value=0, max_value=1e3),
     op=st.sampled_from(UNARY_OPS),
 )
 def test_scalar_unary(v1, e1, op):
@@ -109,10 +134,16 @@ def test_scalar_unary(v1, e1, op):
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v1=st.floats(allow_subnormal=False),
-    v2=st.floats(allow_subnormal=False),
-    e1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
-    e2=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    v1=st.floats(**general_float_strategy),
+    v2=st.floats(**general_float_strategy),
+    e1=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
+    e2=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
     op=st.sampled_from(BINARY_OPS),
 )
 def test_scalar_binary(v1, e1, v2, e2, op):
@@ -130,10 +161,16 @@ def test_scalar_binary(v1, e1, v2, e2, op):
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v1=st.floats(allow_subnormal=False),
-    v2=st.floats(allow_subnormal=False),
-    e1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
-    e2=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    v1=st.floats(**general_float_strategy),
+    v2=st.floats(**general_float_strategy),
+    e1=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
+    e2=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
     op=st.sampled_from([operator.add, operator.sub]),
 )
 def test_scalar_add_sub(v1, e1, v2, e2, op):
@@ -149,10 +186,22 @@ def test_scalar_add_sub(v1, e1, v2, e2, op):
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v1=st.floats(min_value=1, max_value=1e3, allow_subnormal=False),
-    v2=st.floats(min_value=1, max_value=1e3, allow_subnormal=False),
-    e1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
-    e2=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    v1=st.floats(
+        min_value=1,
+        max_value=1e3,
+    ),
+    v2=st.floats(
+        min_value=1,
+        max_value=1e3,
+    ),
+    e1=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
+    e2=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
     op=st.sampled_from([operator.mul, operator.truediv]),
 )
 def test_scalar_mul_div(v1, e1, v2, e2, op):
@@ -170,7 +219,10 @@ def test_scalar_mul_div(v1, e1, v2, e2, op):
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @given(
-    v1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    v1=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
     v2=hnp.arrays(
         dtype=st.sampled_from([np.float64]),
         shape=(11,),
@@ -181,7 +233,10 @@ def test_scalar_mul_div(v1, e1, v2, e2, op):
             allow_infinity=False,
         ),
     ),
-    e1=st.floats(min_value=0, max_value=1e3, allow_subnormal=False),
+    e1=st.floats(
+        min_value=0,
+        max_value=1e3,
+    ),
     e2=hnp.arrays(
         dtype=st.sampled_from([np.float64]),
         shape=(11,),

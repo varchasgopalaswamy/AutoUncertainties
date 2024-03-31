@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import locale
+import math
 import operator
 import warnings
 
@@ -20,19 +21,20 @@ from auto_uncertainties import (
 from auto_uncertainties.util import (
     ignore_numpy_downcast_warnings,
     ignore_runtime_warnings,
-    strip_device_array,
 )
 
 from ..display_format import ScalarDisplay, VectorDisplay
 from ..numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
 ERROR_ON_DOWNCAST = False
+COMPARE_RTOL = 1e-9
 
 __all__ = [
     "Uncertainty",
     "VectorUncertainty",
     "ScalarUncertainty",
     "set_downcast_error",
+    "set_compare_error",
     "nominal_values",
     "std_devs",
 ]
@@ -41,6 +43,11 @@ __all__ = [
 def set_downcast_error(val: bool):
     global ERROR_ON_DOWNCAST
     ERROR_ON_DOWNCAST = val
+
+
+def set_compare_error(val: float):
+    global COMPARE_RTOL
+    COMPARE_RTOL = val
 
 
 def _check_units(value, err):
@@ -125,23 +132,19 @@ class Uncertainty(Generic[T]):
     @ignore_numpy_downcast_warnings
     def __new__(cls: Type[Uncertainty], value: T | Uncertainty, err=None):
         # If instantiated with an Uncertainty subclass
-        if isinstance(value, cls):
-            value = value.value
+        if isinstance(value, (ScalarUncertainty, VectorUncertainty)):
             err = value.error
+            value = value.value
         # If instantiated with a list or tuple of uncertainties
         elif isinstance(value, (list, tuple)):
             inst = cls.from_list(value)
             value = inst.value
             err = inst.error
 
-        value = strip_device_array(value)
-        if err is not None:
-            err = strip_device_array(err)
-
+        nan = False
         # Numpy arrays
         if np.ndim(value) > 0:
             vector = True
-            value = np.asarray(value)
             # Zero error
             if err is None:
                 err = np.zeros_like(value)
@@ -152,8 +155,6 @@ class Uncertainty(Generic[T]):
                 else:
                     assert np.ndim(value) == np.ndim(err)
                     assert np.shape(value) == np.shape(err)
-                    err = np.asarray(err)
-
             # replace NaN with zero in errors
             err[~np.isfinite(err)] = 0
 
@@ -163,27 +164,39 @@ class Uncertainty(Generic[T]):
                 )
         else:
             vector = False
-            if err is None or not np.isfinite(err):
-                err = 0.0
-            elif err < 0:
-                raise NegativeStdDevError(
-                    f"Found negative value ({err}) for the standard deviation!"
-                )
+            if np.isfinite(value):
+                nan = False
+                if np.isfinite(err) and err < 0:
+                    raise NegativeStdDevError(
+                        f"Found negative value ({err}) for the standard deviation!"
+                    )
+                elif err is None:
+                    err = 0.0
+                elif not np.isfinite(err):
+                    err = 0.0
+            else:
+                nan = True
 
-        if vector:
-            inst = object.__new__(VectorUncertainty)
+        if nan:
+            inst = np.NaN
         else:
-            inst = object.__new__(ScalarUncertainty)
-        inst.__init__(value, err)
+            if vector:
+                inst = object.__new__(VectorUncertainty)
+            else:
+                inst = object.__new__(ScalarUncertainty)
+
+            inst.__init__(value, err, trigger=True)
         return inst
 
-    def __init__(self, value: T, err: T | None):
-        if hasattr(value, "units") or hasattr(err, "units"):
-            raise NotImplementedError(
-                "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
-            )
-        self._nom = value
-        self._err = err
+    def __init__(self, value: T, err: T | None, trigger=False):
+        if trigger:
+            if hasattr(value, "units") or hasattr(err, "units"):
+                raise NotImplementedError(
+                    "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
+                )
+
+            self._nom = value
+            self._err = err
 
     def __copy__(self) -> Uncertainty[T]:
         ret = self.__class__(copy.copy(self._nom), copy.copy(self._err))
@@ -203,10 +216,6 @@ class Uncertainty(Generic[T]):
     @property
     def error(self):
         return self._err
-
-    def __hash__(self) -> int:
-        digest = joblib.hash((self._nom, self._err), hash_name="sha1")
-        return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
     @property
     def relative(self) -> T:
@@ -235,7 +244,7 @@ class Uncertainty(Generic[T]):
             return Uncertainty(float(string))
         else:
             u1, u2 = new_str.split("±")
-            return cls(float(u1), float(u2))
+            return Uncertainty(float(u1), float(u2))
 
     @classmethod
     def from_quantities(cls, value, err):
@@ -277,14 +286,18 @@ class Uncertainty(Generic[T]):
 
         return cls(val, err)
 
+    _HANDLED_TYPES = (np.ndarray, float, int)
+
     # Math Operators
     def __add__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom + other._nom
             new_err = np.sqrt(self._err**2 + other._err**2)
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom + other
             new_err = self._err
+        else:
+            return NotImplemented
         try:
             return self.__class__(new_mag, new_err)
         except NotImplementedError:
@@ -296,9 +309,11 @@ class Uncertainty(Generic[T]):
         if isinstance(other, Uncertainty):
             new_mag = self._nom - other._nom
             new_err = np.sqrt(self._err**2 + other._err**2)
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom - other
             new_err = self._err
+        else:
+            return NotImplemented
         try:
             return self.__class__(new_mag, new_err)
         except NotImplementedError:
@@ -311,9 +326,11 @@ class Uncertainty(Generic[T]):
         if isinstance(other, Uncertainty):
             new_mag = self._nom * other._nom
             new_err = np.abs(new_mag) * np.sqrt(self.rel2 + other.rel2)
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom * other
             new_err = np.abs(self._err * other)
+        else:
+            return NotImplemented
         try:
             return self.__class__(new_mag, new_err)
         except NotImplementedError:
@@ -326,9 +343,11 @@ class Uncertainty(Generic[T]):
         if isinstance(other, Uncertainty):
             new_mag = self._nom / other._nom
             new_err = np.abs(new_mag) * np.sqrt(self.rel2 + other.rel2)
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom / other
             new_err = np.abs(self._err / other)
+        else:
+            return NotImplemented
         try:
             return self.__class__(new_mag, new_err)
         except NotImplementedError:
@@ -339,9 +358,11 @@ class Uncertainty(Generic[T]):
         # Other / Self
         if isinstance(other, Uncertainty):
             raise Exception
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = other / self._nom
             new_err = np.abs(new_mag) * np.abs(self.rel)
+        else:
+            return NotImplemented
         try:
             return self.__class__(new_mag, new_err)
         except NotImplementedError:
@@ -353,25 +374,32 @@ class Uncertainty(Generic[T]):
     def __floordiv__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom // other._nom
-            new_err = 0.0
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom // other
-            new_err = 0.0
+        else:
+            return NotImplemented
+        new_err = self.__div__(other).error
+
         return self.__class__(new_mag, new_err)
 
     def __rfloordiv__(self, other):
         if isinstance(other, Uncertainty):
-            return other.__truediv__(self)
-        else:
+            return other.__floordiv__(self)
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = other // self._nom
-            new_err = 0.0
+            new_err = self.__rdiv__(other).error
+
             return self.__class__(new_mag, new_err)
+        else:
+            return NotImplemented
 
     def __mod__(self, other):
         if isinstance(other, Uncertainty):
             new_mag = self._nom % other._nom
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_mag = self._nom % other
+        else:
+            return NotImplemented
         if np.ndim(new_mag) == 0:
             new_err = 0.0
         else:
@@ -382,8 +410,10 @@ class Uncertainty(Generic[T]):
         new_mag = other % self._nom
         if np.ndim(new_mag) == 0:
             new_err = 0.0
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             new_err = np.zeros_like(new_mag)
+        else:
+            return NotImplemented
         return self.__class__(new_mag, new_err)
 
     def __divmod__(self, other):
@@ -399,10 +429,18 @@ class Uncertainty(Generic[T]):
         sA = self._err
         if isinstance(other, Uncertainty):
             B = other._nom
-        else:
+            sB = other._err
+
+        elif isinstance(other, self._HANDLED_TYPES):
             B = other
+            sB = 0
+        else:
+            return NotImplemented
+
         new_mag = A**B
-        new_err = np.abs(new_mag) * np.sqrt((B / A * sA) ** 2)
+        new_err = new_err = np.abs(new_mag) * np.sqrt(
+            (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
+        )
 
         return self.__class__(new_mag, new_err)
 
@@ -414,13 +452,14 @@ class Uncertainty(Generic[T]):
         if isinstance(other, Uncertainty):
             A = other._nom
             sA = other._err
-        else:
+        elif isinstance(other, self._HANDLED_TYPES):
             A = other
             sA = 0
-
+        else:
+            return NotImplemented
         new_mag = A**B
         new_err = np.abs(new_mag) * np.sqrt(
-            (B / A * sA) ** 2 + (np.log(A) * sB) ** 2
+            (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
         )
 
         return self.__class__(new_mag, new_err)
@@ -433,12 +472,6 @@ class Uncertainty(Generic[T]):
 
     def __neg__(self):
         return self.__class__(operator.neg(self._nom), self._err)
-
-    def __eq__(self, other):
-        if isinstance(other, Uncertainty):
-            return self._nom == other._nom
-        else:
-            return self._nom == other
 
     def compare(self, other, op):
         if isinstance(other, Uncertainty):
@@ -478,12 +511,13 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     __array_priority__ = 18
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if np.ndim(self._nom) == 0:
-            raise ValueError(
-                "VectorUncertainty must have a dimension greater than 0!"
-            )
+    def __init__(self, value: T, err: T | None = None, trigger=False):
+        if trigger:
+            super().__init__(value=value, err=err, trigger=trigger)
+            if np.ndim(self._nom) == 0:
+                raise ValueError(
+                    "VectorUncertainty must have a dimension greater than 0!"
+                )
 
     def __ne__(self, other):
         out = self.__eq__(other)
@@ -495,6 +529,13 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def __iter__(self):
         for v, e in zip(self._nom, self._err):
             yield self.__class__(v, e)
+
+    def __eq__(self, other):
+        if isinstance(other, Uncertainty):
+            ret = self._nom == other._nom
+        else:
+            ret = self._nom == other
+        return ret
 
     @property
     def relative(self):
@@ -628,10 +669,20 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             raise TypeError(f"Index {key} not supported!")
 
     def __setitem__(self, key, value):
+        # If value is nan, just set the value in those regions to nan and return. This is the only case where a scalar can be passed as an argument!
         if not isinstance(value, Uncertainty):
-            raise ValueError(
-                f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
-            )
+            try:
+                if not np.isfinite(value):
+                    self._nom[key] = value
+                    self._err[key] = 0
+                    return
+                else:
+                    raise ValueError
+            except Exception:
+                raise ValueError(
+                    f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
+                )
+
         try:
             _ = self._nom[key]
         except ValueError as exc:
@@ -673,6 +724,10 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def view(self):
         return self.__class__(self._nom.view(), self._err.view())
 
+    def __hash__(self) -> int:
+        digest = joblib.hash((self._nom, self._err), hash_name="sha1")
+        return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
+
 
 class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
     @property
@@ -703,3 +758,19 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
     def __ne__(self, other):
         out = self.__eq__(other)
         return not out
+
+    def __eq__(self, other):
+        if isinstance(other, Uncertainty):
+            try:
+                ret = math.isclose(self._nom, other._nom, rel_tol=COMPARE_RTOL)
+            except TypeError:
+                ret = self._nom == other._nom
+        else:
+            try:
+                ret = math.isclose(self._nom, other, rel_tol=COMPARE_RTOL)
+            except TypeError:
+                ret = self._nom == other
+        return ret
+
+    def __hash__(self) -> int:
+        return hash((self._nom, self._err))

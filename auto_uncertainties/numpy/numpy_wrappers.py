@@ -69,7 +69,7 @@ def convert_arg(arg, attr: str = None):
         if attr != "_nom":
             return None
         else:
-            return [convert_arg(item, attr) for item in arg]
+            return np.array([convert_arg(item, attr) for item in arg])
     else:
         if attr != "_nom":
             return None
@@ -430,6 +430,72 @@ implement_func(
 bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp", "median"]
 for ufunc in bcast_reduction_unary:
     implement_func("function", ufunc, implement_mode="reduction_unary")
+
+
+def _power(x1, x2, *args, **kwargs):
+    """x1 ** x2"""
+    from auto_uncertainties import Uncertainty
+
+    if _is_uncertainty(x1):
+        sA = x1._err
+        A = x1._nom
+    else:
+        sA = 0
+        A = x1
+    if _is_uncertainty(x2):
+        sB = x2._err
+        B = x2._nom
+    else:
+        sB = 0
+        B = x2
+
+    new_mag = np.power(A, B, *args, **kwargs)
+
+    new_err = np.abs(new_mag) * np.sqrt(
+        (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
+    )
+
+    return Uncertainty(new_mag, new_err)
+
+
+implements("power", "function")(_power)
+implements("power", "ufunc")(_power)
+
+
+def _searchsort(x1, x2, *args, **kwargs):
+    """x1 ** x2"""
+
+    if _is_uncertainty(x1):
+        A = x1._nom
+    else:
+        A = x1
+    if _is_uncertainty(x2):
+        B = x2._nom
+    else:
+        B = x2
+
+    return np.searchsorted(A, B, *args, **kwargs)
+
+
+implements("searchsorted", "function")(_searchsort)
+
+
+@implements("unique", "function")
+def _unique(
+    ar,
+    return_index=False,
+    return_inverse=False,
+    return_counts=False,
+    axis=None,
+    *,
+    equal_nan=True,
+):
+    ret = np.unique(
+        ar._nom,
+        return_index=True,
+    )
+    idx = ret[1]
+    return ar.__class__(ar._nom[idx], ar._err[idx])
 
 
 @implements("round", "function")
