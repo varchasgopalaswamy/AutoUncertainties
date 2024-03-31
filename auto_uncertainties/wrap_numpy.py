@@ -190,6 +190,7 @@ def implement_func(
     grad_argnum_override=None,
     selection_operator=None,
     output_rank=0,
+    custom_jax_dispatch=None,
 ):
     """Add default-behavior NumPy function/ufunc to the handled list.
 
@@ -213,7 +214,10 @@ def implement_func(
     if jnp is None:
         return
 
-    func = get_func_from_package(func_str, jnp)
+    if custom_jax_dispatch is not None:
+        func = custom_jax_dispatch
+    else:
+        func = get_func_from_package(func_str, jnp)
     # Skip the JAX overhead if you dont need gradient info
     func_np = get_func_from_package(func_str, np)
 
@@ -422,7 +426,12 @@ for ufunc in bcast_apply_to_both_funcs:
     implement_func("function", ufunc, implement_mode="apply_to_both")
 
 # Applies a reduction
-implement_func("function", "trapz", implement_mode="reduction_binary")
+implement_func(
+    "function",
+    "trapz",
+    implement_mode="reduction_binary",
+    custom_jax_dispatch=jax.scipy.integrate.trapezoid,
+)
 
 bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp", "median"]
 for ufunc in bcast_reduction_unary:
