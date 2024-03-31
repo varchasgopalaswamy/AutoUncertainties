@@ -7,6 +7,8 @@ from numpy.typing import NDArray
 
 ROUND_ON_DISPLAY = False
 
+__all__ = ["set_display_rounding", "VectorDisplay", "ScalarDisplay"]
+
 
 def set_display_rounding(val: bool):
     global ROUND_ON_DISPLAY

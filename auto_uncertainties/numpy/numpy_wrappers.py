@@ -3,22 +3,16 @@
 
 from __future__ import annotations
 
-try:
-    import numpy as np
-except ImportError:
-    np = None
-try:
-    import jax
-    import jax.numpy as jnp
+import jax
+import jax.numpy as jnp
+import numpy as np
 
-except ImportError:
-    jax = None
-    jnp = None
-
-from .util import has_length, is_iterable, ndarray_to_scalar
+from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
+
+__all__ = ["wrap_numpy", "HANDLED_UFUNCS", "HANDLED_FUNCTIONS"]
 
 
 def _is_uncertainty(obj):

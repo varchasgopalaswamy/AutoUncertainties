@@ -26,10 +26,16 @@ from pandas.core.dtypes.common import is_integer
 from pandas.core.dtypes.generic import ABCDataFrame, ABCIndex, ABCSeries
 from pandas.core.indexers import check_array_indexer
 
-from .uncertainty import ScalarUncertainty, Uncertainty, VectorUncertainty
+from ..uncertainty.uncertainty import (
+    ScalarUncertainty,
+    Uncertainty,
+    VectorUncertainty,
+)
 
 if TYPE_CHECKING:
     from pandas._typing import type_t
+
+__all__ = ["UncertaintyDtype", "UncertaintyArray"]
 
 
 @register_extension_dtype

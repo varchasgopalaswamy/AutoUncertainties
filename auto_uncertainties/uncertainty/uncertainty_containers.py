@@ -12,16 +12,30 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Generic, Type, TypeVar
 
-from . import NegativeStdDevError, NumpyDowncastWarning
-from .display_format import ScalarDisplay, VectorDisplay
-from .util import (
+from auto_uncertainties import (
+    NegativeStdDevError,
+    NumpyDowncastError,
+    NumpyDowncastWarning,
+)
+from auto_uncertainties.util import (
     ignore_numpy_downcast_warnings,
     ignore_runtime_warnings,
     strip_device_array,
 )
-from .wrap_numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
+
+from ..display_format import ScalarDisplay, VectorDisplay
+from ..numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 
 ERROR_ON_DOWNCAST = False
+
+__all__ = [
+    "Uncertainty",
+    "VectorUncertainty",
+    "ScalarUncertainty",
+    "set_downcast_error",
+    "nominal_values",
+    "std_devs",
+]
 
 
 def set_downcast_error(val: bool):
@@ -56,6 +70,48 @@ def _check_units(value, err):
         ret_err = err
 
     return ret_val, ret_err, ret_units
+
+
+def nominal_values(x):
+    # Is an Uncertainty
+    if hasattr(x, "_nom"):
+        return x.value
+    else:
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return x
+            else:
+                return x2.value
+        else:
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return x
+            else:
+                return x2.value
+
+
+def std_devs(x):
+    # Is an Uncertainty
+    if hasattr(x, "_err"):
+        return x.error
+    else:
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return np.zeros_like(x)
+            else:
+                return x2.error
+        else:
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return 0
+            else:
+                return x2.error
 
 
 ST = TypeVar("ST", float, int)
@@ -509,7 +565,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     def __array__(self, t=None) -> np.ndarray:
         if ERROR_ON_DOWNCAST:
-            raise Exception(
+            raise NumpyDowncastError(
                 "The uncertainty is stripped when downcasting to ndarray."
             )
         else:
