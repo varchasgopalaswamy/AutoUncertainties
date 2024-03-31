@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -375,21 +377,31 @@ bcast_selection_operator_funcs = ["argmax", "argmin"]
 for ufunc in bcast_selection_operator_funcs:
     implement_func("function", ufunc, implement_mode="selection_operator")
 
-# Selects a sub-section of or reshapes the Uncertainty array by some criteria
-bcast_selection_funcs = {
-    "max": "argmax",
-    "min": "argmin",
-    "amax": "argmax",
-    "amin": "argmin",
-}
 
-for ufunc, sel_op in bcast_selection_funcs.items():
-    implement_func(
-        "function",
-        ufunc,
-        implement_mode="selection",
-        selection_operator=sel_op,
-    )
+# This can only be done correctly via Monte-Carlo estimation
+def _monte_carlo_reduction(a, axis=None, **kwargs):
+    from auto_uncertainties import Uncertainty
+
+    N = 1000
+    samples = np.random.normal(size=a._nom.shape + (N,))
+    samples = a._nom[..., None] + samples * a._err[..., None]
+
+    if axis is None:
+        axis = tuple(range(a._nom.ndim))
+
+    operation = getattr(np, kwargs.pop("op"))
+    result = operation(samples, axis=axis, **kwargs)
+
+    mean_value = np.mean(result, axis=-1)
+    std_value = np.std(result, axis=-1)
+
+    return Uncertainty(mean_value, std_value)
+
+
+apply_via_monte_carlo = ["max", "min", "amax", "amin", "median"]
+for ufunc in apply_via_monte_carlo:
+    implements(ufunc, "function")(partial(_monte_carlo_reduction, op=ufunc))
+
 
 # Applies ufunc or func to both the value and error
 bcast_apply_to_both_funcs = [
