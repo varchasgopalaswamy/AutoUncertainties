@@ -209,8 +209,6 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             for t in inputs
         ):
             return NotImplemented
-        if method != "__call__":
-            return NotImplemented
         inputs = tuple(
             x._data if isinstance(x, UncertaintyArray) else x for x in inputs
         )

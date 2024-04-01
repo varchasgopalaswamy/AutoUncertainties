@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from functools import partial
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -251,7 +249,8 @@ def implement_func(
             axis = uncert_kwarg_nom.pop("axis", None)
             if axis is None:
                 idx = sel_func_np(*uncert_arg_nom, **uncert_kwarg_nom)
-                return np.ravel(uncert_arg_nom[0])[idx]
+                val = np.ravel(uncert_arg_nom[0])[idx]
+                err = np.ravel(uncert_arg_err[0])[idx]
             else:
                 idxs = np.expand_dims(
                     sel_func_np(
@@ -259,7 +258,9 @@ def implement_func(
                     ),
                     axis=axis,
                 )
-                return np.take_along_axis(uncert_arg_nom[0], idxs, axis=axis)
+                val = np.take_along_axis(uncert_arg_nom[0], idxs, axis=axis)
+                err = np.take_along_axis(uncert_arg_err[0], idxs, axis=axis)
+            return Uncertainty(val, err)
         elif implement_mode in ["apply_to_both"]:
             val = func_np(*uncert_arg_nom, **uncert_kwarg_nom)
             err = np.abs(func_np(*uncert_arg_err, **uncert_kwarg_nom))
@@ -382,7 +383,7 @@ for ufunc in bcast_selection_operator_funcs:
 def _monte_carlo_reduction(a, axis=None, **kwargs):
     from auto_uncertainties import Uncertainty
 
-    N = 1000
+    N = 10000
     samples = np.random.normal(size=a._nom.shape + (N,))
     samples = a._nom[..., None] + samples * a._err[..., None]
 
@@ -398,10 +399,25 @@ def _monte_carlo_reduction(a, axis=None, **kwargs):
     return Uncertainty(mean_value, std_value)
 
 
-apply_via_monte_carlo = ["max", "min", "amax", "amin", "median"]
-for ufunc in apply_via_monte_carlo:
-    implements(ufunc, "function")(partial(_monte_carlo_reduction, op=ufunc))
+# apply_via_monte_carlo = ["max", "min", "amax", "amin", "median"]
+# for ufunc in apply_via_monte_carlo:
+#     implements(ufunc, "function")(partial(_monte_carlo_reduction, op=ufunc))
 
+# Selects a sub-section of or reshapes the Uncertainty array by some criteria
+bcast_selection_funcs = {
+    "max": "argmax",
+    "min": "argmin",
+    "amax": "argmax",
+    "amin": "argmin",
+}
+
+for ufunc, sel_op in bcast_selection_funcs.items():
+    implement_func(
+        "function",
+        ufunc,
+        implement_mode="selection",
+        selection_operator=sel_op,
+    )
 
 # Applies ufunc or func to both the value and error
 bcast_apply_to_both_funcs = [
