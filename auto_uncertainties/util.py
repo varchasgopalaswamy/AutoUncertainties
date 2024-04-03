@@ -9,7 +9,7 @@ import numpy as np
 from jax import Array
 from numpy.typing import NDArray
 
-from . import NumpyDowncastWarning
+from . import DowncastWarning
 
 T = TypeVar("T", bound=np.generic, covariant=True)
 
@@ -55,7 +55,7 @@ def ignore_numpy_downcast_warnings(f):
     @wraps(f)
     def user_warn_inner(*args, **kwargs):
         with warnings.catch_warnings(record=True):
-            warnings.simplefilter("ignore", category=NumpyDowncastWarning)
+            warnings.simplefilter("ignore", category=DowncastWarning)
             response = f(*args, **kwargs)
         return response
 

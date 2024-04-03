@@ -2,8 +2,8 @@ from . import display_format, exceptions, numpy, pandas, uncertainty, util
 from .display_format import ScalarDisplay, VectorDisplay, set_display_rounding
 from .exceptions import (
     NegativeStdDevError,
-    NumpyDowncastError,
-    NumpyDowncastWarning,
+    DowncastError,
+    DowncastWarning,
 )
 from .pandas import UncertaintyArray, UncertaintyDtype, unc_array
 from .uncertainty import (
@@ -18,8 +18,8 @@ from .uncertainty import (
 
 __all__ = [
     "NegativeStdDevError",
-    "NumpyDowncastError",
-    "NumpyDowncastWarning",
+    "DowncastError",
+    "DowncastWarning",
     "ScalarDisplay",
     "ScalarUncertainty",
     "Uncertainty",

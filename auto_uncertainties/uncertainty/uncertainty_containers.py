@@ -14,9 +14,9 @@ from numpy.typing import NDArray
 from typing_extensions import Generic, Type, TypeVar
 
 from auto_uncertainties import (
+    DowncastError,
+    DowncastWarning,
     NegativeStdDevError,
-    NumpyDowncastError,
-    NumpyDowncastWarning,
 )
 from auto_uncertainties.util import (
     ignore_numpy_downcast_warnings,
@@ -497,6 +497,47 @@ class Uncertainty(Generic[T]):
 
     __nonzero__ = __bool__
 
+    # NumPy function/ufunc support
+    @ignore_runtime_warnings
+    def __array_function__(self, func, types, args, kwargs):
+        if func.__name__ not in HANDLED_FUNCTIONS:
+            return NotImplemented
+        elif not any(issubclass(t, self.__class__) for t in types):
+            return NotImplemented
+        else:
+            return wrap_numpy("function", func, args, kwargs)
+
+    @ignore_runtime_warnings
+    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
+        if method != "__call__":
+            raise NotImplementedError
+        else:
+            if ufunc.__name__ not in HANDLED_UFUNCS:
+                raise NotImplementedError(
+                    f"Ufunc {ufunc.__name__} is not implemented!"
+                ) from None
+            else:
+                return wrap_numpy("ufunc", ufunc, args, kwargs)
+
+    def __getattr__(self, item):
+        if item.startswith("__array_"):
+            # Handle array protocol attributes other than `__array__`
+            raise AttributeError(
+                f"Array protocol attribute {item} not available."
+            )
+        elif item in HANDLED_UFUNCS:
+            return lambda *args, **kwargs: wrap_numpy(
+                "ufunc", item, [self] + list(args), kwargs
+            )
+        elif item in HANDLED_FUNCTIONS:
+            return lambda *args, **kwargs: wrap_numpy(
+                "function", item, [self] + list(args), kwargs
+            )
+        else:
+            raise AttributeError(
+                f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
+            ) from None
+
 
 class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     __apply_to_both_ndarray__ = [
@@ -510,6 +551,38 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     __ndarray_attributes__ = ["dtype", "ndim", "size"]
 
     __array_priority__ = 18
+
+    # More numpy capabilities exposed here
+    def __getattr__(self, item):
+        if item.startswith("__array_"):
+            # Handle array protocol attributes other than `__array__`
+            raise AttributeError(
+                f"Array protocol attribute {item} not available."
+            )
+        elif item in self.__apply_to_both_ndarray__:
+            val = getattr(self._nom, item)
+            err = getattr(self._err, item)
+
+            if callable(val):
+                return lambda *args, **kwargs: self.__class__(
+                    val(*args, **kwargs), err(*args, **kwargs)
+                )
+            else:
+                return self.__class__(val, err)
+        elif item in HANDLED_UFUNCS:
+            return lambda *args, **kwargs: wrap_numpy(
+                "ufunc", item, [self] + list(args), kwargs
+            )
+        elif item in HANDLED_FUNCTIONS:
+            return lambda *args, **kwargs: wrap_numpy(
+                "function", item, [self] + list(args), kwargs
+            )
+        elif item in self.__ndarray_attributes__:
+            return getattr(self._nom, item)
+        else:
+            raise AttributeError(
+                f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
+            ) from None
 
     def __init__(self, value: T, err: T | None = None, trigger=False):
         if trigger:
@@ -551,68 +624,15 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def __round__(self, ndigits):
         return self.__class__(np.round(self._nom, decimals=ndigits), self._err)
 
-    # NumPy function/ufunc support
-    @ignore_runtime_warnings
-    def __array_function__(self, func, types, args, kwargs):
-        if func.__name__ not in HANDLED_FUNCTIONS:
-            return NotImplemented
-        elif not any(issubclass(t, self.__class__) for t in types):
-            return NotImplemented
-        else:
-            return wrap_numpy("function", func, args, kwargs)
-
-    @ignore_runtime_warnings
-    def __array_ufunc__(self, ufunc, method, *args, **kwargs):
-        if method != "__call__":
-            raise NotImplementedError
-        else:
-            if ufunc.__name__ not in HANDLED_UFUNCS:
-                raise NotImplementedError(
-                    f"Ufunc {ufunc.__name__} is not implemented!"
-                ) from None
-            else:
-                return wrap_numpy("ufunc", ufunc, args, kwargs)
-
-    def __getattr__(self, item):
-        if item.startswith("__array_"):
-            # Handle array protocol attributes other than `__array__`
-            raise AttributeError(
-                f"Array protocol attribute {item} not available."
-            )
-        elif item in self.__apply_to_both_ndarray__:
-            val = getattr(self._nom, item)
-            err = getattr(self._err, item)
-
-            if callable(val):
-                return lambda *args, **kwargs: self.__class__(
-                    val(*args, **kwargs), err(*args, **kwargs)
-                )
-            else:
-                return self.__class__(val, err)
-        elif item in HANDLED_UFUNCS:
-            return lambda *args, **kwargs: wrap_numpy(
-                "ufunc", item, [self] + list(args), kwargs
-            )
-        elif item in HANDLED_FUNCTIONS:
-            return lambda *args, **kwargs: wrap_numpy(
-                "function", item, [self] + list(args), kwargs
-            )
-        elif item in self.__ndarray_attributes__:
-            return getattr(self._nom, item)
-        else:
-            raise AttributeError(
-                f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
-            ) from None
-
     def __array__(self, t=None) -> np.ndarray:
         if ERROR_ON_DOWNCAST:
-            raise NumpyDowncastError(
+            raise DowncastError(
                 "The uncertainty is stripped when downcasting to ndarray."
             )
         else:
             warnings.warn(
                 "The uncertainty is stripped when downcasting to ndarray.",
-                NumpyDowncastWarning,
+                DowncastWarning,
                 stacklevel=2,
             )
             return np.asarray(self._nom)
@@ -739,11 +759,45 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
         except ZeroDivisionError:
             return np.NaN
 
-    def __float__(self) -> ScalarUncertainty:
-        return ScalarUncertainty(float(self.value), float(self.error))
+    def __float__(self):
+        if ERROR_ON_DOWNCAST:
+            raise DowncastError(
+                "The uncertainty is stripped when downcasting to float."
+            )
+        else:
+            warnings.warn(
+                "The uncertainty is stripped when downcasting to float.",
+                DowncastWarning,
+                stacklevel=2,
+            )
 
-    def __int__(self) -> ScalarUncertainty[int]:
-        return ScalarUncertainty(int(self.value), int(self.error))
+        return float(self._nom)
+
+    def __int__(self):
+        if ERROR_ON_DOWNCAST:
+            raise DowncastError(
+                "The uncertainty is stripped when downcasting to float."
+            )
+        else:
+            warnings.warn(
+                "The uncertainty is stripped when downcasting to float.",
+                DowncastWarning,
+                stacklevel=2,
+            )
+        return int(self._nom)
+
+    def __complex__(self):
+        if ERROR_ON_DOWNCAST:
+            raise DowncastError(
+                "The uncertainty is stripped when downcasting to float."
+            )
+        else:
+            warnings.warn(
+                "The uncertainty is stripped when downcasting to float.",
+                DowncastWarning,
+                stacklevel=2,
+            )
+        return complex(self._nom)
 
     def __round__(self, ndigits):
         return self.__class__(round(self._nom, ndigits=ndigits), self._err)

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-__all__ = ["NegativeStdDevError", "NumpyDowncastWarning"]
+__all__ = ["NegativeStdDevError", "DowncastWarning"]
 
-__all__ = ["NegativeStdDevError", "NumpyDowncastError", "NumpyDowncastWarning"]
+__all__ = ["NegativeStdDevError", "DowncastError", "DowncastWarning"]
 
 
 class NegativeStdDevError(Exception):
@@ -12,13 +12,13 @@ class NegativeStdDevError(Exception):
     pass
 
 
-class NumpyDowncastError(RuntimeError):
+class DowncastError(RuntimeError):
     """An exception for when an uncertainties array is downcast to a numpy array"""
 
     pass
 
 
-class NumpyDowncastWarning(RuntimeWarning):
+class DowncastWarning(RuntimeWarning):
     """An exception for when an uncertainties array is downcast to a numpy array"""
 
     pass
