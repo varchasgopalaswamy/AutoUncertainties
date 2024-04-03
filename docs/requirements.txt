@@ -1,0 +1,6 @@
+sphinx >= 4.1.2
+sphinx_rtd_theme >= 1.0.0
+sphinxcontrib-bibtex >= 2.3.1
+sphinxcontrib-napoleon >= 0.7
+sphinx_autodoc_typehints
+sphinx-copybutton
