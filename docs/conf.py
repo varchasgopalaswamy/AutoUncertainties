@@ -37,6 +37,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx_rtd_theme",
+    "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
 ]
@@ -67,11 +68,13 @@ autodoc_default_options = {"class-doc-from": "__init__"}
 add_function_parentheses = False
 # -- Options for extensions ----------------------------------------------------
 # napoleon
-
+typehints_fully_qualified = False
 typehints_defaults = "comma"
 typehints_use_rtype = True
 typehints_document_rtype = True
 always_document_param_types = True
+typehints_use_signature = True
+typehints_use_signature_return = True
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

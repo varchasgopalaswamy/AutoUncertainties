@@ -11,6 +11,7 @@ __all__ = ["set_display_rounding", "VectorDisplay", "ScalarDisplay"]
 
 
 def set_display_rounding(val: bool):
+    """Set the rounding on display to PDG recommendations."""
     global ROUND_ON_DISPLAY
     ROUND_ON_DISPLAY = val
 

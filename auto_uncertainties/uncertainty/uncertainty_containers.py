@@ -7,6 +7,7 @@ import locale
 import math
 import operator
 import warnings
+from typing import Sequence
 
 import joblib
 import numpy as np
@@ -41,6 +42,7 @@ __all__ = [
 
 
 def set_downcast_error(val: bool):
+    """Set whether errors occur when uncertainty is stripped"""
     global ERROR_ON_DOWNCAST
     ERROR_ON_DOWNCAST = val
 
@@ -79,7 +81,8 @@ def _check_units(value, err):
     return ret_val, ret_err, ret_units
 
 
-def nominal_values(x):
+def nominal_values(x) -> T:
+    """Return the central value of an Uncertainty object if it is one, otherwise returns the object"""
     # Is an Uncertainty
     if hasattr(x, "_nom"):
         return x.value
@@ -100,7 +103,8 @@ def nominal_values(x):
                 return x2.value
 
 
-def std_devs(x):
+def std_devs(x) -> T:
+    """Return the uncertainty of an Uncertainty object if it is one, otherwise returns zero"""
     # Is an Uncertainty
     if hasattr(x, "_err"):
         return x.error
@@ -126,6 +130,20 @@ T = TypeVar("T", NDArray, float, int)
 
 
 class Uncertainty(Generic[T]):
+    """Base class for Uncertainty objects
+
+
+    Parameters
+    ----------
+
+    value :
+        The central value(s)
+
+    err:
+        The uncertainty value(s). Zero if not provided. Negative numbers raise a RuntimeError.
+
+    """
+
     _nom: T
     _err: T
 
@@ -210,26 +228,32 @@ class Uncertainty(Generic[T]):
         return ret  # type: ignore
 
     @property
-    def value(self):
+    def value(self) -> T:
+        """The central value of the Uncertainty object"""
         return self._nom
 
     @property
-    def error(self):
+    def error(self) -> T:
+        """The uncertainty value of the Uncertainty object"""
         return self._err
 
     @property
     def relative(self) -> T:
+        """The relative uncertainty of the Uncertainty object"""
         raise NotImplementedError
 
     @property
-    def rel(self):
+    def rel(self) -> T:
+        """Alias for relative property"""
         return self.relative
 
     @property
     def rel2(self) -> T:
+        """The square of the relative uncertainty of the Uncertainty object"""
         raise NotImplementedError
 
     def plus_minus(self, err: T):
+        """Add an error to the Uncertainty object"""
         val = self._nom
         old_err = self._err
         new_err = np.sqrt(old_err**2 + err**2)
@@ -238,6 +262,13 @@ class Uncertainty(Generic[T]):
 
     @classmethod
     def from_string(cls, string: str):
+        """Create an Uncertainty object from a string representation of the value and error.
+
+        Parameters
+        ----------
+        string : str
+            A string representation of the value and error. The error can be represented as "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
+        """
         new_str = string.replace("+/-", "±")
         new_str = new_str.replace("+-", "±")
         if "±" not in new_str:
@@ -248,6 +279,15 @@ class Uncertainty(Generic[T]):
 
     @classmethod
     def from_quantities(cls, value, err):
+        """Create an Uncertainty object from two `Pint` quantities
+
+        Parameters
+        ----------
+        value : pint.Quantity
+            The central value of the Uncertainty object
+        err : pint.Quantity
+            The uncertainty value of the Uncertainty object
+        """
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
         if units is not None:
@@ -255,11 +295,25 @@ class Uncertainty(Generic[T]):
         return inst
 
     @classmethod
-    def from_list(cls, u_list):
+    def from_list(cls, u_list: Sequence[Uncertainty]):
+        """Create an Uncertainty object from a list of Uncertainty objects
+
+        Parameters
+        ----------
+        u_list :
+            A list of Uncertainty objects
+        """
         return cls.from_sequence(u_list)
 
     @classmethod
-    def from_sequence(cls, seq):
+    def from_sequence(cls, seq: Sequence[Uncertainty]):
+        """Create an Uncertainty object from a sequence of Uncertainty objects
+
+        Parameters
+        ----------
+        seq :
+            A list of Uncertainty objects
+        """
         _ = iter(seq)
 
         len_seq = len(seq)
@@ -473,22 +527,22 @@ class Uncertainty(Generic[T]):
     def __neg__(self):
         return self.__class__(operator.neg(self._nom), self._err)
 
-    def compare(self, other, op):
+    def _compare(self, other, op):
         if isinstance(other, Uncertainty):
             return op(self._nom, other._nom)
         else:
             return op(self._nom, other)
 
-    __lt__ = lambda self, other: self.compare(  # noqa: E731
+    __lt__ = lambda self, other: self._compare(  # noqa: E731
         other, op=operator.lt
     )
-    __le__ = lambda self, other: self.compare(  # noqa: E731
+    __le__ = lambda self, other: self._compare(  # noqa: E731
         other, op=operator.le
     )
-    __ge__ = lambda self, other: self.compare(  # noqa: E731
+    __ge__ = lambda self, other: self._compare(  # noqa: E731
         other, op=operator.ge
     )
-    __gt__ = lambda self, other: self.compare(  # noqa: E731
+    __gt__ = lambda self, other: self._compare(  # noqa: E731
         other, op=operator.gt
     )
 
@@ -638,14 +692,17 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             return np.asarray(self._nom)
 
     def clip(self, min=None, max=None, out=None, **kwargs):
+        """Numpy clip implementation"""
         return self.__class__(
             self._nom.clip(min, max, out, **kwargs), self._err
         )
 
     def fill(self, value) -> None:
+        """Numpy fill implementation"""
         return self._nom.fill(value)
 
     def put(self, indices, values, mode="raise") -> None:
+        """Numpy put implementation"""
         if isinstance(values, self.__class__):
             self._nom.put(indices, values._nom, mode)
             self._err.put(indices, values._err, mode)
@@ -655,16 +712,19 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             )
 
     def copy(self):
+        """Return a copy of the Uncertainty object"""
         return Uncertainty(self._nom.copy(), self._err.copy())
 
     # Special properties
     @property
     def flat(self):
+        """ "numpy flat implementation"""
         for u, v in (self._nom.flat, self._err.flat):
             yield self.__class__(u, v)
 
     @property
     def shape(self):
+        """Numpy shape implemenetation"""
         return self._nom.shape
 
     @shape.setter
@@ -674,9 +734,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def nbytes(self):
+        """Numpy nbytes implementation"""
         return self._nom.nbytes + self._err.nbytes
 
     def searchsorted(self, v, side="left", sorter=None):
+        """numpy searchsorted implementation"""
         return self._nom.searchsorted(v, side)
 
     def __len__(self) -> int:
@@ -718,6 +780,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             self._err[key] = value._err
 
     def tolist(self):
+        """numpy tolist implementation"""
         try:
             nom = self._nom.tolist()
             err = self._err.tolist()
@@ -739,9 +802,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def ndim(self):
+        """numpy ndim implementation"""
         return np.ndim(self._nom)
 
     def view(self):
+        """numpy view implementation"""
         return self.__class__(self._nom.view(), self._err.view())
 
     def __hash__(self) -> int:
