@@ -69,7 +69,7 @@ np.cos(arr)
 Linear uncertainty propagation of a function $f(x) : \mathbb{R}^n \rightarrow \mathbb{R}^m$ can be computed
 via the simple rule $$ \delta f_j (x)^2 = \left ( \dfrac{\partial f_j}{\partial x_i}\left( x \right ) \delta x_i  \right ) ^2 $$
 
-To compute $\dfrac{\del f_j}{\del x_i}$ for arbitrary $f$, the implementation in `AutoUncertainties` relies on automatic
+To compute $\dfrac{\partial f_j}{\partial x_i}$ for arbitrary $f$, the implementation in `AutoUncertainties` relies on automatic
 differentiaion provided by `jax`. Calls to any `numpy` array function or ufunc are intercepted via the `__array_function`
 and `__array_ufunc__` mechanism, and dispatched to a numpy wrapper routine that computes the Jacobian matrix via `jax.jacfwd`.
 
