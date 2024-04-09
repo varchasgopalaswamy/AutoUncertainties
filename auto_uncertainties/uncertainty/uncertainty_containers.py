@@ -100,7 +100,10 @@ def nominal_values(x) -> T:
             except Exception:
                 return x
             else:
-                return x2.value
+                if isinstance(x2, float):
+                    return x2
+                else:
+                    return x2.value
 
 
 def std_devs(x) -> T:
@@ -122,7 +125,10 @@ def std_devs(x) -> T:
             except Exception:
                 return 0
             else:
-                return x2.error
+                if isinstance(x2, float):
+                    return 0
+                else:
+                    return x2.error
 
 
 ST = TypeVar("ST", float, int)
