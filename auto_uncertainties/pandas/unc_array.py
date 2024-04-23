@@ -151,6 +151,14 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
     ############# Attributes ####################
     #############################################
     @property
+    def value(self):
+        return self._data._nom
+
+    @property
+    def error(self):
+        return self._data._err
+
+    @property
     def nbytes(self):
         """The byte size of the data."""
         return sys.getsizeof(self._data._nom[0]) * len(self) * 2
@@ -209,10 +217,13 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
             for t in inputs
         ):
             return NotImplemented
+        # Extract the underlying Uncertainty from all UArray objects
         inputs = tuple(
             x._data if isinstance(x, UncertaintyArray) else x for x in inputs
         )
+        # Perform the operation
         result = getattr(ufunc, method)(*inputs, **kwargs)
+        # Deal with boolean ops, otherwise return a new UArray
         if all(isinstance(x, (bool, np.bool_)) for x in result):
             if len(result) == 1:
                 retval = result[0]

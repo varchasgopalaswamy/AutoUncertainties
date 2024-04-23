@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import decimal
 import math
+from typing import Tuple
 
 from numpy.typing import NDArray
 
@@ -141,6 +143,7 @@ def first_digit(value):
         return 0
 
 
+# From https://github.com/lmfit/uncertainties/blob/master/uncertainties/core.py
 def PDG_precision(std_dev):
     """
     Return the number of significant digits to be used for the given
@@ -184,7 +187,9 @@ def PDG_precision(std_dev):
         return (2, 10.0**exponent * (1000 / factor))
 
 
-def pdg_round(value, uncertainty, format_spec="g", return_zero: bool = False):
+def pdg_round(
+    value, uncertainty, format_spec="g", return_zero: bool = False
+) -> Tuple[str, str]:
     """
     Format a value with uncertainty according to PDG rounding rules.
 
@@ -197,32 +202,38 @@ def pdg_round(value, uncertainty, format_spec="g", return_zero: bool = False):
     """
     if ROUND_ON_DISPLAY:
         if uncertainty is not None and uncertainty > 0:
-            pdg_digits, pdg_unc = PDG_precision(uncertainty)
+            _, pdg_unc = PDG_precision(uncertainty)
             # Determine the order of magnitude of the uncertainty
             order_of_magnitude = 10 ** (
                 int(math.floor(math.log10(pdg_unc))) - 1
             )
 
-            # Round the uncertainty to one significant figure
+            # Round the uncertainty based on how many digits we want to keep
             rounded_uncertainty = (
                 round(pdg_unc / order_of_magnitude) * order_of_magnitude
             )
             # Round the central value according to the rounded uncertainty
-            unc_rounding_implied = -int(
+            unc_impled_digits_to_keep = -int(
                 math.floor(math.log10(rounded_uncertainty))
             )
             if value != 0:
+                # Keep at least two digits for the central value, even if the uncertainty is much larger
                 digits = max(
-                    unc_rounding_implied,
-                    int(math.floor(math.log10(abs(value)))) + 2,
+                    unc_impled_digits_to_keep,
+                    -int(math.floor(math.log10(abs(value)))) + 1,
                 )
             else:
-                digits = unc_rounding_implied
+                digits = unc_impled_digits_to_keep
 
-            rounded_value = round(value, digits)
+            # Use decimal to keep trailing zeros
+            rounded_value_dec = round(decimal.Decimal(value), digits)
+            rounded_unc_dec = round(
+                decimal.Decimal(rounded_uncertainty),
+                unc_impled_digits_to_keep + 1,
+            )
             return (
-                f"{rounded_value:{format_spec}}",
-                f"{rounded_uncertainty:{format_spec}}",
+                f"{rounded_value_dec:{format_spec}}",
+                f"{rounded_unc_dec:{format_spec}}",
             )
 
         else:

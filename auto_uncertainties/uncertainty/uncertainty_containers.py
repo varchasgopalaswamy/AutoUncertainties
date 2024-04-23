@@ -153,6 +153,16 @@ class Uncertainty(Generic[T]):
     _nom: T
     _err: T
 
+    def __getstate__(self):
+        return {"nominal_value": self._nom, "std_devs": self._err}
+
+    def __setstate__(self, state):
+        self._nom = state["nominal_value"]
+        self._err = state["std_devs"]
+
+    def __getnewargs__(self):
+        return (self._nom, self._err)
+
     @ignore_numpy_downcast_warnings
     def __new__(cls: Type[Uncertainty], value: T | Uncertainty, err=None):
         # If instantiated with an Uncertainty subclass

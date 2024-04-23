@@ -17,12 +17,13 @@ date: 3 April 2024
 
 # Summary
 
-Propagation of uncertainties is critically important in experimental sciences.
+Propagation of uncertainties is of great utility in the experimental sciences.
 While the rules of (linear) uncertainty propagation
 are simple, managing many variables with uncertainty information
 can quickly become complicated in large scientific software stacks, and require
 keeping track of many variables and implementing custom error propagation
-rules for each mathematical operator.
+rules for each mathematical operator. The python package `AutoUncertainties`,
+described here, provides a solution to this problem.
 
 # Statement of need
 
@@ -33,35 +34,35 @@ methods, and uses automatic differentiation via `JAX` to propagate uncertainties
 for most numpy methods applied to both scalar and numpy array variables. In doing so,
 it eliminates the need for carrying around additional uncertainty variables,
 needing to implement custom propagation rules for any numpy operator with a gradient
-rule implemented by `jax`, and in most cases requires minimal re-writing of existing code,
+rule implemented by `jax`, and in most cases requires minimal modification to existing code,
 typically only when uncertainties are attached to central values.
 
 # Prior Work
 
 To the author's knowledge, the only existing error propagation library in python is the `uncertainties` package,
 which inspired the current work. While extremely useful, the `uncertainties` package
-relies on hand-implemented rules for uncertainty propagation of array and scalar data, therefore
-making it somewhat to evaluate complex mathematical expressions. For instance, calculating the uncertainty
-propagation due to the cosine must be handled as
+relies on hand-implemented rules and functions for uncertainty propagation of array and scalar data. While
+this is transparent for the intrinsic dunder methods such as `__add__`, it becomes problematic for advanced
+mathematical operators. For instance, calculating the uncertainty
+propagation due to the cosine requires the import of separate math libraries
 
 ```python
-{
+
 import numpy as np
 from uncertainties import unumpy, ufloat
 arr = np.array([ufloat(1, 0.1), ufloat(2, 0.002)])
 unumpy.cos(arr)
-}
+
 ```
 
-rather than the desired
+rather than being able to use `numpy` directly
 
 ```python
-{
 import numpy as np
 from uncertainties import ufloat
 arr = np.array([ufloat(1, 0.1), ufloat(2, 0.002)])
 np.cos(arr)
-}
+
 ```
 
 # Implementation
@@ -72,6 +73,44 @@ via the simple rule $$ \delta f_j (x)^2 = \left ( \dfrac{\partial f_j}{\partial 
 To compute $\dfrac{\partial f_j}{\partial x_i}$ for arbitrary $f$, the implementation in `AutoUncertainties` relies on automatic
 differentiaion provided by `jax`. Calls to any `numpy` array function or ufunc are intercepted via the `__array_function`
 and `__array_ufunc__` mechanism, and dispatched to a numpy wrapper routine that computes the Jacobian matrix via `jax.jacfwd`.
+
+The user API for the `Uncertainty` object exposes only a small set of properties.
+- `value -> float`: The cenral value of the object
+- `error -> float`: The error of the object
+- `relative -> float`: The relative error (i.e. error / value) of the object
+- `plus_minus(self, err:float) -> Uncertainty`: Adds error (in quadrature)
+- `from_sequence(self, seq: List[ScalarUncertainty]) -> VectorUncertainty`: Constructs an array `Uncertainty` object from a list of scalar `Uncertainty` objects
+
+To extract errors/central values from arbitrary objects, the accessors `nominal_values` and `std_devs` are provided. These
+functions return
+- The central values and errors respectively if the input is an `Uncertainty` object
+- The input and zero if the input is any other kind of object
+
+`Uncertainty` objects are displayed using rounding rules based on the uncertainty, i.e.
+
+- Error to 2 significant digits
+- Central value to first signficant digit of error, or two significant figures (whichever is more significant digits)
+
+This behavior can be toggled using `set_display_rounding`:
+
+```python
+from auto_uncertainties import set_display_rounding
+set_display_rounding(False)
+```
+
+Calling `__array__`, whether via `np.array` or any other method, will by default raise an error. This can be disabled so that a warning is issued instead
+and the `Uncertainty` object is converted to an equivalent array of its nominal values via `set_downcast_error`
+
+```python
+from auto_uncertainties import set_downcast_error
+set_downcast_error(False)
+```
+
+## Pandas
+
+Support for `pandas` via the ExtensionArray mechanism is largely functional.
+
+
 
 
 # Acknowledgements
