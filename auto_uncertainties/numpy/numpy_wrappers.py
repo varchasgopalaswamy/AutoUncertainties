@@ -432,7 +432,6 @@ bcast_apply_to_both_ufuncs = [
     "negative",
     "positive",
     "fabs",
-    "round",
     "ceil",
     "floor",
     "rint",
