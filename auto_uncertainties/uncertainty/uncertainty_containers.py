@@ -6,13 +6,12 @@ import copy
 import locale
 import math
 import operator
-from typing import Generic
+from typing import Generic, TypeVar
 import warnings
 
 import joblib
 import numpy as np
 from numpy.typing import NDArray
-from typing_extensions import TypeVar
 
 from auto_uncertainties import (
     DowncastError,
