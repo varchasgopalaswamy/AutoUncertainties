@@ -16,6 +16,7 @@ dependencies = [
     "jaxlib >= 0.3.14",
     "joblib >= 1.2.0",
     "loguru >= 0.6.0",
+    "lazy_loader==0.4",
 ]
 dynamic = ["version"]
 
