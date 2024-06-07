@@ -1,22 +1,21 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import operator
 
 import numpy as np
-import pytest
 from pandas import Series
+import pytest
 
 from auto_uncertainties import Uncertainty, UncertaintyArray, UncertaintyDtype
 
 
-@pytest.fixture
+@pytest.fixture()
 def dtype():
     """A fixture providing the ExtensionDtype to validate."""
     return UncertaintyDtype(np.float64)
 
 
-@pytest.fixture
+@pytest.fixture()
 def data():
     """
     Length-100 array for this type.
@@ -31,7 +30,7 @@ def data():
     return UncertaintyArray(v, e)
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_for_twos(dtype):
     """
     Length-100 array in which all the elements are two.
@@ -48,7 +47,7 @@ def data_for_twos(dtype):
     return UncertaintyArray(v, e)
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_missing():
     """Length-2 array with [NA, Valid]"""
     return UncertaintyArray([np.nan, 1], [0, 0.1])
@@ -63,7 +62,7 @@ def all_data(request, data, data_missing):
         return data_missing
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_repeated(data):
     """
     Generate many datasets.
@@ -86,7 +85,7 @@ def data_repeated(data):
     return gen
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_for_sorting():
     """
     Length-3 array with a known sort order.
@@ -101,7 +100,7 @@ def data_for_sorting():
     return UncertaintyArray([1, 2, 0], [0.1, 0.2, 0.3])
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_missing_for_sorting():
     """
     Length-3 array with a known sort order.
@@ -112,7 +111,7 @@ def data_missing_for_sorting():
     return UncertaintyArray([1, np.nan, 0], [0.1, np.nan, 0.3])
 
 
-@pytest.fixture
+@pytest.fixture()
 def na_cmp():
     """
     Binary operator for comparing NA values.
@@ -139,7 +138,7 @@ def na_cmp():
     return na_compare
 
 
-@pytest.fixture
+@pytest.fixture()
 def na_value(dtype):
     """
     The scalar missing value for this type. Default dtype.na_value.
@@ -149,7 +148,7 @@ def na_value(dtype):
     return dtype.na_value
 
 
-@pytest.fixture
+@pytest.fixture()
 def data_for_grouping():
     """
     Data for factorization, grouping, and unique tests.
@@ -196,9 +195,7 @@ def all_arithmetic_operators(request):
     return request.param
 
 
-@pytest.fixture(
-    params=["__eq__", "__ne__", "__le__", "__lt__", "__ge__", "__gt__"]
-)
+@pytest.fixture(params=["__eq__", "__ne__", "__le__", "__lt__", "__ge__", "__gt__"])
 def all_compare_operators(request):
     """
     Fixture for dunder names for common compare operations
@@ -343,7 +340,7 @@ def as_array(request):
     return request.param
 
 
-@pytest.fixture
+@pytest.fixture()
 def invalid_scalar(data):
     """
     A scalar that *cannot* be held by this ExtensionArray.

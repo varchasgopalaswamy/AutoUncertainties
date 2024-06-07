@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import re
@@ -8,7 +7,7 @@ import numpy as np
 from pandas.api.extensions import register_extension_dtype
 from pandas.core.dtypes.base import ExtensionDtype
 
-from ..uncertainty import ScalarUncertainty, Uncertainty
+from auto_uncertainties.uncertainty import ScalarUncertainty, Uncertainty
 
 if TYPE_CHECKING:
     from pandas._typing import type_t
@@ -23,7 +22,7 @@ class UncertaintyDtype(ExtensionDtype):
     type = Uncertainty
     name = "Uncertainty"
     _match = re.compile(r"^[U|u]ncertainty(\[([A-Za-z0-9]+)\])?$")
-    _metadata = {}
+    _metadata = {}  # noqa: RUF012
 
     def __init__(self, dtype: np.dtype | str):
         self.value_dtype = np.dtype(dtype).name
@@ -94,18 +93,16 @@ class UncertaintyDtype(ExtensionDtype):
         ...         )
         """
         if not isinstance(string, str):
-            raise TypeError(
-                f"'construct_from_string' expects a string, got {type(string)}"
-            )
+            msg = f"'construct_from_string' expects a string, got {type(string)}"
+            raise TypeError(msg)
         # error: Non-overlapping equality check (left operand type: "str", right
         #  operand type: "Callable[[ExtensionDtype], str]")  [comparison-overlap]
         assert isinstance(cls.name, str), (cls, type(cls.name))
 
         match = cls._match.match(string)
         if match is None:
-            raise TypeError(
-                f"Cannot construct a '{UncertaintyDtype.__name__}' from '{string}'"
-            )
+            msg = f"Cannot construct a '{UncertaintyDtype.__name__}' from '{string}'"
+            raise TypeError(msg)
         if match.group(1) is None:
             return cls("float64")
         return cls(match.group(1))
@@ -139,8 +136,7 @@ class UncertaintyDtype(ExtensionDtype):
                 return False
         if isinstance(other, type(self)):
             return all(
-                getattr(self, attr) == getattr(other, attr)
-                for attr in self._metadata
+                getattr(self, attr) == getattr(other, attr) for attr in self._metadata
             )
         return False
 

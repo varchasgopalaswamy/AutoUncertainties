@@ -1,0 +1,75 @@
+
+target-version = "py311"
+
+[lint]
+select = [
+    "I",
+    "W291", 
+    "W292", 
+    "T100", 
+    "YTT",
+    "UP009", 
+    "E",
+    "F",
+    "UP",
+    "B",
+    "SIM",
+    "A",
+    "COM",
+    "C4",
+    "DTZ",
+    "EM",
+    "EXE",
+    "FA",
+    "ISC",
+    "ICN",
+    "LOG",
+    "G",
+    "INP",
+    "PIE",
+    "T20",
+    "PYI",
+    "PT",
+    "Q",
+    "RSE",
+    "RET",
+    "SLF",
+    "TID",
+    "INT",
+    "PTH",
+    "TD",
+    "PD",
+    "TRY",
+    "FLY",
+    "NPY",
+    "PERF",
+    "RUF",
+    "S",
+]
+
+ignore = ["E501", "ISC002", "ISC001", 
+"COM819", "COM812", "Q003", "Q002", "Q001", "Q000", 
+"D300", "D206", "E117", "E114", "E111", "W191",
+"B008", "SIM300", "S101", "RET505", "SLF001", "RET506"
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401", "E402", "I001", "I002"]
+"__init__.pyi" = ["F401", "E402", "I001", "I002"]
+"doc/source/conf.py" = ["INP001"]
+
+[format]
+docstring-code-format = true
+line-ending = "lf"
+
+[lint.isort]
+from-first = false
+known-first-party = ["hibiscus"]
+force-sort-within-sections = true
+required-imports = ["from __future__ import annotations"]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["pylatex.utils.NoEscape"]
+
+[lint.flake8-self]
+ignore-names = []

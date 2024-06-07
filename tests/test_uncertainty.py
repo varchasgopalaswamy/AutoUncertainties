@@ -1,15 +1,14 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import math
 import operator
 import warnings
 
+from hypothesis import given
+from hypothesis.extra import numpy as hnp
 import hypothesis.strategies as st
 import numpy as np
 import pytest
-from hypothesis import given
-from hypothesis.extra import numpy as hnp
 
 from auto_uncertainties import (
     NegativeStdDevError,

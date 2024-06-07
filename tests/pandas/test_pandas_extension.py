@@ -1,14 +1,13 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from typing import final
 
 import pandas as pd
 import pandas._testing as tm
-import pytest
 from pandas.tests.extension import base
+import pytest
 
-from auto_uncertainties import nominal_values, UncertaintyArray
+from auto_uncertainties import UncertaintyArray, nominal_values
 from auto_uncertainties.uncertainty import set_downcast_error
 from auto_uncertainties.uncertainty.uncertainty_containers import (
     set_compare_error,
@@ -63,9 +62,7 @@ class TestUncertaintyArray(base.ExtensionTests):
 
         # the data can never contain other nan-likes than na_value
         for na_value_obj in tm.NULL_OBJECTS:
-            if na_value_obj is na_value or type(na_value_obj) == type(
-                na_value
-            ):
+            if na_value_obj is na_value or type(na_value_obj) == type(na_value):
                 # type check for e.g. two instances of Decimal("NAN")
                 continue
             assert na_value_obj not in data
@@ -76,9 +73,7 @@ class TestUncertaintyArray(base.ExtensionTests):
             # comparison should match point-wise comparisons
             result = op(ser, other)
             expected = ser.combine(other, op)
-            expected = self._cast_pointwise_result(
-                op.__name__, ser, other, expected
-            )
+            expected = self._cast_pointwise_result(op.__name__, ser, other, expected)
             tm.assert_series_equal(result, expected)
 
         else:
@@ -86,9 +81,7 @@ class TestUncertaintyArray(base.ExtensionTests):
 
             # Didn't error, then should match pointwise behavior
             expected = ser.combine(other, op)
-            expected = self._cast_pointwise_result(
-                op.__name__, ser, other, expected
-            )
+            expected = self._cast_pointwise_result(op.__name__, ser, other, expected)
             tm.assert_series_equal(result, expected)
 
     def test_compare_scalar(self, data, comparison_op):
@@ -144,6 +137,4 @@ class TestUncertaintyArray(base.ExtensionTests):
             result = res_op(skipna=skipna)
             expected = exp_op(skipna=skipna)
 
-        tm.assert_almost_equal(
-            nominal_values(result), nominal_values(expected)
-        )
+        tm.assert_almost_equal(nominal_values(result), nominal_values(expected))

@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import warnings
 from functools import wraps
 from typing import TypeVar
+import warnings
 
-import numpy as np
 from jax import Array
+import numpy as np
 from numpy.typing import NDArray
 
 from . import DowncastWarning
@@ -32,8 +31,7 @@ def ignore_runtime_warnings(f):
     def runtime_warn_inner(*args, **kwargs):
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            response = f(*args, **kwargs)
-        return response
+            return f(*args, **kwargs)
 
     return runtime_warn_inner
 
@@ -56,8 +54,7 @@ def ignore_numpy_downcast_warnings(f):
     def user_warn_inner(*args, **kwargs):
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("ignore", category=DowncastWarning)
-            response = f(*args, **kwargs)
-        return response
+            return f(*args, **kwargs)
 
     return user_warn_inner
 

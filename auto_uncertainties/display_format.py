@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import decimal
 import math
-from typing import Tuple
 
 from numpy.typing import NDArray
 
@@ -18,7 +16,7 @@ def set_display_rounding(val: bool):
     ROUND_ON_DISPLAY = val
 
 
-class VectorDisplay(object):
+class VectorDisplay:
     default_format: str = ""
     _nom: NDArray
     _err: NDArray
@@ -30,7 +28,7 @@ class VectorDisplay(object):
         footer = "</tbody></table>"
         vformatted = []
         eformatted = []
-        for v, e in zip(val_.ravel(), err_.ravel()):
+        for v, e in zip(val_.ravel(), err_.ravel(), strict=False):
             vformat, eformat = pdg_round(v, e, return_zero=True)
             vformatted.append(vformat)
             eformatted.append(eformat)
@@ -43,7 +41,7 @@ class VectorDisplay(object):
         val_ = self._nom
         err_ = self._err
         s = []
-        for v, e in zip(val_.ravel(), err_.ravel()):
+        for v, e in zip(val_.ravel(), err_.ravel(), strict=False):
             vformat, eformat = pdg_round(v, e, return_zero=True)
             s.append(f"{vformat} \\pm {eformat}")
         s = ", ".join(s) + "~"
@@ -56,31 +54,26 @@ class VectorDisplay(object):
         err_ = self._err
 
         s = []
-        for v, e in zip(val_.ravel(), err_.ravel()):
+        for v, e in zip(val_.ravel(), err_.ravel(), strict=False):
             vformat, eformat = pdg_round(v, e, return_zero=True)
             s.append(f"{vformat} +/- {eformat}")
-        s = "[" + ", ".join(s) + "]"
-
-        return s
+        return "[" + ", ".join(s) + "]"
 
     def __format__(self, fmt):
         val_ = self._nom
         err_ = self._err
         s = []
-        for v, e in zip(val_.ravel(), err_.ravel()):
-            vformat, eformat = pdg_round(
-                v, e, format_spec=fmt, return_zero=True
-            )
+        for v, e in zip(val_.ravel(), err_.ravel(), strict=False):
+            vformat, eformat = pdg_round(v, e, format_spec=fmt, return_zero=True)
             s.append(f"{vformat} +/- {eformat}")
 
-        s = "[" + ", ".join(s) + "]"
-        return s
+        return "[" + ", ".join(s) + "]"
 
     def __repr__(self) -> str:
         return str(self)
 
 
-class ScalarDisplay(object):
+class ScalarDisplay:
     default_format: str = ""
     _nom: float
     _err: float
@@ -172,9 +165,7 @@ def PDG_precision(std_dev):
         (exponent, factor) = (exponent - 2, 1)
     else:
         (exponent, factor) = (exponent + 1, 1000)
-    digits = int(
-        std_dev / 10.0**exponent * factor
-    )  # int rounds towards zero
+    digits = int(std_dev / 10.0**exponent * factor)  # int rounds towards zero
 
     # Rules:
     if digits <= 354:
@@ -188,8 +179,8 @@ def PDG_precision(std_dev):
 
 
 def pdg_round(
-    value, uncertainty, format_spec="g", return_zero: bool = False
-) -> Tuple[str, str]:
+    value, uncertainty, format_spec="g", *, return_zero: bool = False
+) -> tuple[str, str]:
     """
     Format a value with uncertainty according to PDG rounding rules.
 
@@ -204,9 +195,7 @@ def pdg_round(
         if uncertainty is not None and uncertainty > 0:
             _, pdg_unc = PDG_precision(uncertainty)
             # Determine the order of magnitude of the uncertainty
-            order_of_magnitude = 10 ** (
-                int(math.floor(math.log10(pdg_unc))) - 1
-            )
+            order_of_magnitude = 10 ** (int(math.floor(math.log10(pdg_unc))) - 1)
 
             # Round the uncertainty based on how many digits we want to keep
             rounded_uncertainty = (
