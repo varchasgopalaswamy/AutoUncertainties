@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import warnings
 
-import hypothesis.strategies as st
-import numpy as np
 from hypothesis import given, settings
 from hypothesis.extra import numpy as hnp
+import hypothesis.strategies as st
+import numpy as np
 
 import auto_uncertainties
 
@@ -40,7 +39,7 @@ def op_test(op, *args, **kwargs):
             units = None
             w_ = op(*without_unc, **kwargs)
         except TypeError:
-            return
+            return None
         w = op(*with_unc, **kwargs)
         if units is not None and hasattr(w_, "units"):
             assert w.units == w_.units
@@ -83,7 +82,7 @@ def given_float_3d(ops):
     return inner
 
 
-@given_float_3d(auto_uncertainties.wrap_numpy.bcast_same_shape_ufuncs)
+@given_float_3d(auto_uncertainties.numpy.numpy_wrappers.bcast_same_shape_ufuncs)
 @settings(deadline=3000)
 def test_same_shape(unom, uerr, units, op):
     vnom = unom / 2
@@ -95,13 +94,13 @@ def test_same_shape(unom, uerr, units, op):
         u *= units
         v *= units
     oper = getattr(np, op)
-    if op in auto_uncertainties.wrap_numpy.unary_bcast_same_shape_ufuncs:
+    if op in auto_uncertainties.numpy.numpy_wrappers.unary_bcast_same_shape_ufuncs:
         op_test(oper, u, units=units)
     else:
         op_test(oper, u, v, units=units)
 
 
-@given_float_3d(auto_uncertainties.wrap_numpy.bcast_same_shape_bool_ufuncs)
+@given_float_3d(auto_uncertainties.numpy.numpy_wrappers.bcast_same_shape_bool_ufuncs)
 @settings(deadline=3000)
 def test_same_shape_bool(unom, uerr, units, op):
     vnom = unom / 2
@@ -112,14 +111,14 @@ def test_same_shape_bool(unom, uerr, units, op):
         u *= units
         v *= units
     oper = getattr(np, op)
-    if op in auto_uncertainties.wrap_numpy.unary_bcast_same_shape_bool_ufuncs:
+    if op in auto_uncertainties.numpy.numpy_wrappers.unary_bcast_same_shape_bool_ufuncs:
         w = oper(u)
     else:
         w = oper(u, v)
     assert w.dtype == bool
 
 
-@given_float_3d(auto_uncertainties.wrap_numpy.bcast_nograd_ufuncs)
+@given_float_3d(auto_uncertainties.numpy.numpy_wrappers.bcast_nograd_ufuncs)
 @settings(deadline=3000)
 def test_nograd(unom, uerr, units, op):
     vnom = unom / 2
@@ -138,7 +137,7 @@ def test_nograd(unom, uerr, units, op):
     assert not isinstance(w, auto_uncertainties.Uncertainty)
 
 
-@given_float_3d(auto_uncertainties.wrap_numpy.bcast_apply_to_both_ufuncs)
+@given_float_3d(auto_uncertainties.numpy.numpy_wrappers.bcast_apply_to_both_ufuncs)
 @settings(deadline=3000)
 def test_apply_to_both(unom, uerr, units, op):
     vnom = unom / 2
@@ -152,7 +151,7 @@ def test_apply_to_both(unom, uerr, units, op):
     op_test(oper, u, units=units)
 
 
-@given_float_3d(auto_uncertainties.wrap_numpy.bcast_reduction_unary)
+@given_float_3d(auto_uncertainties.numpy.numpy_wrappers.bcast_reduction_unary)
 @settings(deadline=3000)
 def test_unary_reduction(unom, uerr, units, op):
     vnom = unom / 2

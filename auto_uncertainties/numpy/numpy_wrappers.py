@@ -1,24 +1,17 @@
-# -*- coding: utf-8 -*-
 # Based heavily on the implementation of pint's numpy array function wrapping
 
 from __future__ import annotations
 
-try:
-    import numpy as np
-except ImportError:
-    np = None
-try:
-    import jax
-    import jax.numpy as jnp
+import jax
+import jax.numpy as jnp
+import numpy as np
 
-except ImportError:
-    jax = None
-    jnp = None
-
-from .util import has_length, is_iterable, ndarray_to_scalar
+from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
+
+__all__ = ["wrap_numpy", "HANDLED_UFUNCS", "HANDLED_FUNCTIONS"]
 
 
 def _is_uncertainty(obj):
@@ -75,7 +68,7 @@ def convert_arg(arg, attr: str = None):
         if attr != "_nom":
             return None
         else:
-            return [convert_arg(item, attr) for item in arg]
+            return np.array([convert_arg(item, attr) for item in arg])
     else:
         if attr != "_nom":
             return None
@@ -101,9 +94,7 @@ def classify_and_split_args_and_kwargs(*args, **kwargs):
     """
 
     uncert_argnums = tuple(
-        idx
-        for idx, arg in enumerate(args)
-        if convert_arg(arg, "_nom") is not None
+        idx for idx, arg in enumerate(args) if convert_arg(arg, "_nom") is not None
     )
     uncert_arg_nom = tuple(convert_arg(arg, "_nom") for arg in args)
     uncert_arg_err = []
@@ -114,9 +105,7 @@ def classify_and_split_args_and_kwargs(*args, **kwargs):
         else:
             uncert_arg_err.append(jnp.zeros_like(uncert_arg_nom[aidx]))
     uncert_arg_err = tuple(uncert_arg_err)
-    uncert_kwarg_nom = {
-        key: convert_arg(arg, "_nom") for key, arg in kwargs.items()
-    }
+    uncert_kwarg_nom = {key: convert_arg(arg, "_nom") for key, arg in kwargs.items()}
     return uncert_argnums, uncert_arg_nom, uncert_arg_err, uncert_kwarg_nom
 
 
@@ -132,7 +121,8 @@ def implements(numpy_func_string, func_type):
         elif func_type == "ufunc":
             HANDLED_UFUNCS[numpy_func_string] = func
         else:
-            raise ValueError("Invalid func_type {}".format(func_type))
+            msg = f"Invalid func_type {func_type}"
+            raise ValueError(msg)
         return func
 
     return decorator
@@ -144,7 +134,7 @@ def get_func_from_package(func_str, namespace):
     func = getattr(namespace, func_str_split[0], None)
     # If the function is not available, do not attempt to implement it
     if func is None:
-        return
+        return None
     for func_str_piece in func_str_split[1:]:
         func = getattr(func, func_str_piece)
 
@@ -154,23 +144,22 @@ def get_func_from_package(func_str, namespace):
 def elementwise_grad(g):
     def wrapped(*args, **kwargs):
         y, g_vjp = jax.vjp(lambda *a: g(*a, **kwargs), *args)
-        x_bar = g_vjp(np.ones_like(y))
-        return x_bar
+        return g_vjp(np.ones_like(y))
 
     return wrapped
 
 
 def get_mappable_dims(*args):
     # Check that all the args have the same dimension
-    assert all([a.ndim == args[0].ndim for a in args])
+    assert all(a.ndim == args[0].ndim for a in args)
     # Check that the size of each dimension is either the same as the maximum, or 1
     mappable = [None for a in args]
     max_dim_sizes = []
-    for i, dim in enumerate(range(args[0].ndim)):
+    for _, dim in enumerate(range(args[0].ndim)):
         sz = [a.shape[dim] for a in args]
         max_sz = max(sz)
         max_dim_sizes.append(max_sz)
-        assert all([s == max_sz or s == 1 for s in sz])
+        assert all(s == max_sz or s == 1 for s in sz)
     for i, a in enumerate(args):
         map_axes = []
         for j, dim in enumerate(range(args[0].ndim)):
@@ -190,6 +179,7 @@ def implement_func(
     grad_argnum_override=None,
     selection_operator=None,
     output_rank=0,
+    custom_jax_dispatch=None,
 ):
     """Add default-behavior NumPy function/ufunc to the handled list.
 
@@ -213,7 +203,10 @@ def implement_func(
     if jnp is None:
         return
 
-    func = get_func_from_package(func_str, jnp)
+    if custom_jax_dispatch is not None:
+        func = custom_jax_dispatch
+    else:
+        func = get_func_from_package(func_str, jnp)
     # Skip the JAX overhead if you dont need gradient info
     func_np = get_func_from_package(func_str, np)
 
@@ -235,31 +228,32 @@ def implement_func(
             value = func_np(*bcast_args_nom, **uncert_kwarg_nom)
             grads = elementwise_grad(func)(*bcast_args_nom, **uncert_kwarg_nom)
             error_dot_grad_sqr = [
-                (e * g) ** 2 for e, g in zip(bcast_args_err, grads)
+                (e * g) ** 2 for e, g in zip(bcast_args_err, grads, strict=False)
             ]
             error = np.sum(error_dot_grad_sqr, axis=0) ** 0.5
             return Uncertainty(value, error)
         #            return uncert_instance.__class__(val, err)
-        elif implement_mode == "same_shape_bool":
-            return func_np(*uncert_arg_nom, **uncert_kwarg_nom)
-        elif implement_mode == "nograd":
-            return func_np(*uncert_arg_nom, **uncert_kwarg_nom)
-        elif implement_mode == "selection_operator":
+        elif (
+            implement_mode == "same_shape_bool"
+            or implement_mode == "nograd"
+            or implement_mode == "selection_operator"
+        ):
             return func_np(*uncert_arg_nom, **uncert_kwarg_nom)
         elif implement_mode == "selection":
             sel_func_np = get_func_from_package(selection_operator, np)
             axis = uncert_kwarg_nom.pop("axis", None)
             if axis is None:
                 idx = sel_func_np(*uncert_arg_nom, **uncert_kwarg_nom)
-                return np.ravel(uncert_arg_nom[0])[idx]
+                val = np.ravel(uncert_arg_nom[0])[idx]
+                err = np.ravel(uncert_arg_err[0])[idx]
             else:
                 idxs = np.expand_dims(
-                    sel_func_np(
-                        *uncert_arg_nom, axis=axis, **uncert_kwarg_nom
-                    ),
+                    sel_func_np(*uncert_arg_nom, axis=axis, **uncert_kwarg_nom),
                     axis=axis,
                 )
-                return np.take_along_axis(uncert_arg_nom[0], idxs, axis=axis)
+                val = np.take_along_axis(uncert_arg_nom[0], idxs, axis=axis)
+                err = np.take_along_axis(uncert_arg_err[0], idxs, axis=axis)
+            return Uncertainty(val, err)
         elif implement_mode in ["apply_to_both"]:
             val = func_np(*uncert_arg_nom, **uncert_kwarg_nom)
             err = np.abs(func_np(*uncert_arg_err, **uncert_kwarg_nom))
@@ -276,15 +270,19 @@ def implement_func(
                 axis = tuple(axis)
                 error_dot_grad_sqr = [
                     np.sum((e * g) ** 2, axis=axis)
-                    for e, g in zip(bcast_args_err, grads)
+                    for e, g in zip(bcast_args_err, grads, strict=False)
                 ]
             else:
                 error_dot_grad_sqr = [
-                    np.sum((e * g) ** 2) for e, g in zip(bcast_args_err, grads)
+                    np.sum((e * g) ** 2)
+                    for e, g in zip(bcast_args_err, grads, strict=False)
                 ]
 
             err = np.sum(error_dot_grad_sqr, axis=0) ** 0.5
             return Uncertainty(ndarray_to_scalar(val), ndarray_to_scalar(err))
+        else:
+            msg = f"Invalid implement_mode {implement_mode}"
+            raise ValueError(msg)
 
 
 # Returns a bool array of the same shape (i.e. elementwise conditionals)
@@ -365,9 +363,7 @@ binary_bcast_same_shape_ufuncs = [
     "arctan2",
     "hypot",
 ]
-bcast_same_shape_ufuncs = (
-    binary_bcast_same_shape_ufuncs + unary_bcast_same_shape_ufuncs
-)
+bcast_same_shape_ufuncs = binary_bcast_same_shape_ufuncs + unary_bcast_same_shape_ufuncs
 for ufunc in bcast_same_shape_ufuncs:
     implement_func("ufunc", ufunc, implement_mode="same_shape")
 
@@ -376,6 +372,31 @@ bcast_selection_operator_funcs = ["argmax", "argmin"]
 
 for ufunc in bcast_selection_operator_funcs:
     implement_func("function", ufunc, implement_mode="selection_operator")
+
+
+# This can only be done correctly via Monte-Carlo estimation
+def _monte_carlo_reduction(a, axis=None, **kwargs):
+    from auto_uncertainties import Uncertainty
+
+    N = 10000
+    samples = np.random.normal(size=(*a._nom.shape, N))  # noqa: NPY002
+    samples = a._nom[..., None] + samples * a._err[..., None]
+
+    if axis is None:
+        axis = tuple(range(a._nom.ndim))
+
+    operation = getattr(np, kwargs.pop("op"))
+    result = operation(samples, axis=axis, **kwargs)
+
+    mean_value = np.mean(result, axis=-1)
+    std_value = np.std(result, axis=-1)
+
+    return Uncertainty(mean_value, std_value)
+
+
+# apply_via_monte_carlo = ["max", "min", "amax", "amin", "median"]
+# for ufunc in apply_via_monte_carlo:
+#     implements(ufunc, "function")(partial(_monte_carlo_reduction, op=ufunc))
 
 # Selects a sub-section of or reshapes the Uncertainty array by some criteria
 bcast_selection_funcs = {
@@ -411,7 +432,6 @@ bcast_apply_to_both_ufuncs = [
     "negative",
     "positive",
     "fabs",
-    "round",
     "ceil",
     "floor",
     "rint",
@@ -422,11 +442,76 @@ for ufunc in bcast_apply_to_both_funcs:
     implement_func("function", ufunc, implement_mode="apply_to_both")
 
 # Applies a reduction
-implement_func("function", "trapz", implement_mode="reduction_binary")
+implement_func(
+    "function",
+    "trapz",
+    implement_mode="reduction_binary",
+    custom_jax_dispatch=jax.scipy.integrate.trapezoid,
+)
 
 bcast_reduction_unary = ["std", "sum", "var", "mean", "ptp", "median"]
 for ufunc in bcast_reduction_unary:
     implement_func("function", ufunc, implement_mode="reduction_unary")
+
+
+def _power(x1, x2, *args, **kwargs):
+    """x1 ** x2"""
+    from auto_uncertainties import Uncertainty
+
+    if _is_uncertainty(x1):
+        sA = x1._err
+        A = x1._nom
+    else:
+        sA = 0
+        A = x1
+    if _is_uncertainty(x2):
+        sB = x2._err
+        B = x2._nom
+    else:
+        sB = 0
+        B = x2
+
+    new_mag = np.power(A, B, *args, **kwargs)
+
+    new_err = np.abs(new_mag) * np.sqrt(
+        (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
+    )
+
+    return Uncertainty(new_mag, new_err)
+
+
+implements("power", "function")(_power)
+implements("power", "ufunc")(_power)
+
+
+def _searchsort(x1, x2, *args, **kwargs):
+    """x1 ** x2"""
+
+    A = x1._nom if _is_uncertainty(x1) else x1
+    B = x2._nom if _is_uncertainty(x2) else x2
+
+    return np.searchsorted(A, B, *args, **kwargs)
+
+
+implements("searchsorted", "function")(_searchsort)
+
+
+@implements("unique", "function")
+def _unique(
+    ar,
+    return_index=False,
+    return_inverse=False,
+    return_counts=False,
+    axis=None,
+    *,
+    equal_nan=True,
+):
+    ret = np.unique(
+        ar._nom,
+        return_index=True,
+    )
+    idx = ret[1]
+    return ar.__class__(ar._nom[idx], ar._err[idx])
 
 
 @implements("round", "function")
@@ -434,6 +519,12 @@ def _round(a, *args, **kwargs):
     val = np.round(a._nom, *args, **kwargs).squeeze()
     err = a._err + 0.5 * np.sign(a._err)
     return a.__class__(val, err)
+
+
+@implements("sort", "function")
+def _sort(a, *args, **kwargs):
+    ind = np.argsort(a._nom, *args, **kwargs)
+    return np.take_along_axis(a, ind, *args, **kwargs).squeeze()
 
 
 @implements("take_along_axis", "function")
@@ -471,12 +562,10 @@ def wrap_numpy(func_type, func, args, kwargs):
     elif func_type == "ufunc":
         handled = HANDLED_UFUNCS
         # ufuncs do not have func.__module__
-        if isinstance(func, str):
-            name = func
-        else:
-            name = func.__name__
+        name = func if isinstance(func, str) else func.__name__
     else:
-        raise ValueError("Invalid func_type {}".format(func_type))
+        msg = f"Invalid func_type {func_type}"
+        raise ValueError(msg)
 
     if name not in handled:
         return NotImplemented

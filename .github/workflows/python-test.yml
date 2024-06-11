@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.11"]
 
     steps:
       - uses: actions/checkout@v3
@@ -19,11 +19,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pylint pytest pytest-cov hypothesis
-          pip install .[pandas]
-      - name: Lint with pylint
+          pip install pre-commit pytest pytest-cov hypothesis
+          pre-commit install 
+          pip install .[CI]
+      - name: Run pre-commit checks
         run: |
-          pylint --fail-under=8 auto_uncertainties
+          pre-commit run --all-files
       - name: Test with pytest
         run: |
-          pytest --cov=auto_uncertainties --cov-report=xml --cov-report=html -k "not pandas"
+          pytest --cov=auto_uncertainties --cov-report=xml --cov-report=html --ignore=tests/pandas

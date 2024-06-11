@@ -1,66 +1,35 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import numpy as np
+__private__ = ["util"]
+__protected__ = ["numpy"]
+import lazy_loader
 
 
-class NegativeStdDevError(Exception):
-    """An exception for when the standard deviation is negative"""
+__getattr__, __dir__, __all__ = lazy_loader.attach_stub(__name__, __file__)
 
-    pass
-
-
-class NumpyDowncastWarning(RuntimeWarning):
-    """An exception for when an uncertainties array is downcast to a numpy array"""
-
-    pass
-
-
-from .uncertainty import Uncertainty  # noqa: E402
-
-try:
-    from .pandas_compat import UncertaintyArray
-except ImportError:
-    UncertaintyArray = None
-
-
-def nominal_values(x):
-    # Is an Uncertainty
-    if hasattr(x, "_nom"):
-        return x.value
-    else:
-        if np.ndim(x) > 0:
-            try:
-                x2 = Uncertainty.from_sequence(x)
-            except Exception:
-                return x
-            else:
-                return x2.value
-        else:
-            try:
-                x2 = Uncertainty(x)
-            except Exception:
-                return x
-            else:
-                return x2.value
-
-
-def std_devs(x):
-    # Is an Uncertainty
-    if hasattr(x, "_err"):
-        return x.error
-    else:
-        if np.ndim(x) > 0:
-            try:
-                x2 = Uncertainty.from_sequence(x)
-            except Exception:
-                return np.zeros_like(x)
-            else:
-                return x2.error
-        else:
-            try:
-                x2 = Uncertainty(x)
-            except Exception:
-                return 0
-            else:
-                return x2.error
+__all__ = [
+    "DowncastError",
+    "DowncastWarning",
+    "NegativeStdDevError",
+    "ScalarDisplay",
+    "ScalarUncertainty",
+    "Uncertainty",
+    "UncertaintyArray",
+    "UncertaintyDtype",
+    "VectorDisplay",
+    "VectorUncertainty",
+    "display_format",
+    "exceptions",
+    "nominal_values",
+    "numpy",
+    "pandas",
+    "set_compare_error",
+    "set_display_rounding",
+    "set_downcast_error",
+    "std_devs",
+    "unc_array",
+    "unc_dtype",
+    "uncertainty",
+    "uncertainty_containers",
+    "util",
+]

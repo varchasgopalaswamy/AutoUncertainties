@@ -1,21 +1,31 @@
 auto\_uncertainties package
 ===========================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   auto_uncertainties.numpy
+   auto_uncertainties.pandas
+   auto_uncertainties.uncertainty
+
 Submodules
 ----------
 
-auto\_uncertainties.pandas\_compat module
------------------------------------------
+auto\_uncertainties.display\_format module
+------------------------------------------
 
-.. automodule:: auto_uncertainties.pandas_compat
+.. automodule:: auto_uncertainties.display_format
    :members:
    :undoc-members:
    :show-inheritance:
 
-auto\_uncertainties.uncertainty module
---------------------------------------
+auto\_uncertainties.exceptions module
+-------------------------------------
 
-.. automodule:: auto_uncertainties.uncertainty
+.. automodule:: auto_uncertainties.exceptions
    :members:
    :undoc-members:
    :show-inheritance:
@@ -24,14 +34,6 @@ auto\_uncertainties.util module
 -------------------------------
 
 .. automodule:: auto_uncertainties.util
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-auto\_uncertainties.wrap\_numpy module
---------------------------------------
-
-.. automodule:: auto_uncertainties.wrap_numpy
    :members:
    :undoc-members:
    :show-inheritance:
