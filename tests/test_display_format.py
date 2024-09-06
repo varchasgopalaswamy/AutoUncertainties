@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from hypothesis import given
+from hypothesis import strategies as st
 import numpy as np
 import pytest
 
 from auto_uncertainties.display_format import (
+    ScalarDisplay,
     VectorDisplay,
+    pdg_round,
 )
 
 
@@ -68,4 +72,61 @@ class TestVectorDisplay:
         assert vd.__format__(fmt) == expected
 
 
-class TestScalarDisplay: ...
+class TestScalarDisplay:
+    @staticmethod
+    @given(
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    )
+    def test__repr_html_(f1, f2):
+        vd = ScalarDisplay()
+        vd._nom = f1
+        vd._err = f2
+        assert vd._repr_html_() == f"{pdg_round(f1, f2)[0]} ± {pdg_round(f1, f2)[1]}"
+
+        # TODO: Should be improved to get full coverage!
+
+    @staticmethod
+    @given(
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    )
+    def test__repr_latex_(f1, f2):
+        vd = ScalarDisplay()
+        vd._nom = f1
+        vd._err = f2
+        assert (
+            vd._repr_latex_() == f"{pdg_round(f1, f2)[0]} \\pm {pdg_round(f1, f2)[1]}"
+        )
+
+        # TODO: Should be improved to get full coverage!
+
+    @staticmethod
+    @given(
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    )
+    def test_str_and_repr(f1, f2):
+        vd = ScalarDisplay()
+        vd._nom = f1
+        vd._err = f2
+        assert vd.__str__() == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+        assert vd.__repr__() == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+
+        # TODO: Should be improved to get full coverage!
+
+    @staticmethod
+    @given(
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+        st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
+    )
+    def test___format__(f1, f2):
+        vd = ScalarDisplay()
+        vd._nom = f1
+        vd._err = f2
+        assert vd.__format__("") == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+
+        # TODO: Should be improved to get full coverage!
+
+
+def test_first_digit(): ...
