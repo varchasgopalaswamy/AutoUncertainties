@@ -66,3 +66,6 @@ class TestVectorDisplay:
         vd._nom = arr1
         vd._err = arr2
         assert vd.__format__(fmt) == expected
+
+
+class TestScalarDisplay: ...
