@@ -6,9 +6,12 @@ import numpy as np
 import pytest
 
 from auto_uncertainties.display_format import (
+    PDG_precision,
     ScalarDisplay,
     VectorDisplay,
+    first_digit,
     pdg_round,
+    set_display_rounding,
 )
 
 
@@ -129,4 +132,43 @@ class TestScalarDisplay:
         # TODO: Should be improved to get full coverage!
 
 
-def test_first_digit(): ...
+@pytest.mark.parametrize(
+    "val, expected",
+    [
+        (0, 0),
+        (1, 0),
+        (100, 2),
+        (3.2e7, 7),
+        (999.99, 2),
+        (-1, 0),
+        (-10e5, 6),
+        (1e-3, -3),
+        (39.2e-12, -11),
+    ],
+)
+def test_first_digit(val, expected):
+    assert first_digit(val) == expected
+
+
+@pytest.mark.parametrize(
+    "val, expected", [(1, (2, 1)), (0.99, (2, 1.0)), (4.235, (1, 4.235))]
+)
+def test_PDG_precision(val, expected):
+    assert PDG_precision(val) == expected
+
+
+@pytest.mark.parametrize(
+    "val1, val2, expected1, expected2",
+    [
+        (1, 2, ("1", "2"), ("1.0", "2.0")),
+        (0, 0.125, ("0", "0.125"), ("0.0", "0.12")),
+        (1, -0.1252, ("1", "-0.1252"), ("1", "")),
+    ],
+)
+def test_pdg_round(val1, val2, expected1, expected2):
+    assert pdg_round(val1, val2) == expected1
+
+    set_display_rounding(True)
+    assert pdg_round(val1, val2) == expected2
+
+    set_display_rounding(False)  # reset state for rest of tests
