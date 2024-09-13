@@ -4,11 +4,30 @@
 AutoUncertainties is a package that makes handling linear uncertainty propagation for scientific applications 
 straightforward and automatic using auto-differentiation.
 
+* View the [full documentation here](https://autouncertainties.readthedocs.io/en/latest/). 
+
 ## Supported Features
 
 - [x] Scalars
 - [x] Arrays, with support for most `numpy` ufuncs and functions
 - [ ] Pandas Extension Type
+
+## Prerequisites
+
+For array support:
+
+* `jax`
+* `jaxlib`
+* `numpy`
+
+
+## Installation
+
+To install, simply run:
+
+```
+pip install auto_uncertainties
+```
 
 ## Basic Usage
 
@@ -151,23 +170,6 @@ straightforward and automatic using auto-differentiation.
 
   Exception: The uncertainty is stripped when downcasting to ndarray.
   ```
-
-## Prerequisites
-
-For array support:
-
-* `jax`
-* `jaxlib`
-* `numpy`
-
-
-## Installation
-
-To install, simply run:
-
-```
-pip install auto_uncertainties
-```
 
 ## Inspirations
 
