@@ -2,11 +2,23 @@
 Welcome to AutoUncertainties's documentation!
 =============================================
 
+.. image:: https://img.shields.io/badge/GitHub-AutoUncertainties-blue?logo=github&labelColor=black
+   :target: https://github.com/varchasgopalaswamy/AutoUncertainties
+   :alt: Static Badge
+
+.. image:: https://img.shields.io/github/v/release/varchasgopalaswamy/AutoUncertainties?label=Current%20Release&color
+   :target: https://github.com/varchasgopalaswamy/AutoUncertainties/releases
+   :alt: GitHub Release
+
+.. image:: https://img.shields.io/badge/Python-3.11%20%7C%203.12-ffed57?logo=python&logoColor=white
+   :target: https://www.python.org/downloads/
+   :alt: python
+
+
 AutoUncertainties is a package that makes handling linear uncertainty propagation for scientific applications
 straightforward and automatic using auto-differentiation.
 
    For instructions on how to install AutoUncertainties, see :doc:`getting_started`.
-
 
 Supported Features
 ------------------
