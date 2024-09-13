@@ -9,8 +9,8 @@ straightforward and automatic using auto-differentiation.
 ## Supported Features
 
 - [x] Scalars
-- [x] Arrays, with support for most `numpy` ufuncs and functions
-- [ ] Pandas Extension Type
+- [x] Arrays, with support for most NumPy ufuncs and functions
+- [ ] Pandas Extension Type (see [here](https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html))
 
 ## Prerequisites
 
@@ -174,4 +174,4 @@ pip install auto_uncertainties
 ## Inspirations
 
 The class structure of `Uncertainty`, and the `numpy` ufunc implementation is heavily inspired by the 
-excellent package [pint](https://github.com/hgrecco/pint).
+excellent package [Pint](https://github.com/hgrecco/pint).

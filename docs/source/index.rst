@@ -24,8 +24,8 @@ Supported Features
 ------------------
 
 - 🗹 Scalars
-- 🗹 Arrays, with support for most `numpy` ufuncs and functions
-- ☐ Pandas Extension Type
+- 🗹 Arrays, with support for most NumPy ufuncs and functions
+- ☐ Pandas Extension Type (see `here <https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html>`_)
 
 Usage
 -----
@@ -36,7 +36,7 @@ Inspirations
 ------------
 
 The class structure of `~auto_uncertainties.uncertainty.uncertainty_containers.Uncertainty`, and the `numpy`
-ufunc implementation is heavily inspired by the excellent package `pint <https://github.com/hgrecco/pint>`_.
+ufunc implementation is heavily inspired by the excellent package `Pint <https://github.com/hgrecco/pint>`_.
 
 
 Indices and tables

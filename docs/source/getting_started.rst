@@ -9,19 +9,19 @@ Getting Started
    :target: https://www.python.org/downloads/
    :alt: python
 
-AutoUncertainties is easy to install via ``pip``:
+* AutoUncertainties is easy to install via ``pip``:
 
 .. code:: bash
 
     pip install auto_uncertainties
 
-The integration with `pandas` (still WIP) can be enabled by installing `pandas`, either separately or via:
+* The integration with `pandas` (still WIP) can be enabled by installing `pandas`, either separately or via:
 
 .. code:: bash
 
     pip install auto_uncertainties[pandas]
 
-The documentation can be built by installing `auto_uncertainties` with the `[docs]` extension:
+* The documentation can be built by installing `auto_uncertainties` with the `[docs]` extension:
 
 .. code:: bash
 
