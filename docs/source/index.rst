@@ -27,6 +27,8 @@ The class structure of `~auto_uncertainties.uncertainty.uncertainty_containers.U
 ufunc implementation is heavily inspired by the excellent package `pint <https://github.com/hgrecco/pint>`_.
 
 
+Indices and tables
+==================
 
 .. toctree::
    :maxdepth: 2
@@ -43,8 +45,6 @@ ufunc implementation is heavily inspired by the excellent package `pint <https:/
 
    api/auto_uncertainties/index
 
-Indices and tables
-==================
 
 * :ref:`genindex`
 * :ref:`modindex`
