@@ -18,38 +18,42 @@ from auto_uncertainties.util import (
 
 
 @pytest.mark.parametrize(
-    "warning, should_raise",
+    "warning",
     [
-        (RuntimeWarning, False),
+        RuntimeWarning,
     ],
 )
-def test_ignore_runtime_warnings(warning, should_raise):
+def test_ignore_runtime_warnings(warning):
     @ignore_runtime_warnings
+    def test_func_silent():
+        warnings.warn("warning!", warning)
+
     def test_func():
         warnings.warn("warning!", warning)
 
-    if should_raise:
-        with pytest.warns(warning):
-            test_func()
-    else:
+    warnings.simplefilter("error")  # treat warnings as errors
+
+    with pytest.warns(warning):
         test_func()
 
-    # TODO: Improve this (decorator seems to block all warnings?)
+    test_func_silent()
 
 
-@pytest.mark.parametrize("warning, should_raise", [(DowncastWarning, False)])
-def test_ignore_numpy_downcast_warnings(warning, should_raise):
+@pytest.mark.parametrize("warning", [DowncastWarning])
+def test_ignore_numpy_downcast_warnings(warning):
     @ignore_numpy_downcast_warnings
+    def test_func_silent():
+        warnings.warn("warning!", warning)
+
     def test_func():
         warnings.warn("warning!", warning)
 
-    if should_raise:
-        with pytest.warns(warning):
-            test_func()
-    else:
+    warnings.simplefilter("error")  # treat warnings as errors
+
+    with pytest.warns(warning):
         test_func()
 
-    # TODO: Improve this (decorator seems to block all warnings?)
+    test_func_silent()
 
 
 @pytest.mark.parametrize(
