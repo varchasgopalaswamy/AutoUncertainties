@@ -1,8 +1,8 @@
-Numpy Integration
+NumPy Integration
 =================
 
 Using `Jax <https://jax.readthedocs.io/en/latest/>`_ to provide auto-differentiation capabilities
-(either :code:`jax.grad` or :code:`jax.jacfwd`), linear uncertainty propagation is enabled for most numpy operations.
+(either :code:`jax.grad` or :code:`jax.jacfwd`), linear uncertainty propagation is enabled for most `numpy` operations.
 
 .. code-block:: python
 
