@@ -23,7 +23,7 @@ project = "auto_uncertainties"
 version = importlib.metadata.version(project)
 release = version
 this_year = datetime.date.today()
-copyright = f"2021-{this_year:%Y}, Varchas Gopalaswamy"
+copyright = f"2021-{this_year:%Y} Varchas Gopalaswamy"
 author = "Varchas Gopalaswamy"
 
 # -- General configuration ---------------------------------------------------
@@ -39,10 +39,13 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
+    "sphinx_design",
+    "sphinx.ext.graphviz",
+    "autoapi.extension",
 ]
 
-
 templates_path = ["_templates"]
+
 exclude_patterns = [
     "_build",
     "Thumbs.db",
@@ -50,11 +53,15 @@ exclude_patterns = [
     "setup.rst",
     "versioneer.rst",
     "tests*",
+    "_autoapi_templates",
 ]
 
+autoapi_ignore = [
+    "tests*",
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "sphinx"
+# pygments_style = "sphinx"
 
 # The suffix of source filenames.
 source_suffix = ".rst"
@@ -62,24 +69,14 @@ source_suffix = ".rst"
 # The master toctree document.
 master_doc = "index"
 
-autodoc_default_options = {"class-doc-from": "__init__"}
 
-add_function_parentheses = False
-# -- Options for extensions ----------------------------------------------------
-# napoleon
-typehints_fully_qualified = False
-typehints_defaults = "comma"
-typehints_use_rtype = True
-typehints_document_rtype = True
-always_document_param_types = True
-typehints_use_signature = True
-typehints_use_signature_return = True
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
+html_last_updated_fmt = "%B %d, %Y at %I:%M %p"
 
 html_title = f"{project} v{version} Manual"
 
@@ -88,9 +85,10 @@ html_title = f"{project} v{version} Manual"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-
 default_role = "py:obj"
 
+# Avoids cluttered function signature docs
+maximum_signature_line_length = 70
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
@@ -102,3 +100,48 @@ intersphinx_mapping = {
     "pint": ("https://pint.readthedocs.io/en/stable", None),
     "pandas": ("https://pandas.pydata.org/docs/", None),
 }
+
+
+# ------------------------- Options for extensions -------------------------
+
+# copybutton
+copybutton_prompt_text = ">>> "
+
+# type hints
+typehints_defaults = "comma"
+autodoc_typehints = "description"
+typehints_use_rtype = True
+typehints_document_rtype = True
+always_document_param_types = True
+
+# AutoAPI
+autoapi_template_dir = "_autoapi_templates"
+autoapi_dirs = ["../../auto_uncertainties"]
+suppress_warnings = ["autoapi.python_import_resolution"]
+autoapi_add_toctree_entry = False
+autoapi_python_class_content = "class"
+autoapi_root = "api"
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "private-members",
+    "show-inheritance",
+    "show-module-summary",
+    "special-members",
+    "imported-members",
+    "show-inheritance-diagram",
+]
+
+
+# Custom jinja environment additions for AutoAPI
+def autoapi_prepare_jinja_env(jinja_env):
+    from docs.source.jinja_formatters import (
+        format_alias,
+        format_function_defaults,
+        format_typevar,
+    )
+
+    # Add custom jinja filters and functions
+    jinja_env.filters["format_alias"] = format_alias
+    jinja_env.filters["format_typevar"] = format_typevar
+    jinja_env.globals["format_function_defaults"] = format_function_defaults

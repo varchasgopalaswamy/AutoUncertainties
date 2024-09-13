@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from . import DowncastWarning
 
-T = TypeVar("T", bound=np.generic, covariant=True)
+T: TypeVar = TypeVar("T", bound=np.generic, covariant=True)
 
 
 def ignore_runtime_warnings(f):
