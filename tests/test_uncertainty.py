@@ -10,10 +10,16 @@ import hypothesis.strategies as st
 import numpy as np
 import pytest
 
-from auto_uncertainties import (
-    NegativeStdDevError,
+from auto_uncertainties import NegativeStdDevError
+from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
     Uncertainty,
+    VectorUncertainty,
+    set_downcast_error,
+    set_compare_error,
+    nominal_values,
+    std_devs,
+    _check_units,
 )
 
 try:
