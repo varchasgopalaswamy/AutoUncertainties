@@ -8,21 +8,23 @@ from hypothesis import given
 from hypothesis.extra import numpy as hnp
 import hypothesis.strategies as st
 import numpy as np
+from pint import (
+    DimensionalityError,
+    Quantity,
+)
 import pytest
 
-from auto_uncertainties import (
-    NegativeStdDevError,
+# requires installation with CI dependencies
+from auto_uncertainties import NegativeStdDevError
+from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS
+from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
     Uncertainty,
+    VectorUncertainty,
+    _check_units,
+    nominal_values,
+    std_devs,
 )
-
-try:
-    from pint import DimensionalityError
-except ImportError:
-
-    class DimensionalityError(Exception):
-        pass
-
 
 BINARY_OPS = [
     operator.lt,
@@ -292,3 +294,186 @@ def test_numpy_math_ops(v1, e1, op):
     u = op(u1)
     if np.isfinite(v1) and np.isfinite(u):
         math.isclose(u.value, op(u1.value))
+
+
+# -----------------------------------------------------------------
+# --------------------------  NEW TESTS  --------------------------
+# -----------------------------------------------------------------
+
+
+def test_check_units():
+    assert _check_units
+
+
+def test_nominal_values():
+    x = Uncertainty(2, 3)
+    assert nominal_values(x) == x.value
+
+    x = np.array([1, 2, 3])
+    assert nominal_values(x).all() == Uncertainty.from_sequence(x).value.all()
+
+    x = "not an Uncertainty"
+    assert nominal_values(x) == x
+
+    x = np.nan
+    assert np.isnan(nominal_values(x))
+
+    # TODO: could be improved
+
+
+def test_std_devs():
+    x = Uncertainty(2, 3)
+    assert std_devs(x) == x.error
+
+    x = np.array([1, 2, 3])
+    assert std_devs(x).all() == Uncertainty.from_sequence(x).error.all()
+
+    x = "not an Uncertainty"
+    assert std_devs(x) == 0
+
+    x = np.nan
+    assert std_devs(x) == 0
+
+    # TODO: could be improved
+
+
+class TestUncertainty:
+    """Tests that expand the coverage of the previous tests."""
+
+    @staticmethod
+    def test_getstate():
+        u = Uncertainty(2, 3)
+        assert u.__getstate__() == {"nominal_value": u._nom, "std_devs": u._err}
+
+    @staticmethod
+    def test_setstate():
+        u = Uncertainty(2, 3)
+        u.__setstate__({"nominal_value": 100, "std_devs": 200})
+        assert u.__getstate__()["nominal_value"] == 100
+        assert u.__getstate__()["std_devs"] == 200
+
+    @staticmethod
+    def test_getnewargs():
+        u = Uncertainty(2, 3)
+        assert u.__getnewargs__()[0] == 2
+        assert u.__getnewargs__()[1] == 3
+
+    @staticmethod
+    def test_init():
+        scalar = Uncertainty(2, 3)
+        vector = Uncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        assert isinstance(scalar, ScalarUncertainty)  # verify scalar type was chosen
+        assert isinstance(vector, VectorUncertainty)  # verify vector type was chosen
+
+        # Verify inheritance
+        assert isinstance(scalar, Uncertainty)
+        assert isinstance(vector, Uncertainty)
+
+    @staticmethod
+    def test_properties():
+        u = Uncertainty(2, 3)
+        assert isinstance(u, ScalarUncertainty)
+
+        assert u.value == u._nom
+        assert u.error == u._err
+        assert u.relative == 1.5
+        assert u.rel == u.relative
+        assert u.rel2 == 2.25
+
+    @staticmethod
+    @given(
+        st.floats(0, 10),
+        st.floats(0, 10),
+        st.floats(0, 10),
+    )
+    def test_plus_minus(val, err, pm):
+        u = Uncertainty(val, err)
+        u = u.plus_minus(pm)
+
+        assert u.value == val
+        assert u.error == np.sqrt(err**2 + pm**2)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "val, expected",
+        [
+            ("2.0 +/- 3.5", Uncertainty(2.0, 3.5)),
+            ("2.0 +- 3.5", Uncertainty(2.0, 3.5)),
+            ("2.6", Uncertainty(2.6)),
+        ],
+    )
+    def test_from_string(val, expected):
+        assert Uncertainty.from_string(val) == expected
+
+        # TODO: uncertainty_containers:154  ->  should err param be default to 0.0? Seems to break wrappers if so
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "val, err", [(Quantity(2, "radian"), Quantity(3, "radian")), (2, 3), (8.5, 9.5)]
+    )
+    def test_from_quantities(val, err):
+        if isinstance(val, Quantity) and isinstance(err, Quantity):
+            with pytest.raises(NotImplementedError):
+                _ = Uncertainty.from_quantities(val, err)
+            return
+
+        assert Uncertainty.from_quantities(val, err).value == val
+        assert Uncertainty.from_quantities(val, err).error == err
+
+        # TODO: uncertainty_containers:290 & 63-69  -->  should this be tested if it doesn't work?
+
+    @staticmethod
+    def test_from_sequence():
+        seq = [Uncertainty(2, 3), Uncertainty(3, 4), Uncertainty(4, 5)]
+        result = Uncertainty.from_sequence(seq)
+        assert isinstance(result, VectorUncertainty)
+        assert result[0] == Uncertainty(2, 3)
+        assert result[1] == Uncertainty(3, 4)
+        assert result[2] == Uncertainty(4, 5)
+
+        seq = [None, Uncertainty(2, 3)]
+        with pytest.raises(TypeError):
+            _ = Uncertainty.from_sequence(seq)
+
+        # TODO: uncertainty_containers:327 & 63-69  -->  should this be tested if it doesn't work?
+
+        # seq = [Uncertainty(2, 3) * Unit('radian'), Uncertainty(5, 8)]
+        # result = Uncertainty.from_sequence(seq)
+        # assert result.units == Unit('radian')
+
+    # TODO: ------------------------------------------
+    # TODO: Add tests for operator dunder methods here
+    # TODO: ------------------------------------------
+
+
+class TestVectorUncertainty:
+    """Tests that expand the coverage of the previous VectorUncertainty tests."""
+
+    @staticmethod
+    def test_getattr():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        with pytest.raises(AttributeError):
+            _ = v.__array_something
+
+        for item1 in v.__apply_to_both_ndarray__:
+            try:
+                assert callable(getattr(v, item1)) or isinstance(
+                    getattr(v, item1), VectorUncertainty
+                )
+            except ValueError:
+                continue
+
+        for item2 in HANDLED_UFUNCS:
+            assert callable(getattr(v, item2))
+
+        for item3 in HANDLED_FUNCTIONS:
+            assert getattr(v, item3) is not None
+
+        for item4 in v.__ndarray_attributes__:
+            assert getattr(v, item4) == getattr(v._nom, item4)
+
+        with pytest.raises(AttributeError):
+            _ = v.ATTRIBUTE_THAT_DOES_NOT_EXIST
+
+    # WORK IN PROGRESS...
