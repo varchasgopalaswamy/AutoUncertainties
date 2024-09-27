@@ -1,23 +1,25 @@
-"""An implementation of Decimal as a DType.
+"""
+An implementation of Decimal as a DType.
 
-https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.api.extensions.ExtensionDtype.html#pandas.api.extensions.ExtensionDtype
-https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.api.extensions.ExtensionArray.html#pandas.api.extensions.ExtensionArray
+.. seealso::
 
-https://github.com/pandas-dev/pandas/tree/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/tests/extension/decimal
+   * `pandas.api.extensions.ExtensionArray`
+   * `Decimal <https://github.com/pandas-dev/pandas/tree/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/tests/extension/decimal>`_
 
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import deepcopy
 import sys
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_list_like
 from pandas.compat import set_function_name
-from pandas.core.arrays import ExtensionArray, ExtensionScalarOpsMixin
+from pandas.core.arrays.base import ExtensionArray, ExtensionScalarOpsMixin
 from pandas.core.dtypes.common import is_integer
 from pandas.core.indexers import check_array_indexer
 
@@ -36,7 +38,14 @@ __all__ = ["UncertaintyArray"]
 
 
 class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
-    """Abstract base class for custom 1-D array types."""
+    """
+    Abstract base class for custom 1-D array types.
+
+    :param values:
+    :param errors:
+    :param dtype:
+    :param copy:
+    """
 
     __array_priority__ = VectorUncertainty.__array_priority__
     __pandas_priority__ = 1999
@@ -56,7 +65,24 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         *,
         dtype: UncertaintyDtype | None = None,
         copy: bool = False,
-    ):
+    ) -> ExtensionArray:
+        """
+        Construct a new `~pandas.core.arrays.base.ExtensionArray` from a sequence of strings.
+
+        :param strings: Each element will be an instance of the scalar type for this array, ``cls.dtype.type``
+        :param dtype: Construct for this particular dtype. This should be a Dtype
+            compatible with the `~pandas.core.arrays.base.ExtensionArray` (Optional)
+        :param copy: If `True`, copy the underlying data
+
+        .. code-block:: python
+           :caption: Example
+
+           >>> pd.arrays.IntegerArray._from_sequence_of_strings(["1", "2", "3"])
+           <IntegerArray>
+           [1, 2, 3]
+           Length: 3, dtype: Int64
+        """
+
         vals = []
         for s in strings:
             if not isinstance(s, str):
@@ -68,7 +94,7 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _from_factorized(cls, values, original):
-        """Reconstruct an ExtensionArray after factorization."""
+        """Reconstruct an `~pandas.core.arrays.base.ExtensionArray` after factorization."""
         return cls(values)
 
     def __init__(
@@ -76,7 +102,7 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         values,
         errors=None,
         dtype=None,
-        copy=False,
+        copy: bool = False,
     ):
         if errors is not None:
             assert len(values) == len(
@@ -179,19 +205,16 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         """
         Return a copy of the array.
 
-        Returns
-        -------
-        ExtensionArray
+        .. code-block:: python
+           :caption: Example
 
-        Examples
-        --------
-        >>> arr = pd.array([1, 2, 3])
-        >>> arr2 = arr.copy()
-        >>> arr[0] = 2
-        >>> arr2
-        <IntegerArray>
-        [1, 2, 3]
-        Length: 3, dtype: Int64
+           >>> arr = pd.array([1, 2, 3])
+           >>> arr2 = arr.copy()
+           >>> arr[0] = 2
+           >>> arr2
+           <IntegerArray>
+           [1, 2, 3]
+           Length: 3, dtype: Int64
         """
 
         return self.__class__(self._data, dtype=self.dtype, copy=True)
@@ -302,10 +325,16 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         allow_fill=False,
         fill_value: (float | tuple[float, float] | ScalarUncertainty | None) = None,
     ):
-        """Take elements from an array.
+        """
+        Take elements from an array.
 
-        Relies on the take method defined in pandas:
-        https://github.com/pandas-dev/pandas/blob/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/core/algorithms.py#L1483
+        :param indexer:
+        :param allow_fill:
+        :param fill_value:
+
+        .. seealso::
+
+           Relies on the `take <https://github.com/pandas-dev/pandas/blob/e246c3b05924ac1fe083565a765ce847fcad3d91/pandas/core/algorithms.py#L1483>`_ method defined in `pandas`:
         """
         from pandas.api.extensions import take
 
@@ -378,18 +407,18 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
     def searchsorted(self, value, side="left", sorter=None):
         return np.searchsorted(self._data, value, side=side, sorter=sorter)
 
-    def _values_for_argsort(self):
+    def _values_for_argsort(self) -> np.ndarray:
         """
         Return values for sorting.
-        Returns
-        -------
-        ndarray
-            The transformed values should maintain the ordering between values
+
+        :return:  The transformed values should maintain the ordering between values
             within the array.
-        See Also
-        --------
-        ExtensionArray.argsort : Return the indices that would sort this array.
+
+        .. seealso::
+
+           `pandas.api.extensions.ExtensionArray.argsort` (Return the indices that would sort this array)
         """
+
         # Note: this is used in `ExtensionArray.argsort`.
         return self._data._nom
 
@@ -413,6 +442,19 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         keepdims: bool = False,
         **kwargs,
     ):
+        """
+        Return a scalar result of performing the reduction operation.
+
+        :param name: Name of the function, supported values are: { any, all, min, max, sum, mean, median, prod, std,
+            var, sem, kurt, skew }
+        :param skipna: If `True`, skip NaN values
+        :param keepdims: If `False`, a scalar is returned. If `True`, the result has dimension with
+            size one along the reduced axis.
+        :param kwargs: Additional keyword arguments passed to the reduction function. Currently,
+            `ddof` is the only supported kwarg.
+
+        :raise TypeError: If subclass does not define reductions
+        """
         functions = {
             "min": np.min,
             "max": np.max,
@@ -462,43 +504,42 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         return value_counts(self._data._nom, dropna=dropna)
 
     @classmethod
-    def _create_method(cls, op, coerce_to_dtype: bool = True, result_dtype=None):
+    def _create_method(
+        cls, op, coerce_to_dtype: bool = True, result_dtype=None
+    ) -> Callable[[Any, Any], np.ndarray | ExtensionArray]:
         """
         A class method that returns a method that will correspond to an
-        operator for an ExtensionArray subclass, by dispatching to the
+        operator for an `ExtensionArray` subclass, by dispatching to the
         relevant operator defined on the individual elements of the
         ExtensionArray.
 
-        Parameters
-        ----------
-        op : function
-            An operator that takes arguments op(a, b)
-        coerce_to_dtype : bool, default True
-            boolean indicating whether to attempt to convert
-            the result to the underlying ExtensionArray dtype.
-            If it's not possible to create a new ExtensionArray with the
-            values, an ndarray is returned instead.
+        :param op: An operator that takes arguments op(a, b)
+        :param coerce_to_dtype: Whether to attempt to convert
+            the result to the underlying `ExtensionArray` dtype.
+            If it's not possible to create a new `ExtensionArray` with the
+            values, a `numpy.ndarray` is returned instead.
+        :param result_dtype:
 
-        Returns
-        -------
-        Callable[[Any, Any], Union[ndarray, ExtensionArray]]
+        :return:
             A method that can be bound to a class. When used, the method
             receives the two arguments, one of which is the instance of
-            this class, and should return an ExtensionArray or an ndarray.
+            this class, and should return an ExtensionArray or a `numpy.ndarray`.
 
-            Returning an ndarray may be necessary when the result of the
+            Returning a `numpy.ndarray` may be necessary when the result of the
             `op` cannot be stored in the ExtensionArray. The dtype of the
             ndarray uses NumPy's normal inference rules.
 
-        Examples
-        --------
-        Given an ExtensionArray subclass called MyExtensionArray, use
+        .. tip::
 
-            __add__ = cls._create_method(operator.add)
+           Given an `ExtensionArray` subclass called `MyExtensionArray`, use
 
-        in the class definition of MyExtensionArray to create the operator
-        for addition, that will be based on the operator implementation
-        of the underlying elements of the ExtensionArray
+           .. code-block:: python
+
+              __add__ = cls._create_method(operator.add)
+
+           in the class definition of `MyExtensionArray` to create the operator
+           for addition, that will be based on the operator implementation
+           of the underlying elements of the `ExtensionArray`.
         """
 
         def _binop(self: Self, other):

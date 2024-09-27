@@ -1,4 +1,0 @@
-Pandas Integration
-================
-
-Still WIP
