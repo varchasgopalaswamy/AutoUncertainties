@@ -15,16 +15,11 @@ T: TypeVar = TypeVar("T", bound=np.generic, covariant=True)
 
 def ignore_runtime_warnings(f):
     """
-    A decorator to ignore runtime warnings
-    Parameters
-    ----------
-    f: function
-        The wrapped function
+    A decorator to ignore runtime warnings.
 
-    Returns
-    -------
-    wrapped_function: function
-        The wrapped function
+    :param f: The functin to wrap
+
+    :return: The wrapped function
     """
 
     @wraps(f)
@@ -39,15 +34,10 @@ def ignore_runtime_warnings(f):
 def ignore_numpy_downcast_warnings(f):
     """
     A decorator to ignore NumpyDowncastWarning
-    Parameters
-    ----------
-    f: function
-        The wrapped function
 
-    Returns
-    -------
-    wrapped_function: function
-        The wrapped function
+    :param f: The function to wrap
+
+    :return: The wrapped function
     """
 
     @wraps(f)
