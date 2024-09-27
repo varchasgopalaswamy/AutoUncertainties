@@ -131,18 +131,11 @@ T = TypeVar("T", NDArray, float, int)
 
 
 class Uncertainty(Generic[T]):
-    """Base class for Uncertainty objects
+    """
+    Base class for `Uncertainty` objects.
 
-
-    Parameters
-    ----------
-
-    value :
-        The central value(s)
-
-    err:
-        The uncertainty value(s). Zero if not provided. Negative numbers raise a RuntimeError.
-
+    :param value: The central value(s)
+    :param err: The uncertainty value(s). Zero if not provided. Negative numbers raise a `RuntimeError`.
     """
 
     _nom: T
@@ -265,13 +258,13 @@ class Uncertainty(Generic[T]):
 
     @classmethod
     def from_string(cls, string: str):
-        """Create an Uncertainty object from a string representation of the value and error.
-
-        Parameters
-        ----------
-        string : str
-            A string representation of the value and error. The error can be represented as "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
         """
+        Create an Uncertainty object from a string representation of the value and error.
+
+        :param string: A string representation of the value and error. The error can be represented as
+            "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
+        """
+
         new_str = string.replace("+/-", "±")
         new_str = new_str.replace("+-", "±")
         if "±" not in new_str:
@@ -281,16 +274,14 @@ class Uncertainty(Generic[T]):
             return Uncertainty(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err):
-        """Create an Uncertainty object from two `Pint` quantities
-
-        Parameters
-        ----------
-        value : pint.Quantity
-            The central value of the Uncertainty object
-        err : pint.Quantity
-            The uncertainty value of the Uncertainty object
+    def from_quantities(cls, value, err) -> Uncertainty:
         """
+        Create an `Uncertainty` object from two `pint.Quantity` objects.
+
+        :param value: The central value of the Uncertainty object
+        :param err: The uncertainty value of the Uncertainty object
+        """
+
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
         if units is not None:
@@ -299,23 +290,19 @@ class Uncertainty(Generic[T]):
 
     @classmethod
     def from_list(cls, u_list: Sequence[Uncertainty]):
-        """Create an Uncertainty object from a list of Uncertainty objects
+        """
+        Create an Uncertainty object from a list of Uncertainty objects.
 
-        Parameters
-        ----------
-        u_list :
-            A list of Uncertainty objects
+        :param u_list: A list of `Uncertainty` objects.
         """
         return cls.from_sequence(u_list)
 
     @classmethod
     def from_sequence(cls, seq: Sequence[Uncertainty]):
-        """Create an Uncertainty object from a sequence of Uncertainty objects
+        """
+        Create an Uncertainty object from a sequence of Uncertainty objects
 
-        Parameters
-        ----------
-        seq :
-            A list of Uncertainty objects
+        :param seq: A sequence of `Uncertainty` objects.
         """
         _ = iter(seq)
 

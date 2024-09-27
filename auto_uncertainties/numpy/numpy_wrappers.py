@@ -14,35 +14,27 @@ HANDLED_FUNCTIONS = {}
 __all__ = ["wrap_numpy", "HANDLED_UFUNCS", "HANDLED_FUNCTIONS"]
 
 
-def _is_uncertainty(obj):
-    """Test for _nom and _err attrs.
-
-    This is done in place of isinstance(Uncertainty, arg), which would cause a circular import.
-
-    Parameters
-    ----------
-    obj : Object
-
-
-    Returns
-    -------
-    bool
+def _is_uncertainty(obj) -> bool:
     """
+    Test for _nom and _err attrs.
+
+    This is done in place of ``isinstance(Uncertainty, arg)``, which would cause a circular import.
+
+    :param obj:
+    """
+
     return hasattr(obj, "_nom") and hasattr(obj, "_err")
 
 
-def _is_sequence_with_uncertainty_elements(obj):
-    """Test for sequences of uncertainties.
-
-    Parameters
-    ----------
-    obj : object
-
-
-    Returns
-    -------
-    True if obj is a sequence and at least one element is an Uncertainty; False otherwise
+def _is_sequence_with_uncertainty_elements(obj) -> bool:
     """
+    Test for sequences of uncertainties.
+
+    :param obj:
+
+    :return: `True` if obj is a sequence and at least one element is an Uncertainty; `False` otherwise
+    """
+
     return (
         is_iterable(obj)
         and has_length(obj)
@@ -51,17 +43,26 @@ def _is_sequence_with_uncertainty_elements(obj):
     )
 
 
-def convert_arg(arg, attr: str = None):
-    """Convert uncertainties and sequences of uncertainties to nominal values or errors
+def convert_arg(arg, attr: str | None = None):
+    """
+    Convert uncertainties and sequences of uncertainties to nominal values or errors.
 
     This function has a different behavior if the nominal value or errors are requested.
-    If the nominal value is requested, the outputs are:
-        copies if arg is not an uncertainty (or sequence of)
-        nominal values (or sequence of) if arg is an uncertainty (or sequence of)
-    If the errors are requested, the outputs are:
-        None if arg is not an uncertainty (or sequence of)
-        errors (or sequence of) if arg is an uncertainty (or sequence of)
+
+    * If the nominal value is requested, the outputs are:
+
+      - copies if arg is not an uncertainty (or sequence of)
+      - nominal values (or sequence of) if arg is an uncertainty (or sequence of)
+
+    * If the errors are requested, the outputs are:
+
+      - `None` if arg is not an uncertainty (or sequence of)
+      - errors (or sequence of) if arg is an uncertainty (or sequence of)
+
+    :param arg:
+    :param attr:
     """
+
     if _is_uncertainty(arg):
         return getattr(arg, attr)
     elif _is_sequence_with_uncertainty_elements(arg):
@@ -76,21 +77,26 @@ def convert_arg(arg, attr: str = None):
             return arg
 
 
-def classify_and_split_args_and_kwargs(*args, **kwargs):
-    """Checks the args and kwargs to see if they contain uncertanty info, and prepares them for use by JAX.
+def classify_and_split_args_and_kwargs(*args, **kwargs) -> tuple:
+    """
+    Checks the args and kwargs to see if they contain uncertanty info, and prepares them for use by JAX.
 
     JAX does not support differentiating with respect to kwargs so uncertainty info there is just discarded.
-    Returns:
-        uncert_argnums: list of int
-            A list of the positional arguments with respect to which derivatives need to be taken
-        uncert_arg_nom:
-            A list of arguments to the function, without errors
-        uncert_arg_err:
-            A list of errors for the positional arguments which will have derivatives
-        uncert_kwarg_nom:
-            A dict of keyword args that will be passed to the function
-        uncert_instance:
-            Returns an instance of an Uncertainty object for the class constructor
+
+    :param args:
+    :param kwargs:
+
+    :return:
+      * `uncert_argnums`: `list[int]`
+        - A list of the positional arguments with respect to which derivatives need to be taken
+      * `uncert_arg_nom`
+        - A list of arguments to the function, without errors
+      * `uncert_arg_err`
+        - A list of errors for the positional arguments which will have derivatives
+      * `uncert_kwarg_nom`
+        - A dict of keyword args that will be passed to the function
+      * `uncert_instance`
+        - Returns an instance of an Uncertainty object for the class constructor
     """
 
     uncert_argnums = tuple(
@@ -110,9 +116,11 @@ def classify_and_split_args_and_kwargs(*args, **kwargs):
 
 
 def implements(numpy_func_string, func_type):
-    """Register an __array_function__/__array_ufunc__ implementation for Uncertainty
-    objects.
+    """
+    Register an ``__array_function__/__array_ufunc__`` implementation for `Uncertainty` objects.
 
+    :param numpy_func_string:
+    :param func_type:
     """
 
     def decorator(func):
@@ -173,32 +181,28 @@ def get_mappable_dims(*args):
 
 
 def implement_func(
-    func_type,
-    func_str,
-    implement_mode,
-    grad_argnum_override=None,
+    func_type: str,
+    func_str: str,
+    implement_mode: str,
+    grad_argnum_override: list[int] | None = None,
     selection_operator=None,
-    output_rank=0,
+    output_rank: int = 0,
     custom_jax_dispatch=None,
 ):
-    """Add default-behavior NumPy function/ufunc to the handled list.
-
-    Parameters
-    ----------
-    func_type : str
-        "function" for NumPy functions, "ufunc" for NumPy ufuncs
-    func_str : str
-        String representing the name of the NumPy function/ufunc to add
-    implement_mode: str
-        Instructs on the implementation type
-    grad_argnum_override: list of int
-        Positions of arguments that should be differentiated, if necessary to enforce
-    selection_operator: func
-        An operator that provides selection indices that correspond to the action of the function that needs to be implemented
-        E.g. np.argmax for np.max
-    output_rank: int
-        The rank of the output. If it's greater than rank 0 and derivatives are needed, jacfwd needs to be used instead of grad.
     """
+    Add default-behavior NumPy function/ufunc to the handled list.
+
+    :param func_type: "function" for `numpy` functions, "ufunc" for `numpy` ufuncs
+    :param func_str: String representing the name of the NumPy function/ufunc to add
+    :param implement_mode: Instructs on the implementation type
+    :param grad_argnum_override: Positions of arguments that should be differentiated, if necessary to enforce
+    :param selection_operator: An operator that provides selection indices that correspond to the action of the
+        function that needs to be implemented (e.g. `numpy.argmax` for `numpy.max`)
+    :param output_rank: The rank of the output. If it's greater than rank 0 and derivatives are needed,
+        jacfwd needs to be used instead of grad.
+    :param custom_jax_dispatch:
+    """
+
     # If Jax+NumPy is not available, do not attempt implement that which does not exist
     if jnp is None:
         return
