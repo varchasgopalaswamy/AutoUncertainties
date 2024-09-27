@@ -23,9 +23,21 @@ straightforward and automatic using auto-differentiation.
 Supported Features
 ------------------
 
-- 🗹 Scalars
-- 🗹 Arrays, with support for most NumPy ufuncs and functions
-- ☐ Pandas Extension Type (see `here <https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html>`_)
+.. raw:: html
+
+  <div>
+    <input type="checkbox" id="scalars" name="scalars" checked disabled />
+    <label for="scalars">Scalars</label>
+  </div>
+  <div>
+    <input type="checkbox" id="arrays" name="arrays" checked disabled />
+    <label for="arrays">Arrays, with support for most NumPy ufuncs and functions</label>
+  </div>
+  <div>
+    <input type="checkbox" id="pandas" name="pandas" unchecked disabled />
+    <label for="arrays">Pandas Extension Type (see <a href="https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html">here</a>)</label>
+  </div>
+
 
 Usage
 -----
