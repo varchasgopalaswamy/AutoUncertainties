@@ -8,9 +8,15 @@ from hypothesis import given
 from hypothesis.extra import numpy as hnp
 import hypothesis.strategies as st
 import numpy as np
+from pint import (
+    DimensionalityError,
+    Quantity,
+)
 import pytest
 
+# requires installation with CI dependencies
 from auto_uncertainties import NegativeStdDevError
+from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
     Uncertainty,
@@ -19,14 +25,6 @@ from auto_uncertainties.uncertainty.uncertainty_containers import (
     nominal_values,
     std_devs,
 )
-
-try:
-    from pint import DimensionalityError, Quantity
-except ImportError:
-
-    class DimensionalityError(Exception):
-        pass
-
 
 BINARY_OPS = [
     operator.lt,
@@ -424,4 +422,58 @@ class TestUncertainty:
 
         # TODO: uncertainty_containers:290 & 63-69  -->  should this be tested if it doesn't work?
 
-    # WORK IN PROGRESS
+    @staticmethod
+    def test_from_sequence():
+        seq = [Uncertainty(2, 3), Uncertainty(3, 4), Uncertainty(4, 5)]
+        result = Uncertainty.from_sequence(seq)
+        assert isinstance(result, VectorUncertainty)
+        assert result[0] == Uncertainty(2, 3)
+        assert result[1] == Uncertainty(3, 4)
+        assert result[2] == Uncertainty(4, 5)
+
+        seq = [None, Uncertainty(2, 3)]
+        with pytest.raises(TypeError):
+            _ = Uncertainty.from_sequence(seq)
+
+        # TODO: uncertainty_containers:327 & 63-69  -->  should this be tested if it doesn't work?
+
+        # seq = [Uncertainty(2, 3) * Unit('radian'), Uncertainty(5, 8)]
+        # result = Uncertainty.from_sequence(seq)
+        # assert result.units == Unit('radian')
+
+    # TODO: ------------------------------------------
+    # TODO: Add tests for operator dunder methods here
+    # TODO: ------------------------------------------
+
+
+class TestVectorUncertainty:
+    """Tests that expand the coverage of the previous VectorUncertainty tests."""
+
+    @staticmethod
+    def test_getattr():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        with pytest.raises(AttributeError):
+            _ = v.__array_something
+
+        for item1 in v.__apply_to_both_ndarray__:
+            try:
+                assert callable(getattr(v, item1)) or isinstance(
+                    getattr(v, item1), VectorUncertainty
+                )
+            except ValueError:
+                continue
+
+        for item2 in HANDLED_UFUNCS:
+            assert callable(getattr(v, item2))
+
+        for item3 in HANDLED_FUNCTIONS:
+            assert getattr(v, item3) is not None
+
+        for item4 in v.__ndarray_attributes__:
+            assert getattr(v, item4) == getattr(v._nom, item4)
+
+        with pytest.raises(AttributeError):
+            _ = v.ATTRIBUTE_THAT_DOES_NOT_EXIST
+
+    # WORK IN PROGRESS...

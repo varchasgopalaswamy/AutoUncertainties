@@ -21,7 +21,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-CI = ["pytest", "pytest-cov","hypothesis","pylint"]
+CI = ["pytest", "pytest-cov", "hypothesis", "pylint", "pint"]
 pandas = ["pandas >= 1.5.1"]
 docs = [
     "sphinx >= 4.1.2",

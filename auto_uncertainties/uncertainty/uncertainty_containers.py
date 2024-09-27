@@ -291,11 +291,16 @@ class Uncertainty(Generic[T]):
         return inst
 
     @classmethod
-    def from_list(cls, u_list: Sequence[Uncertainty]):
+    def from_list(cls, u_list: Sequence[Uncertainty]):  # pragma: no cover
         """
         Create an Uncertainty object from a list of `Uncertainty` objects.
 
         :param u_list: A list of `Uncertainty` objects.
+
+        .. note::
+
+           This method is an alias for `~Uncertainty.from_sequence`.
+
         """
         return cls.from_sequence(u_list)
 
@@ -316,7 +321,7 @@ class Uncertainty(Generic[T]):
             try:
                 first_item + 1
             except TypeError:
-                msg = f"Sequence elements of type {type(first_item)} dont support math operations!"
+                msg = f"Sequence elements of type {type(first_item)} don't support math operations!"
                 raise TypeError(msg) from None
             if hasattr(first_item, "units"):
                 val *= first_item.units
