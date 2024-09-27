@@ -15,11 +15,9 @@ from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
     Uncertainty,
     VectorUncertainty,
-    set_downcast_error,
-    set_compare_error,
+    _check_units,
     nominal_values,
     std_devs,
-    _check_units,
 )
 
 try:
@@ -298,3 +296,93 @@ def test_numpy_math_ops(v1, e1, op):
     u = op(u1)
     if np.isfinite(v1) and np.isfinite(u):
         math.isclose(u.value, op(u1.value))
+
+
+# -----------------------------------------------------------------
+# --------------------------  NEW TESTS  --------------------------
+# -----------------------------------------------------------------
+
+
+def test_check_units():
+    assert _check_units
+
+
+def test_nominal_values():
+    x = Uncertainty(2, 3)
+    assert nominal_values(x) == x.value
+
+    x = np.array([1, 2, 3])
+    assert nominal_values(x).all() == Uncertainty.from_sequence(x).value.all()
+
+    x = "not an Uncertainty"
+    assert nominal_values(x) == x
+
+    x = np.nan
+    assert np.isnan(nominal_values(x))
+
+    # TODO: could be improved
+
+
+def test_std_devs():
+    x = Uncertainty(2, 3)
+    assert std_devs(x) == x.error
+
+    x = np.array([1, 2, 3])
+    assert std_devs(x).all() == Uncertainty.from_sequence(x).error.all()
+
+    x = "not an Uncertainty"
+    assert std_devs(x) == 0
+
+    x = np.nan
+    assert std_devs(x) == 0
+
+    # TODO: could be improved
+
+
+class TestUncertainty:
+    """Tests that expand the coverage of the previous tests."""
+
+    @staticmethod
+    def test_getstate():
+        u = Uncertainty(2, 3)
+        assert u.__getstate__() == {"nominal_value": u._nom, "std_devs": u._err}
+
+    @staticmethod
+    def test_setstate():
+        u = Uncertainty(2, 3)
+        u.__setstate__({"nominal_value": 100, "std_devs": 200})
+        assert u.__getstate__()["nominal_value"] == 100
+        assert u.__getstate__()["std_devs"] == 200
+
+    @staticmethod
+    def test_getnewargs():
+        u = Uncertainty(2, 3)
+        assert u.__getnewargs__()[0] == 2
+        assert u.__getnewargs__()[1] == 3
+
+    @staticmethod
+    def test_init():
+        scalar = Uncertainty(2, 3)
+        vector = Uncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        assert isinstance(scalar, ScalarUncertainty)  # verify scalar type was chosen
+        assert isinstance(vector, VectorUncertainty)  # verify vector type was chosen
+
+        # Verify inheritance
+        assert isinstance(scalar, Uncertainty)
+        assert isinstance(vector, Uncertainty)
+
+    @staticmethod
+    def test_properties():
+        u = Uncertainty(2, 3)
+        assert isinstance(u, ScalarUncertainty)
+
+        assert u.value == u._nom
+        assert u.error == u._err
+        assert u.relative == 1.5
+        assert u.rel == u.relative
+        assert u.rel2 == 2.25
+
+    @staticmethod
+    def test_plus_minus(): ...
+
+    # WORK IN PROGRESS

@@ -6,12 +6,11 @@ import copy
 import locale
 import math
 import operator
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 import warnings
 
 import joblib
 import numpy as np
-from numpy.typing import NDArray
 
 from auto_uncertainties import (
     DowncastError,
@@ -39,18 +38,18 @@ __all__ = [
 ]
 
 
-def set_downcast_error(val: bool):
-    """Set whether errors occur when uncertainty is stripped"""
+def set_downcast_error(val: bool) -> None:
+    """Set whether errors occur when uncertainty is stripped."""
     global ERROR_ON_DOWNCAST
     ERROR_ON_DOWNCAST = val
 
 
-def set_compare_error(val: float):
+def set_compare_error(val: float) -> None:
     global COMPARE_RTOL
     COMPARE_RTOL = val
 
 
-def _check_units(value, err):
+def _check_units(value, err) -> tuple[Any, Any, Any]:
     mag_has_units = hasattr(value, "units")
     mag_units = getattr(value, "units", None)
     err_has_units = hasattr(err, "units")
@@ -61,7 +60,7 @@ def _check_units(value, err):
         ret_val = Q(value).to(mag_units).m
         ret_err = Q(err).to(mag_units).m if err is not None else None
         ret_units = mag_units
-    # This branch will never actually work, but its here
+    # This branch will never actually work, but it's here
     # to raise a Dimensionality error without needing to import pint
     elif err_has_units:
         Q = err_units._REGISTRY.Quantity  # type: ignore
@@ -77,7 +76,7 @@ def _check_units(value, err):
 
 
 def nominal_values(x) -> T:
-    """Return the central value of an Uncertainty object if it is one, otherwise returns the object"""
+    """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
     # Is an Uncertainty
     if hasattr(x, "_nom"):
         return x.value
@@ -102,7 +101,7 @@ def nominal_values(x) -> T:
 
 
 def std_devs(x) -> T:
-    """Return the uncertainty of an Uncertainty object if it is one, otherwise returns zero"""
+    """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     # Is an Uncertainty
     if hasattr(x, "_err"):
         return x.error
@@ -127,7 +126,7 @@ def std_devs(x) -> T:
 
 
 ST = TypeVar("ST", float, int)
-T = TypeVar("T", NDArray, float, int)
+T = TypeVar("T", np.ndarray, float, int)
 
 
 class Uncertainty(Generic[T]):
@@ -141,15 +140,15 @@ class Uncertainty(Generic[T]):
     _nom: T
     _err: T
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, T]:
         return {"nominal_value": self._nom, "std_devs": self._err}
 
-    def __setstate__(self, state):
+    def __setstate__(self, state) -> None:
         self._nom = state["nominal_value"]
         self._err = state["std_devs"]
 
-    def __getnewargs__(self):
-        return (self._nom, self._err)
+    def __getnewargs__(self) -> tuple[T, T]:
+        return self._nom, self._err
 
     @ignore_numpy_downcast_warnings
     def __new__(cls: type[Uncertainty], value: T | Uncertainty, err=None):
@@ -206,7 +205,7 @@ class Uncertainty(Generic[T]):
             inst.__init__(value, err, trigger=True)
         return inst
 
-    def __init__(self, value: T, err: T | None, *, trigger=False):
+    def __init__(self, value: T, err: T | None = 0.0, *, trigger=False):
         if trigger:
             if hasattr(value, "units") or hasattr(err, "units"):
                 msg = "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
@@ -225,31 +224,31 @@ class Uncertainty(Generic[T]):
 
     @property
     def value(self) -> T:
-        """The central value of the Uncertainty object"""
+        """The central value of the `Uncertainty` object."""
         return self._nom
 
     @property
     def error(self) -> T:
-        """The uncertainty value of the Uncertainty object"""
+        """The uncertainty value of the `Uncertainty` object."""
         return self._err
 
     @property
     def relative(self) -> T:
-        """The relative uncertainty of the Uncertainty object"""
+        """The relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
     @property
     def rel(self) -> T:
-        """Alias for relative property"""
+        """Alias for relative property."""
         return self.relative
 
     @property
     def rel2(self) -> T:
-        """The square of the relative uncertainty of the Uncertainty object"""
+        """The square of the relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
     def plus_minus(self, err: T):
-        """Add an error to the Uncertainty object"""
+        """Add an error to the `Uncertainty` object."""
         val = self._nom
         old_err = self._err
         new_err = np.sqrt(old_err**2 + err**2)
@@ -257,9 +256,9 @@ class Uncertainty(Generic[T]):
         return self.__class__(val, new_err)
 
     @classmethod
-    def from_string(cls, string: str):
+    def from_string(cls, string: str) -> Uncertainty:
         """
-        Create an Uncertainty object from a string representation of the value and error.
+        Create an `Uncertainty` object from a string representation of the value and error.
 
         :param string: A string representation of the value and error. The error can be represented as
             "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
@@ -278,8 +277,8 @@ class Uncertainty(Generic[T]):
         """
         Create an `Uncertainty` object from two `pint.Quantity` objects.
 
-        :param value: The central value of the Uncertainty object
-        :param err: The uncertainty value of the Uncertainty object
+        :param value: The central value of the `Uncertainty` object
+        :param err: The uncertainty value of the `Uncertainty` object
         """
 
         value_, err_, units = _check_units(value, err)
@@ -291,7 +290,7 @@ class Uncertainty(Generic[T]):
     @classmethod
     def from_list(cls, u_list: Sequence[Uncertainty]):
         """
-        Create an Uncertainty object from a list of Uncertainty objects.
+        Create an Uncertainty object from a list of `Uncertainty` objects.
 
         :param u_list: A list of `Uncertainty` objects.
         """
@@ -300,7 +299,7 @@ class Uncertainty(Generic[T]):
     @classmethod
     def from_sequence(cls, seq: Sequence[Uncertainty]):
         """
-        Create an Uncertainty object from a sequence of Uncertainty objects
+        Create an `Uncertainty` object from a sequence of `Uncertainty` objects.
 
         :param seq: A sequence of `Uncertainty` objects.
         """
@@ -577,6 +576,8 @@ class Uncertainty(Generic[T]):
 
 
 class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
+    """Vector `Uncertainty` class."""
+
     __apply_to_both_ndarray__ = (
         "flatten",
         "real",
@@ -786,6 +787,8 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
 
 class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
+    """Scalar `Uncertainty` class."""
+
     @property
     def relative(self):
         try:
