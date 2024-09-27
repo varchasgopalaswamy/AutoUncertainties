@@ -21,7 +21,7 @@ from auto_uncertainties.uncertainty.uncertainty_containers import (
 )
 
 try:
-    from pint import DimensionalityError
+    from pint import DimensionalityError, Quantity
 except ImportError:
 
     class DimensionalityError(Exception):
@@ -383,6 +383,45 @@ class TestUncertainty:
         assert u.rel2 == 2.25
 
     @staticmethod
-    def test_plus_minus(): ...
+    @given(
+        st.floats(0, 10),
+        st.floats(0, 10),
+        st.floats(0, 10),
+    )
+    def test_plus_minus(val, err, pm):
+        u = Uncertainty(val, err)
+        u = u.plus_minus(pm)
+
+        assert u.value == val
+        assert u.error == np.sqrt(err**2 + pm**2)
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "val, expected",
+        [
+            ("2.0 +/- 3.5", Uncertainty(2.0, 3.5)),
+            ("2.0 +- 3.5", Uncertainty(2.0, 3.5)),
+            ("2.6", Uncertainty(2.6)),
+        ],
+    )
+    def test_from_string(val, expected):
+        assert Uncertainty.from_string(val) == expected
+
+        # TODO: uncertainty_containers:154  ->  should err param be default to 0.0? Seems to break wrappers if so
+
+    @staticmethod
+    @pytest.mark.parametrize(
+        "val, err", [(Quantity(2, "radian"), Quantity(3, "radian")), (2, 3), (8.5, 9.5)]
+    )
+    def test_from_quantities(val, err):
+        if isinstance(val, Quantity) and isinstance(err, Quantity):
+            with pytest.raises(NotImplementedError):
+                _ = Uncertainty.from_quantities(val, err)
+            return
+
+        assert Uncertainty.from_quantities(val, err).value == val
+        assert Uncertainty.from_quantities(val, err).error == err
+
+        # TODO: uncertainty_containers:290 & 63-69  -->  should this be tested if it doesn't work?
 
     # WORK IN PROGRESS

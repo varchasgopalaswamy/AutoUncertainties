@@ -184,6 +184,9 @@ class Uncertainty(Generic[T]):
                 raise NegativeStdDevError(msg)
         else:
             vector = False
+            # Zero error
+            if err is None:
+                err = 0.0
             if np.isfinite(value):
                 nan = False
                 if np.isfinite(err) and err < 0:
@@ -205,7 +208,7 @@ class Uncertainty(Generic[T]):
             inst.__init__(value, err, trigger=True)
         return inst
 
-    def __init__(self, value: T, err: T | None = 0.0, *, trigger=False):
+    def __init__(self, value: T, err: T = 0.0, *, trigger=False):
         if trigger:
             if hasattr(value, "units") or hasattr(err, "units"):
                 msg = "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
