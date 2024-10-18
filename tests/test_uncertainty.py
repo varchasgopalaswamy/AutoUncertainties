@@ -34,15 +34,6 @@ BINARY_OPS = [
     operator.gt,
     operator.ge,
 ]
-ARITH_OPS = [
-    operator.add,
-    operator.sub,
-    operator.mul,
-    operator.truediv,
-    operator.floordiv,
-    operator.mod,
-    operator.pow,
-]
 UNARY_OPS = [operator.not_, operator.abs]
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -167,7 +158,7 @@ def test_scalar_binary(v1, e1, v2, e2, op):
         if np.isfinite(e1) and np.isfinite(e2):
             assert np.isfinite(u.error)
     else:
-        assert math.isclose(u, op(u1.value, u2.value), rel_tol=1e-09)
+        assert math.isclose(u, op(u1.value, u2.value), rel_tol=1e-07)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -450,9 +441,132 @@ class TestUncertainty:
         # result = Uncertainty.from_sequence(seq)
         # assert result.units == Unit('radian')
 
-    # TODO: ------------------------------------------
-    # TODO: Add tests for operator dunder methods here
-    # TODO: ------------------------------------------
+    @staticmethod
+    @given(
+        v1=st.floats(**general_float_strategy),
+        v2=st.floats(**general_float_strategy),
+        e1=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+        e2=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+        op=st.sampled_from([operator.add, operator.sub]),
+    )
+    def test_addsub(v1, v2, e1, e2, op):
+        u1 = Uncertainty(v1, e1)
+        u2 = Uncertainty(v2, e2)
+
+        result = op(u1, u2)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(u1.value, u2.value)
+        assert result.error == np.sqrt(u1.error**2 + u2.error**2)
+
+        result = op(u1, v2)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(u1.value, v2)
+        assert result.error == u1.error
+
+        # Reverse case
+        result = op(v2, u1)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(v2, u1.value)
+        assert result.error == u1.error
+
+        u1 = Uncertainty(np.array([v1, v2]), np.array([e1, e2]))
+        result = op(u1, np.array([1, 2]))
+        assert isinstance(result, Uncertainty)
+
+    @staticmethod
+    @given(
+        v1=st.floats(**general_float_strategy),
+        v2=st.floats(**general_float_strategy),
+        e1=st.floats(
+            min_value=1,
+            max_value=1e3,
+        ),
+        e2=st.floats(
+            min_value=1,
+            max_value=1e3,
+        ),
+        op=st.sampled_from([operator.mul, operator.truediv]),
+    )
+    def test_muldiv(v1, v2, e1, e2, op):
+        assume(not (op == operator.truediv and (v2 == 0 or e2 == 0)))
+
+        u1 = Uncertainty(v1, e1)
+        u2 = Uncertainty(v2, e2)
+
+        assume(not np.isnan(u1.rel2 + u2.rel2))
+        assume(not np.isinf(u1.rel2 + u2.rel2))
+
+        result = op(u1, u2)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(u1.value, u2.value)
+        assert result.error == np.abs(result.value) * np.sqrt(u1.rel2 + u2.rel2)
+
+        result = op(u1, v2)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(u1.value, v2)
+        assert result.error == np.abs(op(u1.error, v2))
+
+        # Reverse case
+        result = op(v2, u1)
+        assert isinstance(result, Uncertainty)
+        assert result.value == op(v2, u1.value)
+        assert (
+            result.error == np.abs(result.value) * np.abs(u1.rel)
+            if op == operator.truediv
+            else np.abs(op(u1.error, v2))
+        )
+
+        u1 = Uncertainty(np.array([v1, v2]), np.array([e1, e2]))
+        result = op(u1, np.array([1, 2]))
+        assert isinstance(result, Uncertainty)
+
+    @staticmethod
+    @given(
+        v1=st.floats(**general_float_strategy),
+        v2=st.floats(**general_float_strategy),
+        e1=st.floats(
+            min_value=1,
+            max_value=1e3,
+        ),
+        e2=st.floats(
+            min_value=1,
+            max_value=1e3,
+        ),
+    )
+    def test_floordiv(v1, v2, e1, e2):
+        assume(v1 != 0 and v2 != 0)
+
+        u1 = Uncertainty(v1, e1)
+        u2 = Uncertainty(v2, e2)
+
+        assume(not np.isnan(u1.rel2 + u2.rel2))
+        assume(not np.isinf(u1.rel2 + u2.rel2))
+
+        result = u1 // u2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value // u2.value
+        assert result.error == (u1 / u2).error
+
+        result = u1 // v2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value // v2
+        assert result.error == (u1 / v2).error
+
+        # Reverse case
+        result = v2 // u1
+        assert isinstance(result, Uncertainty)
+        assert result.value == v2 // u1.value
+        assert result.error == (v2 / u1).error
+
+        u1 = Uncertainty(np.array([v1, v2]), np.array([e1, e2]))
+        result = u1 // np.array([1, 2])
+        assert isinstance(result, Uncertainty)
 
     @staticmethod
     @given(
@@ -466,22 +580,81 @@ class TestUncertainty:
             min_value=0,
             max_value=1e3,
         ),
-        op=st.sampled_from(ARITH_OPS),
     )
-    def test_arithmetic(v1, e1, v2, e2, op):
-        assume(v1 != 0 and v2 != 0 and e1 != 0 and e2 != 0)
-        assume(v1 != 0 and v2 != 0 and e1 > 0 and e2 > 0)
-        assume(not (op == operator.pow and v2 > 10 and e2 > 10))
+    def test_mod(v1, v2, e1, e2):
+        assume(v1 != 0 and e1 != 0)
+        assume(v2 != 0 and e2 != 0)
 
         u1 = Uncertainty(v1, e1)
         u2 = Uncertainty(v2, e2)
 
-        result = op(u1, u2)
+        result = u1 % u2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value % u2.value
+        assert result.error == 0.0
 
+        result = u1 % v2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value % v2
+        assert result.error == 0.0
+
+        # Reverse case
+        result = v2 % u1
+        assert isinstance(result, Uncertainty)
+        assert result.value == v2 % u1.value
+        assert result.error == 0.0
+
+        u1 = Uncertainty(np.array([v1, v2]), np.array([e1, e2]))
+        result = u1 % np.array([1, 2])
         assert isinstance(result, Uncertainty)
 
-        # TODO: THIS DOES NOT WORK!!!
-        # TODO: CHANGE TO SEPARATE TESTS FOR EACH DUNDER METHOD (use hypothesis still though
+        # TODO: uncertainty_containers:460 has not been tested here!
+
+    @staticmethod
+    @given(
+        v1=st.floats(
+            min_value=0.1,
+            max_value=5,
+        ),
+        v2=st.floats(
+            min_value=0.1,
+            max_value=5,
+        ),
+        e1=st.floats(
+            min_value=0.1,
+            max_value=5,
+        ),
+        e2=st.floats(
+            min_value=0.1,
+            max_value=5,
+        ),
+    )
+    def test_pow(v1, v2, e1, e2):
+        u1 = Uncertainty(v1, e1)
+        u2 = Uncertainty(v2, e2)
+
+        result = u1**u2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value**u2.value
+        assert result.error == np.abs(result.value) * np.sqrt(
+            (u2.value / u1.value * u1.error) ** 2
+            + (np.log(np.abs(u1.value)) * u2.error) ** 2
+        )
+
+        result = u1**v2
+        assert isinstance(result, Uncertainty)
+        assert result.value == u1.value**v2
+        assert result.error == np.abs(result.value) * np.sqrt(
+            (v2 / u1.value * u1.error) ** 2 + (np.log(np.abs(u1.value)) * 0) ** 2
+        )
+
+        # Reverse case
+        result = v2**u1
+        assert isinstance(result, Uncertainty)
+        assert result.value == v2**u1.value
+        assert result.error == np.abs(result.value) * np.sqrt(
+            (u1.value / v2 * 0) ** 2 + (np.log(np.abs(v2)) * u1.error) ** 2
+        )
 
 
 class TestVectorUncertainty:

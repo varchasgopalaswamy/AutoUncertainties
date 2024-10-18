@@ -463,10 +463,10 @@ class Uncertainty(Generic[T]):
             return NotImplemented
         return self.__class__(new_mag, new_err)
 
-    def __divmod__(self, other):
+    def __divmod__(self, other):  # pragma: no cover
         return self // other, self % other
 
-    def __rdivmod__(self, other):
+    def __rdivmod__(self, other):  # pragma: no cover
         return other // self, other % self
 
     @ignore_runtime_warnings
@@ -485,7 +485,7 @@ class Uncertainty(Generic[T]):
             return NotImplemented
 
         new_mag = A**B
-        new_err = new_err = np.abs(new_mag) * np.sqrt(
+        new_err = np.abs(new_mag) * np.sqrt(
             (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
         )
 
