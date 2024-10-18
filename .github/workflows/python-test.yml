@@ -27,4 +27,4 @@ jobs:
           pre-commit run --all-files
       - name: Test with pytest
         run: |
-          coverage run -m pytest --cov=auto_uncertainties --cov-report=xml --cov-report=html --cov-report=term --ignore=tests/pandas
+          coverage run -m pytest --cov --cov-report=xml --cov-report=html --cov-report=term --ignore=tests/pandas

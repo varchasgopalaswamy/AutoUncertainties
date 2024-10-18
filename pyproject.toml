@@ -61,3 +61,12 @@ reportUntypedFunctionDecorator = true
 reportUntypedClassDecorator = true
 reportMissingImports = false
 exclude = ["install*", "public*", "**/tests*", "**/resources*"]
+
+[tool.coverage.run]
+source = ["./"]
+omit =  ["*/test*", "*/*__init__.py", "*/_version.py"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

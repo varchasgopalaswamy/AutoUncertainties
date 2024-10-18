@@ -152,13 +152,16 @@ def test_scalar_binary(v1, e1, v2, e2, op):
     u1 = Uncertainty(v1, e1)
     u2 = Uncertainty(v2, e2)
 
-    u = op(u1, u2)
-    if isinstance(u, Uncertainty):
-        assert math.isclose(u.value, op(u1.value, u2.value))
-        if np.isfinite(e1) and np.isfinite(e2):
-            assert np.isfinite(u.error)
-    else:
-        assert math.isclose(u, op(u1.value, u2.value), rel_tol=1e-07)
+    # Compare Uncertainty with Uncertainty, and with float
+    results = [op(u1, u2), op(u1, v2)]
+
+    for result in results:
+        if isinstance(result, Uncertainty):
+            assert math.isclose(result.value, op(u1.value, u2.value))
+            if np.isfinite(e1) and np.isfinite(e2):
+                assert np.isfinite(result.error)
+        else:
+            assert math.isclose(result, op(u1.value, u2.value), rel_tol=1e-07)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -655,6 +658,45 @@ class TestUncertainty:
         assert result.error == np.abs(result.value) * np.sqrt(
             (u1.value / v2 * 0) ** 2 + (np.log(np.abs(v2)) * u1.error) ** 2
         )
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_abs(v, e):
+        u = Uncertainty(v, e)
+        assert abs(u).value == abs(v)
+        assert abs(u).error == e
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_pos(v, e):
+        u = Uncertainty(v, e)
+        assert (+u).value == v
+        assert (+u).error == e
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_neg(v, e):
+        u = Uncertainty(v, e)
+        assert (-u).value == -v
+        assert (-u).error == e
 
 
 class TestVectorUncertainty:
