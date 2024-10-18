@@ -680,15 +680,15 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             return np.asarray(self._nom)
 
     def clip(self, min=None, max=None, out=None, **kwargs):  # noqa: A002
-        """Numpy clip implementation"""
+        """Numpy clip implementation."""
         return self.__class__(self._nom.clip(min, max, out, **kwargs), self._err)
 
     def fill(self, value) -> None:
-        """Numpy fill implementation"""
+        """Numpy fill implementation."""
         return self._nom.fill(value)
 
     def put(self, indices, values, mode="raise") -> None:
-        """Numpy put implementation"""
+        """Numpy put implementation."""
         if isinstance(values, self.__class__):
             self._nom.put(indices, values._nom, mode)
             self._err.put(indices, values._err, mode)
@@ -697,19 +697,19 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             raise TypeError(msg)
 
     def copy(self):
-        """Return a copy of the Uncertainty object"""
+        """Return a copy of the `Uncertainty` object."""
         return Uncertainty(self._nom.copy(), self._err.copy())
 
     # Special properties
     @property
     def flat(self):
-        """ "numpy flat implementation"""
+        """Numpy flat implementation."""
         for u, v in (self._nom.flat, self._err.flat):
             yield self.__class__(u, v)
 
     @property
     def shape(self):
-        """Numpy shape implemenetation"""
+        """Numpy shape implemenetation."""
         return self._nom.shape
 
     @shape.setter
@@ -719,11 +719,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def nbytes(self):
-        """Numpy nbytes implementation"""
+        """Numpy nbytes implementation."""
         return self._nom.nbytes + self._err.nbytes
 
     def searchsorted(self, v, side="left", sorter=None):
-        """numpy searchsorted implementation"""
+        """Numpy searchsorted implementation."""
         return self._nom.searchsorted(v, side)
 
     def __len__(self) -> int:
@@ -732,9 +732,9 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def __getitem__(self, key):
         try:
             return Uncertainty(self._nom[key], self._err[key])
-        except TypeError:
+        except IndexError as e:
             msg = f"Index {key} not supported!"
-            raise TypeError(msg) from None
+            raise IndexError(msg) from e
 
     def __setitem__(self, key, value):
         # If value is nan, just set the value in those regions to nan and return. This is the only case where a scalar can be passed as an argument!
@@ -761,7 +761,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             self._err[key] = value._err
 
     def tolist(self):
-        """numpy tolist implementation"""
+        """Numpy tolist implementation."""
         try:
             nom = self._nom.tolist()
             err = self._err.tolist()
@@ -782,11 +782,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def ndim(self):
-        """numpy ndim implementation"""
+        """Numpy ndim implementation."""
         return np.ndim(self._nom)
 
     def view(self):
-        """numpy view implementation"""
+        """Numpy view implementation."""
         return self.__class__(self._nom.view(), self._err.view())
 
     def __hash__(self) -> int:
@@ -821,11 +821,11 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
 
     def __int__(self):
         if ERROR_ON_DOWNCAST:
-            msg = "The uncertainty is stripped when downcasting to float."
+            msg = "The uncertainty is stripped when downcasting to int."
             raise DowncastError(msg)
         else:
             warnings.warn(
-                "The uncertainty is stripped when downcasting to float.",
+                "The uncertainty is stripped when downcasting to int.",
                 DowncastWarning,
                 stacklevel=2,
             )

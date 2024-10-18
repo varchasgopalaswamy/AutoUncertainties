@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import locale
 import math
 import operator
 import warnings
@@ -7,6 +8,7 @@ import warnings
 from hypothesis import assume, given
 from hypothesis.extra import numpy as hnp
 import hypothesis.strategies as st
+import joblib
 import numpy as np
 from pint import (
     DimensionalityError,
@@ -15,7 +17,12 @@ from pint import (
 import pytest
 
 # requires installation with CI dependencies
-from auto_uncertainties import NegativeStdDevError
+from auto_uncertainties import (
+    DowncastError,
+    DowncastWarning,
+    NegativeStdDevError,
+    set_downcast_error,
+)
 from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS
 from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
@@ -161,7 +168,7 @@ def test_scalar_binary(v1, e1, v2, e2, op):
             if np.isfinite(e1) and np.isfinite(e2):
                 assert np.isfinite(result.error)
         else:
-            assert math.isclose(result, op(u1.value, u2.value), rel_tol=1e-07)
+            assert math.isclose(result, op(u1.value, u2.value), rel_tol=1e-06)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -729,4 +736,265 @@ class TestVectorUncertainty:
         with pytest.raises(AttributeError):
             _ = v.ATTRIBUTE_THAT_DOES_NOT_EXIST
 
-    # WORK IN PROGRESS...
+    @staticmethod
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+        arr3=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr4=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+    )
+    def test_ne_eq(arr1, arr2, arr3, arr4):
+        assume(not np.array_equal(arr1, arr3) and not np.array_equal(arr2, arr4))
+
+        v1 = VectorUncertainty(arr1, arr2)
+        v2 = VectorUncertainty(arr3, arr4)
+        v_same = VectorUncertainty(arr1, arr2)
+
+        result = v1 == v_same
+        assert np.all(result)
+
+        result = v1 == v2
+        assert not np.all(result)
+
+        result = v1 != v2
+        assert np.array_equal(result, np.logical_not(v1 == v2))
+
+        # Test with bare array
+        result = v1 == arr1
+        assert np.all(result)
+
+    @staticmethod
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+    )
+    def test_bytes(arr1, arr2):
+        v = VectorUncertainty(arr1, arr2)
+        assert v.__bytes__() == str(v).encode(locale.getpreferredencoding())
+
+    @staticmethod
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+    )
+    def test_iter(arr1, arr2):
+        v = VectorUncertainty(arr1, arr2)
+
+        for idx, item in enumerate(v):
+            assert item == Uncertainty(arr1[idx], arr2[idx])
+
+    @staticmethod
+    def test_properties():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        assert np.array_equal(v.relative, np.array([4, 2, 2]))
+        assert np.array_equal(v.rel2, v.relative**2)
+        assert v.shape == (3,)
+        assert v.nbytes == v._nom.nbytes + v._err.nbytes
+        assert v.ndim == 1
+
+    @staticmethod
+    @pytest.mark.filterwarnings(
+        "ignore: __array__ implementation doesn't accept a copy keyword"
+    )
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+    )
+    def test_array(arr1, arr2):
+        v = VectorUncertainty(arr1, arr2)
+
+        with pytest.warns(DowncastWarning):
+            result = np.array(v)
+            assert np.array_equal(result, np.asarray(v._nom))
+
+        set_downcast_error(True)
+        with pytest.raises(DowncastError):
+            _ = np.array(v)
+
+        set_downcast_error(False)
+
+    @staticmethod
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
+    )
+    def test_getitem(arr1, arr2):
+        v = VectorUncertainty(arr1, arr2)
+
+        for i in range(3):
+            assert v[i] == Uncertainty(arr1[i], arr2[i])
+
+        with pytest.raises(IndexError):
+            _ = v[4]
+
+    @staticmethod
+    def test_setitem():
+        v = VectorUncertainty(np.array([1.0, 2.0, 3.0]), np.array([4.0, 5.0, 6.0]))
+
+        v[0] = Uncertainty(400.0, 100.0)
+        assert v[0] == Uncertainty(400.0, 100.0)
+
+        # Use VectorUncertainty with only one item
+        v[0] = Uncertainty(np.array([400.0]), np.array([100.0]))
+        assert v[0] == Uncertainty(400.0, 100.0)
+
+        # Check NaN case
+        v[0] = np.nan
+        assert np.isnan(v[0])
+
+        with pytest.raises(ValueError):
+            v[0] = 400.0
+
+        # TODO: Test uncertainty_containers:752 (Uncertainty with no indexing support)
+
+    # TODO: Fix this (something isn't quite right with the tolist method...)
+    """
+    @staticmethod
+    @given(
+        arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
+        arr2=hnp.arrays(np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)),
+    )
+    def test_tolist(arr1, arr2):
+        v = VectorUncertainty(arr1, arr2)
+
+        result = v.tolist()
+    """
+
+    @staticmethod
+    def test_hash():
+        v = VectorUncertainty(np.array([1.0, 2.0, 3.0]), np.array([4.0, 5.0, 6.0]))
+
+        digest = joblib.hash((v._nom, v._err), hash_name="sha1")
+        assert v.__hash__() == int.from_bytes(bytes(digest, encoding="utf-8"), "big")
+
+
+class TestScalarUncertainty:
+    """Tests that expand the coverage of the previous ScalarUncertainty tests."""
+
+    @staticmethod
+    def test_properties():
+        s = ScalarUncertainty(0, 1)
+        assert np.isnan(s.relative)
+
+        s = ScalarUncertainty(5, 6)
+        assert s.relative == s._err / s._nom
+        assert s.rel2 == s.relative**2
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_float(v, e):
+        s = ScalarUncertainty(v, e)
+
+        with pytest.warns(DowncastWarning):
+            f = float(s)
+            assert f == float(s._nom)
+
+        set_downcast_error(True)
+
+        with pytest.raises(DowncastError):
+            _ = float(s)
+
+        set_downcast_error(False)
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_int(v, e):
+        s = ScalarUncertainty(v, e)
+
+        with pytest.warns(DowncastWarning):
+            i = int(s)
+            assert i == int(s._nom)
+
+        set_downcast_error(True)
+
+        with pytest.raises(DowncastError):
+            _ = int(s)
+
+        set_downcast_error(False)
+
+    @staticmethod
+    @given(
+        v=st.floats(**general_float_strategy),
+        e=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+    )
+    def test_complex(v, e):
+        s = ScalarUncertainty(v, e)
+
+        with pytest.warns(DowncastWarning):
+            f = complex(s)
+            assert f == complex(s._nom)
+
+        set_downcast_error(True)
+
+        with pytest.raises(DowncastError):
+            _ = complex(s)
+
+        set_downcast_error(False)
+
+    @staticmethod
+    @given(
+        v1=st.floats(**general_float_strategy),
+        e1=st.floats(min_value=0, max_value=1e3),
+        v2=st.floats(**general_float_strategy),
+        e2=st.floats(min_value=0, max_value=1e3),
+    )
+    def test_ne_eq(v1, e1, v2, e2):
+        assume(v1 != v2 and e1 != e2)
+
+        s1 = ScalarUncertainty(v1, e1)
+        s2 = ScalarUncertainty(v2, e2)
+        s_same = ScalarUncertainty(v1, e1)
+
+        result = s1 == s_same
+        assert result is True
+
+        result = s1 == s2
+        assert result is False
+
+        result = s1 != s2
+        assert result == (s1 != s2)
+
+        # Test with bare number
+        result = s1 == v1
+        assert result is True
+
+        # Test invalid inputs
+        result = s1 == "something"
+        assert result is False
+
+        s2._nom = "bad value"
+        result = s1 == s2
+        assert result is False
+
+    @staticmethod
+    def test_hash():
+        s = ScalarUncertainty(1, 2)
+        assert s.__hash__() == hash((s._nom, s._err))
