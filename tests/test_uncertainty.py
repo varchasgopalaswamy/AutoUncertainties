@@ -168,7 +168,7 @@ def test_scalar_binary(v1, e1, v2, e2, op):
             if np.isfinite(e1) and np.isfinite(e2):
                 assert np.isfinite(result.error)
         else:
-            assert math.isclose(result, op(u1.value, u2.value), rel_tol=1e-06)
+            assert np.isclose(result, op(u1.value, u2.value))
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
