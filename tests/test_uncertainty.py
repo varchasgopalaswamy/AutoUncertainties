@@ -4,7 +4,7 @@ import math
 import operator
 import warnings
 
-from hypothesis import given
+from hypothesis import assume, given
 from hypothesis.extra import numpy as hnp
 import hypothesis.strategies as st
 import numpy as np
@@ -33,6 +33,15 @@ BINARY_OPS = [
     operator.ne,
     operator.gt,
     operator.ge,
+]
+ARITH_OPS = [
+    operator.add,
+    operator.sub,
+    operator.mul,
+    operator.truediv,
+    operator.floordiv,
+    operator.mod,
+    operator.pow,
 ]
 UNARY_OPS = [operator.not_, operator.abs]
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -444,6 +453,35 @@ class TestUncertainty:
     # TODO: ------------------------------------------
     # TODO: Add tests for operator dunder methods here
     # TODO: ------------------------------------------
+
+    @staticmethod
+    @given(
+        v1=st.floats(**general_float_strategy),
+        v2=st.floats(**general_float_strategy),
+        e1=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+        e2=st.floats(
+            min_value=0,
+            max_value=1e3,
+        ),
+        op=st.sampled_from(ARITH_OPS),
+    )
+    def test_arithmetic(v1, e1, v2, e2, op):
+        assume(v1 != 0 and v2 != 0 and e1 != 0 and e2 != 0)
+        assume(v1 != 0 and v2 != 0 and e1 > 0 and e2 > 0)
+        assume(not (op == operator.pow and v2 > 10 and e2 > 10))
+
+        u1 = Uncertainty(v1, e1)
+        u2 = Uncertainty(v2, e2)
+
+        result = op(u1, u2)
+
+        assert isinstance(result, Uncertainty)
+
+        # TODO: THIS DOES NOT WORK!!!
+        # TODO: CHANGE TO SEPARATE TESTS FOR EACH DUNDER METHOD (use hypothesis still though
 
 
 class TestVectorUncertainty:
