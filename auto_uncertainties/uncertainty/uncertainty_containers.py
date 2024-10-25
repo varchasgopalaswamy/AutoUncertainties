@@ -766,15 +766,6 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
         self._nom.shape = value
         self._err.shape = value
 
-    def reshape(
-        self, shape, /, *, order: Literal["A", "C", "F"] = "C", copy: bool | None = None
-    ):
-        """NumPy `~numpy.ndarray.reshape` implementation."""
-        return self.__class__(
-            self._nom.reshape(shape, order=order, copy=copy),
-            self._err.reshape(shape, order=order, copy=copy),
-        )
-
     @property
     def nbytes(self):
         """NumPy `~numpy.ndarray.nbytes` implementation."""
