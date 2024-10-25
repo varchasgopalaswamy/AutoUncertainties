@@ -44,7 +44,7 @@ def set_downcast_error(val: bool) -> None:
     ERROR_ON_DOWNCAST = val
 
 
-def set_compare_error(val: float) -> None:
+def set_compare_error(val: float) -> None:  # pragma: no cover
     global COMPARE_RTOL
     COMPARE_RTOL = val
 
@@ -57,15 +57,15 @@ def _check_units(value, err) -> tuple[Any, Any, Any]:
 
     if mag_has_units and mag_units is not None:
         Q = mag_units._REGISTRY.Quantity
-        ret_val = Q(value).to(mag_units).m
-        ret_err = Q(err).to(mag_units).m if err is not None else None
+        ret_val = Q(value.m, value.units).to(mag_units).m
+        ret_err = Q(err.m, err.units).to(mag_units).m if err_has_units else err
         ret_units = mag_units
     # This branch will never actually work, but it's here
     # to raise a Dimensionality error without needing to import pint
     elif err_has_units:
         Q = err_units._REGISTRY.Quantity  # type: ignore
         ret_val = Q(value).to(err_units).m
-        ret_err = Q(err).to(err_units).m
+        ret_err = Q(err.m, err.units).to(err_units).m
         ret_units = err_units
     else:
         ret_units = None
@@ -133,8 +133,16 @@ class Uncertainty(Generic[T]):
     """
     Base class for `Uncertainty` objects.
 
-    :param value: The central value(s)
-    :param err: The uncertainty value(s). Zero if not provided. Negative numbers raise a `RuntimeError`.
+    :param value: The central value(s). Can be numbers, `numpy` arrays,
+        another `Uncertainty` object, or a list / tuple of `Uncertainty` objects.
+    :param err: The uncertainty value(s). Zero if not provided.
+
+    :raise RuntimeError: If ``err`` is negative.
+
+    .. note::
+
+       If an `Uncertainty` is supplied for ``value``, its ``error`` attribute will
+       override any ``err`` argument (if it is supplied).
     """
 
     _nom: T
@@ -151,7 +159,11 @@ class Uncertainty(Generic[T]):
         return self._nom, self._err
 
     @ignore_numpy_downcast_warnings
-    def __new__(cls: type[Uncertainty], value: T | Uncertainty, err=None):
+    def __new__(
+        cls: type[Uncertainty],
+        value: T | Uncertainty | Sequence[Uncertainty],
+        err: T | None = None,
+    ):
         # If instantiated with an Uncertainty subclass
         if isinstance(value, ScalarUncertainty | VectorUncertainty):
             err = value.error
@@ -208,7 +220,13 @@ class Uncertainty(Generic[T]):
             inst.__init__(value, err, trigger=True)
         return inst
 
-    def __init__(self, value: T, err: T = 0.0, *, trigger=False):
+    def __init__(
+        self,
+        value: T | Uncertainty | Sequence[Uncertainty],
+        err: T | None = None,
+        *,
+        trigger=False,
+    ):
         if trigger:
             if hasattr(value, "units") or hasattr(err, "units"):
                 msg = "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
@@ -236,7 +254,7 @@ class Uncertainty(Generic[T]):
         return self._err
 
     @property
-    def relative(self) -> T:
+    def relative(self) -> T:  # pragma: no cover
         """The relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
@@ -246,7 +264,7 @@ class Uncertainty(Generic[T]):
         return self.relative
 
     @property
-    def rel2(self) -> T:
+    def rel2(self) -> T:  # pragma: no cover
         """The square of the relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
@@ -282,6 +300,21 @@ class Uncertainty(Generic[T]):
 
         :param value: The central value of the `Uncertainty` object
         :param err: The uncertainty value of the `Uncertainty` object
+
+        .. note::
+
+           * If **neither** argument is a `~pint.Quantity`, returns a unitless
+             `Uncertainty` object.
+
+           * If **both** arguments are `~pint.Quantity` objects, returns an
+             `Uncertainty` with the same units as ``value`` (attempts to convert
+             ``err`` to ``value.units``).
+
+           * If **only the** ``value`` argument is a `~pint.Quantity`, returns
+             an `Uncertainty` object with the same units as ``value``.
+
+           * If **only the** ``err`` argument is a `~pint.Quantity`, returns
+             an `Uncertainty` object with the same units as ``err``.
         """
 
         value_, err_, units = _check_units(value, err)
@@ -333,6 +366,12 @@ class Uncertainty(Generic[T]):
                 except AttributeError:
                     val[i] = float(seq_i)
                     err[i] = 0
+
+        # Handle Pint Quantities
+        if hasattr(val, "units") or hasattr(
+            err, "units"
+        ):  # TODO: SHOULD THIS BE REMOVED, AND JUST HANDLED BY INIT?
+            return cls.from_quantities(val, err)
 
         return cls(val, err)
 
@@ -438,7 +477,6 @@ class Uncertainty(Generic[T]):
         elif isinstance(other, self._HANDLED_TYPES):
             new_mag = other // self._nom
             new_err = self.__rdiv__(other).error
-
             return self.__class__(new_mag, new_err)
         else:
             return NotImplemented
@@ -454,14 +492,15 @@ class Uncertainty(Generic[T]):
         return self.__class__(new_mag, new_err)
 
     def __rmod__(self, other):
-        new_mag = other % self._nom
-        if np.ndim(new_mag) == 0:
-            new_err = 0.0
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_err = np.zeros_like(new_mag)
+        if isinstance(other, self._HANDLED_TYPES):
+            new_mag = other % self._nom
+            if np.ndim(new_mag) == 0:
+                new_err = 0.0
+            else:
+                new_err = np.zeros_like(new_mag)
+            return self.__class__(new_mag, new_err)
         else:
             return NotImplemented
-        return self.__class__(new_mag, new_err)
 
     def __divmod__(self, other):  # pragma: no cover
         return self // other, self % other
@@ -631,7 +670,9 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def __init__(self, value: T, err: T | None = None, *, trigger=False):
         if trigger:
             super().__init__(value=value, err=err, trigger=trigger)
-            if np.ndim(self._nom) == 0:
+
+            # This should not be executed, as the parent class should account for this
+            if np.ndim(self._nom) == 0:  # pragma: no cover
                 msg = "VectorUncertainty must have a dimension greater than 0!"
                 raise ValueError(msg)
 

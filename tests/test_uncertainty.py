@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import locale
 import math
 import operator
@@ -13,6 +14,7 @@ import numpy as np
 from pint import (
     DimensionalityError,
     Quantity,
+    Unit,
 )
 import pytest
 
@@ -379,6 +381,34 @@ class TestUncertainty:
         assert isinstance(scalar, Uncertainty)
         assert isinstance(vector, Uncertainty)
 
+        # Check creating from other Uncertainty objects
+        from_subclass = Uncertainty(vector)
+        assert isinstance(from_subclass, Uncertainty)
+        assert np.array_equal(from_subclass.value, vector.value)
+        assert np.array_equal(from_subclass.error, vector.error)
+
+        # Check creating from a Sequence
+        from_list = Uncertainty(
+            [Uncertainty(1, 2), Uncertainty(4, 5), Uncertainty(1.5, 9.25)]
+        )
+        assert isinstance(from_list, Uncertainty)
+
+        # Check error is raised when Quantity objects are passed
+        with pytest.raises(NotImplementedError):
+            _ = Uncertainty(Quantity(2, "radian"), Quantity(1, "radian"))
+
+    @staticmethod
+    def test_copy():
+        u = Uncertainty(2, 3)
+        dup = copy.copy(u)
+        assert id(u) != id(dup)
+
+    @staticmethod
+    def test_deepcopy():
+        u = Uncertainty(2, 3)
+        dup = copy.deepcopy(u)
+        assert id(u) != id(dup)
+
     @staticmethod
     def test_properties():
         u = Uncertainty(2, 3)
@@ -415,22 +445,20 @@ class TestUncertainty:
     def test_from_string(val, expected):
         assert Uncertainty.from_string(val) == expected
 
-        # TODO: uncertainty_containers:154  ->  should err param be default to 0.0? Seems to break wrappers if so
-
     @staticmethod
     @pytest.mark.parametrize(
-        "val, err", [(Quantity(2, "radian"), Quantity(3, "radian")), (2, 3), (8.5, 9.5)]
+        "val, err",
+        [
+            (Quantity(2, "radian"), Quantity(3, "radian")),
+            (Quantity(2, "radian"), 3),
+            (2, Quantity(3, "radian")),
+            (2, 3),
+            (8.5, 9.5),
+        ],
     )
     def test_from_quantities(val, err):
-        if isinstance(val, Quantity) and isinstance(err, Quantity):
-            with pytest.raises(NotImplementedError):
-                _ = Uncertainty.from_quantities(val, err)
-            return
-
         assert Uncertainty.from_quantities(val, err).value == val
         assert Uncertainty.from_quantities(val, err).error == err
-
-        # TODO: uncertainty_containers:290 & 63-69  -->  should this be tested if it doesn't work?
 
     @staticmethod
     def test_from_sequence():
@@ -445,11 +473,10 @@ class TestUncertainty:
         with pytest.raises(TypeError):
             _ = Uncertainty.from_sequence(seq)
 
-        # TODO: uncertainty_containers:327 & 63-69  -->  should this be tested if it doesn't work?
-
-        # seq = [Uncertainty(2, 3) * Unit('radian'), Uncertainty(5, 8)]
-        # result = Uncertainty.from_sequence(seq)
-        # assert result.units == Unit('radian')
+        # Test with Quantity objects
+        seq = [Uncertainty.from_quantities(Quantity(2, "radian"), 1), Uncertainty(5, 8)]
+        result = Uncertainty.from_sequence(seq)
+        assert result.units == Unit("radian")
 
     @staticmethod
     @given(
@@ -705,6 +732,37 @@ class TestUncertainty:
         assert (-u).value == -v
         assert (-u).error == e
 
+    @staticmethod
+    def test_not_implemented_ops():
+        u = Uncertainty(2, 3)
+        assert u.__add__("not a handled type") == NotImplemented
+        assert u.__sub__("not a handled type") == NotImplemented
+        assert u.__mul__("not a handled type") == NotImplemented
+        assert u.__truediv__("not a handled type") == NotImplemented
+        assert u.__rtruediv__("not a handled type") == NotImplemented
+        assert u.__floordiv__("not a handled type") == NotImplemented
+        assert u.__rfloordiv__("not a handled type") == NotImplemented
+        assert u.__mod__("not a handled type") == NotImplemented
+        assert u.__rmod__("not a handled type") == NotImplemented
+        assert u.__pow__("not a handled type") == NotImplemented
+        assert u.__rpow__("not a handled type") == NotImplemented
+
+    @staticmethod
+    def test_getattr():
+        u = Uncertainty(2, 3)
+
+        with pytest.raises(AttributeError):
+            _ = u.__array_something
+
+        for item1 in HANDLED_UFUNCS:
+            assert callable(getattr(u, item1))
+
+        for item2 in HANDLED_FUNCTIONS:
+            assert callable(getattr(u, item2))
+
+        with pytest.raises(AttributeError):
+            _ = u.ATTRIBUTE_THAT_DOES_NOT_EXIST
+
 
 class TestVectorUncertainty:
     """Tests that expand the coverage of the previous VectorUncertainty tests."""
@@ -802,6 +860,20 @@ class TestVectorUncertainty:
         assert v.ndim == 1
 
     @staticmethod
+    def test_round():
+        v = VectorUncertainty(
+            np.array([1.1111, 2.2222, 3.3333]), np.array([4.4444, 5.5555, 6.6666])
+        )
+
+        rounded = round(v, 2)
+        assert np.array_equal(
+            rounded.value, np.array([1.11, 2.22, 3.33])
+        )  # should round value
+        assert np.array_equal(
+            rounded.error, np.array([4.4444, 5.5555, 6.6666])
+        )  # should not round error
+
+    @staticmethod
     @pytest.mark.filterwarnings(
         "ignore: __array__ implementation doesn't accept a copy keyword"
     )
@@ -823,6 +895,26 @@ class TestVectorUncertainty:
             _ = np.array(v)
 
         set_downcast_error(False)
+
+    """
+
+    # ---------------------------- WORK IN PROGRESS ---------------------------- 
+    
+    # need to determine proper way to ensure numpy operations are functioning as intended
+
+    @staticmethod
+    def test_clip():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        clipped = np.clip(v, min=1, max=2)
+        assert np.array_equal(clipped.value, np.array([1, 2, 2]))  # value should be clipped
+        assert np.array_equal(clipped.error, np.array([4, 5, 6]))  # error should not be clipped
+
+    @staticmethod
+    def test_fill():
+        pass
+    
+    """
 
     @staticmethod
     @given(
@@ -967,7 +1059,8 @@ class TestScalarUncertainty:
         e2=st.floats(min_value=0, max_value=1e3),
     )
     def test_ne_eq(v1, e1, v2, e2):
-        assume(v1 != v2 and e1 != e2)
+        assume(e1 != e2)
+        assume(not np.isclose(v1, v2))
 
         s1 = ScalarUncertainty(v1, e1)
         s2 = ScalarUncertainty(v2, e2)

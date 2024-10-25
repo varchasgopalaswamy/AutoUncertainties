@@ -56,9 +56,7 @@ exclude_patterns = [
     "_autoapi_templates",
 ]
 
-autoapi_ignore = [
-    "tests*",
-]
+autoapi_ignore = ["tests*", "*_version.py"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = "sphinx"
