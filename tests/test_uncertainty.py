@@ -321,32 +321,46 @@ def test_nominal_values():
     x = Uncertainty(2, 3)
     assert nominal_values(x) == x.value
 
+    # Check creating from sequence
     x = np.array([1, 2, 3])
-    assert nominal_values(x).all() == Uncertainty.from_sequence(x).value.all()
+    assert np.array_equal(nominal_values(x), Uncertainty.from_sequence(x).value)
 
+    # Check when unable to create from sequence
+    x = [None, Uncertainty(2, 3)]
+    assert nominal_values(x) == x
+
+    # Check wrong type
     x = "not an Uncertainty"
     assert nominal_values(x) == x
 
-    x = np.nan
-    assert np.isnan(nominal_values(x))
+    # Check NaN / when float is returned instead of Uncertainty
+    assert np.isnan(nominal_values(np.nan))
 
-    # TODO: could be improved
+    # Check non-vector
+    assert nominal_values(5) == 5
 
 
 def test_std_devs():
     x = Uncertainty(2, 3)
     assert std_devs(x) == x.error
 
+    # Check creating from sequence
     x = np.array([1, 2, 3])
-    assert std_devs(x).all() == Uncertainty.from_sequence(x).error.all()
+    assert np.array_equal(std_devs(x), Uncertainty.from_sequence(x).error)
 
+    # Check when unable to create from sequence
+    x = [None, Uncertainty(2, 3)]
+    assert np.array_equal(std_devs(x), np.array([0, 0]))
+
+    # Check wrong type
     x = "not an Uncertainty"
     assert std_devs(x) == 0
 
-    x = np.nan
-    assert std_devs(x) == 0
+    # Check NaN / when float is returned instead of Uncertainty
+    assert std_devs(np.nan) == 0
 
-    # TODO: could be improved
+    # Check non-vector
+    assert std_devs(5) == 0
 
 
 class TestUncertainty:
@@ -393,14 +407,24 @@ class TestUncertainty:
         )
         assert isinstance(from_list, Uncertainty)
 
+        # Check vector value, constant error edge case
+        v = Uncertainty(np.array([1, 2, 3]), 0)
+        assert isinstance(v, Uncertainty)
+
         # Check error is raised when Quantity objects are passed
         with pytest.raises(NotImplementedError):
             _ = Uncertainty(Quantity(2, "radian"), Quantity(1, "radian"))
+
+        # Check error is raised when a negative value is found in the err array
+        with pytest.raises(NegativeStdDevError):
+            _ = Uncertainty(np.array([1, 2, 3]), np.array([-1, 2, 3]))
 
     @staticmethod
     def test_copy():
         u = Uncertainty(2, 3)
         dup = copy.copy(u)
+        assert dup.value == u.value
+        assert dup.error == u.error
         assert id(u) != id(dup)
 
     @staticmethod
@@ -641,11 +665,14 @@ class TestUncertainty:
         assert result.value == v2 % u1.value
         assert result.error == 0.0
 
+        # Reverse case w/ vector edge case
+        result = v2 % Uncertainty(np.array([v1, v1, v1]), np.array([e1, e1, e1]))
+        assert isinstance(result, Uncertainty)
+        assert np.array_equal(result.error, np.array([0.0, 0.0, 0.0]))
+
         u1 = Uncertainty(np.array([v1, v2]), np.array([e1, e2]))
         result = u1 % np.array([1, 2])
         assert isinstance(result, Uncertainty)
-
-        # TODO: uncertainty_containers:460 has not been tested here!
 
     @staticmethod
     @given(
@@ -896,25 +923,87 @@ class TestVectorUncertainty:
 
         set_downcast_error(False)
 
-    """
-
-    # ---------------------------- WORK IN PROGRESS ---------------------------- 
-    
-    # need to determine proper way to ensure numpy operations are functioning as intended
-
     @staticmethod
     def test_clip():
         v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
 
-        clipped = np.clip(v, min=1, max=2)
-        assert np.array_equal(clipped.value, np.array([1, 2, 2]))  # value should be clipped
-        assert np.array_equal(clipped.error, np.array([4, 5, 6]))  # error should not be clipped
+        clipped = v.clip(min=1, max=2)
+        assert np.array_equal(
+            clipped.value, np.array([1, 2, 2])
+        )  # value should be clipped
+        assert np.array_equal(
+            clipped.error, np.array([4, 5, 6])
+        )  # error should not be clipped
+
+        # TODO: Should this also work with np.clip()? Currently raises TypeError...
 
     @staticmethod
     def test_fill():
-        pass
-    
-    """
+        v = VectorUncertainty(np.empty(3), np.array([4, 5, 6]))
+        v.fill(1)
+
+        assert np.array_equal(v.value, np.array([1, 1, 1]))
+
+    @staticmethod
+    def test_put():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        with pytest.raises(TypeError):
+            v.put(1, 98)
+
+        v.put(1, VectorUncertainty(np.array([98])))
+
+        assert np.array_equal(v.value, np.array([1, 98, 3]))
+
+    @staticmethod
+    def test_copy():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        dup = v.copy()
+
+        assert np.array_equal(dup.value, v.value)
+        assert np.array_equal(dup.error, v.error)
+        assert id(dup) != id(v)
+
+    @staticmethod
+    def test_flat():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+
+        for i, item in enumerate(v.flat):
+            assert v[i] == item
+
+    @staticmethod
+    def test_shape_reshape():
+        v = VectorUncertainty(
+            np.array([[1, 2, 3], [4, 5, 6]]), np.array([[4, 5, 6], [7, 8, 9]])
+        )
+        assert v.shape == (2, 3)
+
+        # Return reshaped version
+        reshaped = v.reshape(6)
+        assert np.array_equal(reshaped.value, np.array([1, 2, 3, 4, 5, 6]))
+        assert np.array_equal(reshaped.error, np.array([4, 5, 6, 7, 8, 9]))
+
+        # In-place reshape
+        v.shape = 6
+        assert np.array_equal(v.value, np.array([1, 2, 3, 4, 5, 6]))
+        assert np.array_equal(v.error, np.array([4, 5, 6, 7, 8, 9]))
+
+    @staticmethod
+    def test_nbytes():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        assert v.nbytes == v.value.nbytes + v.error.nbytes
+
+    @staticmethod
+    def test_searchsorted():
+        v = VectorUncertainty(
+            np.array([1, 2, 3, 8, 9, 10]), np.array([1, 2, 3, 8, 9, 10])
+        )
+        assert np.array_equal(v.searchsorted([5, 6]), np.array([3, 3]))
+
+    @staticmethod
+    def test_len():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        assert len(v) == len(v.value)
 
     @staticmethod
     @given(
@@ -950,20 +1039,57 @@ class TestVectorUncertainty:
         with pytest.raises(ValueError):
             v[0] = 400.0
 
-        # TODO: Test uncertainty_containers:752 (Uncertainty with no indexing support)
+        v._nom = {
+            1,
+            2,
+            3,
+            4,
+            5,
+        }  # Contrived set-based example to test non-indexable object
+        with pytest.raises(ValueError):
+            v[0] = Uncertainty(2, 3)
 
-    # TODO: Fix this (something isn't quite right with the tolist method...)
-    """
     @staticmethod
     @given(
         arr1=hnp.arrays(np.float64, (3,), elements=st.floats(**general_float_strategy)),
-        arr2=hnp.arrays(np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)),
+        arr2=hnp.arrays(
+            np.float64, (3,), elements=st.floats(min_value=0, max_value=1e3)
+        ),
     )
     def test_tolist(arr1, arr2):
         v = VectorUncertainty(arr1, arr2)
-
         result = v.tolist()
-    """
+
+        assert isinstance(result, list)
+        assert len(result) == 3
+
+        for item in result:
+            assert isinstance(item, Uncertainty)
+
+    @staticmethod
+    def test_tolist_edgecase():
+        """Contrived test for when tolist is not available."""
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        v._nom = {1, 2, 3, 4}
+
+        with pytest.raises(AttributeError):
+            _ = v.tolist()
+
+    @staticmethod
+    @given(dims=st.integers(1, 64))
+    def test_ndim(dims):
+        args = np.ones(dims, dtype=int)
+        arr = np.ones(shape=tuple([*args]))
+        v = VectorUncertainty(arr, arr)
+        assert v.ndim == dims
+
+    @staticmethod
+    def test_view():
+        v = VectorUncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        view = v.view()
+
+        assert np.array_equal(view.value, v.value.view())
+        assert np.array_equal(view.error, v.error.view())
 
     @staticmethod
     def test_hash():
@@ -984,6 +1110,11 @@ class TestScalarUncertainty:
         s = ScalarUncertainty(5, 6)
         assert s.relative == s._err / s._nom
         assert s.rel2 == s.relative**2
+
+        # Test overflow error catching + warning
+        with pytest.warns(RuntimeWarning):
+            s = ScalarUncertainty(np.float16(0.01), np.float16(6.55e4))
+            assert np.isinf(s.relative)
 
     @staticmethod
     @given(
@@ -1050,6 +1181,14 @@ class TestScalarUncertainty:
             _ = complex(s)
 
         set_downcast_error(False)
+
+    @staticmethod
+    def test_round():
+        s = ScalarUncertainty(2.2222, 3.3333)
+
+        rounded = round(s, 2)
+        assert rounded.value == 2.22
+        assert rounded.error == 3.3333
 
     @staticmethod
     @given(

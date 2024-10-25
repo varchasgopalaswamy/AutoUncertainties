@@ -6,7 +6,7 @@ import copy
 import locale
 import math
 import operator
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
@@ -667,7 +667,13 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             msg = f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
             raise AttributeError(msg) from None
 
-    def __init__(self, value: T, err: T | None = None, *, trigger=False):
+    def __init__(
+        self,
+        value: T | Uncertainty | Sequence[Uncertainty],
+        err: T | None = None,
+        *,
+        trigger=False,
+    ):
         if trigger:
             super().__init__(value=value, err=err, trigger=trigger)
 
@@ -720,16 +726,18 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             )
             return np.asarray(self._nom)
 
-    def clip(self, min=None, max=None, out=None, **kwargs):  # noqa: A002
-        """Numpy clip implementation."""
+    def clip(self, min=None, max=None, out=None, **kwargs) -> Uncertainty:  # noqa: A002
+        """Numpy `~numpy.ndarray.clip` implementation."""
         return self.__class__(self._nom.clip(min, max, out, **kwargs), self._err)
 
     def fill(self, value) -> None:
-        """Numpy fill implementation."""
+        """NumPy `~numpy.ndarray.fill` implementation."""
         return self._nom.fill(value)
 
-    def put(self, indices, values, mode="raise") -> None:
-        """Numpy put implementation."""
+    def put(
+        self, indices, values, mode: Literal["raise", "wrap", "clip"] = "raise"
+    ) -> None:
+        """NumPy `~numpy.ndarray.put` implementation."""
         if isinstance(values, self.__class__):
             self._nom.put(indices, values._nom, mode)
             self._err.put(indices, values._err, mode)
@@ -744,13 +752,13 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     # Special properties
     @property
     def flat(self):
-        """Numpy flat implementation."""
-        for u, v in (self._nom.flat, self._err.flat):
+        """NumPy `~numpy.ndarray.flat` implementation."""
+        for u, v in zip(self._nom.flat, self._err.flat, strict=False):
             yield self.__class__(u, v)
 
     @property
     def shape(self):
-        """Numpy shape implemenetation."""
+        """NumPy `~numpy.ndarray.shape` implemenetation."""
         return self._nom.shape
 
     @shape.setter
@@ -758,13 +766,22 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
         self._nom.shape = value
         self._err.shape = value
 
+    def reshape(
+        self, shape, /, *, order: Literal["A", "C", "F"] = "C", copy: bool | None = None
+    ):
+        """NumPy `~numpy.ndarray.reshape` implementation."""
+        return self.__class__(
+            self._nom.reshape(shape, order=order, copy=copy),
+            self._err.reshape(shape, order=order, copy=copy),
+        )
+
     @property
     def nbytes(self):
-        """Numpy nbytes implementation."""
+        """NumPy `~numpy.ndarray.nbytes` implementation."""
         return self._nom.nbytes + self._err.nbytes
 
-    def searchsorted(self, v, side="left", sorter=None):
-        """Numpy searchsorted implementation."""
+    def searchsorted(self, v, side: Literal["left", "right"] = "left", sorter=None):
+        """NumPy `~numpy.ndarray.searchsorted` implementation."""
         return self._nom.searchsorted(v, side)
 
     def __len__(self) -> int:
@@ -790,7 +807,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
         try:
             _ = self._nom[key]
-        except ValueError as exc:
+        except TypeError as exc:
             msg = f"Object {type(self._nom)} does not support indexing"
             raise ValueError(msg) from exc
 
@@ -802,7 +819,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             self._err[key] = value._err
 
     def tolist(self):
-        """Numpy tolist implementation."""
+        """NumPy `~numpy.ndarray.tolist` implementation."""
         try:
             nom = self._nom.tolist()
             err = self._err.tolist()
@@ -815,7 +832,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
                         if isinstance(n, list)
                         else self.__class__(n, e)
                     )
-                    for n, e in (nom, err)
+                    for n, e in zip(nom, err, strict=False)
                 ]
         except AttributeError:
             msg = f"{type(self._nom).__name__}' does not support tolist."
@@ -823,11 +840,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def ndim(self):
-        """Numpy ndim implementation."""
+        """NumPy `~numpy.ndarray.ndim` implementation."""
         return np.ndim(self._nom)
 
     def view(self):
-        """Numpy view implementation."""
+        """NumPy `~numpy.ndarray.view` implementation."""
         return self.__class__(self._nom.view(), self._err.view())
 
     def __hash__(self) -> int:
