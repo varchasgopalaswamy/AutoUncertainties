@@ -154,15 +154,16 @@ pip install auto_uncertainties
 
   ```python
   >>> from auto_uncertainties import set_downcast_error
-  >>> set_downcast_error(False)
+  >>> set_downcast_error(True)
   >>> from auto_uncertainties import Uncertainty
   >>> import numpy as np
   >>> value = np.linspace(start=0, stop=10, num=5)
   >>> error = np.ones_like(value)*0.1
   >>> u = Uncertainty(value, error)
   >>> np.array(u)
-  <stdin>:1: DowncastWarning: The uncertainty is stripped when downcasting to ndarray.
-  array([ 0. ,  2.5,  5. ,  7.5, 10. ])
+  Traceback (most recent call last):
+      ...
+  auto_uncertainties.exceptions.DowncastError: The uncertainty is stripped when downcasting to ndarray.
   ```
 
 ## Inspirations
