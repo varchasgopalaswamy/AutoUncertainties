@@ -166,11 +166,11 @@ def test_scalar_binary(v1, e1, v2, e2, op):
 
     for result in results:
         if isinstance(result, Uncertainty):
-            assert math.isclose(result.value, op(u1.value, u2.value))
+            assert math.isclose(result.value, op(u1.value, u2.value), rel_tol=1e-9)
             if np.isfinite(e1) and np.isfinite(e2):
                 assert np.isfinite(result.error)
         else:
-            assert np.isclose(result, op(u1.value, u2.value))
+            assert math.isclose(result, op(u1.value, u2.value), rel_tol=1e-9)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -952,8 +952,6 @@ class TestVectorUncertainty:
         assert np.array_equal(
             clipped.error, np.array([4, 5, 6])
         )  # error should not be clipped
-
-        # TODO: Should this also work with np.clip()? Currently raises TypeError...
 
     @staticmethod
     def test_fill():
