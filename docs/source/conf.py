@@ -97,6 +97,7 @@ intersphinx_mapping = {
     "sparse": ("https://sparse.pydata.org/en/latest/", None),
     "pint": ("https://pint.readthedocs.io/en/stable", None),
     "pandas": ("https://pandas.pydata.org/docs/", None),
+    "jax": ("https://jax.readthedocs.io/en/latest/", None),
 }
 
 
