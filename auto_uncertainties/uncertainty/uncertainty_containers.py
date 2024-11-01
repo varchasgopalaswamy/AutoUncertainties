@@ -164,10 +164,15 @@ class Uncertainty(Generic[T]):
         value: T | Uncertainty | Sequence[Uncertainty],
         err: T | None = None,
     ):
+        # If instantiated with Quantity objects, call from_quantities
+        if hasattr(value, "units") or hasattr(err, "units"):
+            return cls.from_quantities(value, err)
+
         # If instantiated with an Uncertainty subclass
         if isinstance(value, ScalarUncertainty | VectorUncertainty):
             err = value.error
             value = value.value
+
         # If instantiated with a list or tuple of uncertainties
         elif isinstance(value, list | tuple):
             inst = cls.from_list(value)
@@ -218,6 +223,7 @@ class Uncertainty(Generic[T]):
                 inst = object.__new__(ScalarUncertainty)
 
             inst.__init__(value, err, trigger=True)
+
         return inst
 
     def __init__(
@@ -229,8 +235,8 @@ class Uncertainty(Generic[T]):
     ):
         if trigger:
             if hasattr(value, "units") or hasattr(err, "units"):
-                msg = "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
-                raise NotImplementedError(msg)
+                msg = "Parameters 'value' or 'err' should not have the 'units' attribute at this point."
+                raise ValueError(msg)
 
             self._nom = value
             self._err = err
@@ -366,12 +372,6 @@ class Uncertainty(Generic[T]):
                 except AttributeError:
                     val[i] = float(seq_i)
                     err[i] = 0
-
-        # Handle Pint Quantities
-        if hasattr(val, "units") or hasattr(
-            err, "units"
-        ):  # TODO: SHOULD THIS BE REMOVED, AND JUST HANDLED BY INIT?
-            return cls.from_quantities(val, err)
 
         return cls(val, err)
 

@@ -314,7 +314,21 @@ def test_numpy_math_ops(v1, e1, op):
 
 
 def test_check_units():
-    assert _check_units
+    val, err = Quantity(2, "radian"), Quantity(3, "radian")
+    assert _check_units(val, err) == (2, 3, Unit("radian"))
+
+    val, err = 2, Quantity(3, "radian")
+    assert _check_units(val, err) == (2, 3, Unit("radian"))
+
+    val, err = Quantity(2, "radian"), 3
+    assert _check_units(val, err) == (2, 3, Unit("radian"))
+
+    val, err = 2, 3
+    assert _check_units(val, err) == (2, 3, None)
+
+    with pytest.raises(DimensionalityError):
+        val, err = Quantity(2, "m"), Quantity(3, "deg")
+        _ = _check_units(val, err)
 
 
 def test_nominal_values():
@@ -411,9 +425,12 @@ class TestUncertainty:
         v = Uncertainty(np.array([1, 2, 3]), 0)
         assert isinstance(v, Uncertainty)
 
-        # Check error is raised when Quantity objects are passed
-        with pytest.raises(NotImplementedError):
-            _ = Uncertainty(Quantity(2, "radian"), Quantity(1, "radian"))
+        # Check proper handling of Quantity inputs
+        # (further tests for from_quantities are handled in a separate function)
+        from_quant = Uncertainty(Quantity(2, "radian"), Quantity(1, "radian"))
+        assert isinstance(from_quant, Quantity)
+        assert isinstance(from_quant.m, Uncertainty)
+        assert from_quant.units == Unit("radian")
 
         # Check error is raised when a negative value is found in the err array
         with pytest.raises(NegativeStdDevError):
@@ -630,6 +647,7 @@ class TestUncertainty:
         assert isinstance(result, Uncertainty)
 
     @staticmethod
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     @given(
         v1=st.floats(**general_float_strategy),
         v2=st.floats(**general_float_strategy),
