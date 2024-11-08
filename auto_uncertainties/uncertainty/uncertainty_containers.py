@@ -25,6 +25,11 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
+try:
+    from auto_uncertainties.pint import UncertaintyQuantity
+except ImportError:
+    UncertaintyQuantity = None
+
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
@@ -274,20 +279,40 @@ class Uncertainty(Generic[T]):
             return cls(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err) -> Uncertainty:
+    def from_quantities(cls, value, err) -> UncertaintyQuantity | Uncertainty:
         """
-        Create an `Uncertainty` object from two `pint.Quantity` objects.
+        Create an `Uncertainty` object from one or more `pint.Quantity` objects.
 
-        :param value: The central value of the Uncertainty object
-        :param err: The uncertainty value of the Uncertainty object
+        .. important:: The `pint` package must be installed for this to work.
+
+        :param value: The central value of the `Uncertainty` object
+        :param err: The uncertainty value of the `Uncertainty` object
+
+        .. note::
+
+           * If **neither** argument is a `~pint.Quantity`, returns an
+             `Uncertainty` object.
+
+           * If **both** arguments are `~pint.Quantity` objects, returns an
+             `UncertaintyQuantity` with the same units as ``value`` (attempts
+             to convert ``err`` to ``value.units``).
+
+           * If **only the** ``value`` argument is a `~pint.Quantity`, returns
+             an `UncertaintyQuantity` object with the same units as ``value``.
+
+           * If **only the** ``err`` argument is a `~pint.Quantity`, returns
+             an `UncertaintyQuantity` object with the same units as ``err``.
         """
 
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
-        if units is not None:
-            from auto_uncertainties.pint.extensions import UncertaintyQuantity
 
+        if units is not None:
+            if UncertaintyQuantity is None:
+                msg = "Failed to load Pint extensions (Pint is not currently installed). Run 'pip install pint' to install it."
+                raise ImportError(msg)
             inst = UncertaintyQuantity(inst, units)
+
         return inst
 
     @classmethod
