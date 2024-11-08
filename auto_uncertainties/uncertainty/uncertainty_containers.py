@@ -268,10 +268,10 @@ class Uncertainty(Generic[T]):
         new_str = string.replace("+/-", "±")
         new_str = new_str.replace("+-", "±")
         if "±" not in new_str:
-            return Uncertainty(float(string))
+            return cls(float(string))
         else:
             u1, u2 = new_str.split("±")
-            return Uncertainty(float(u1), float(u2))
+            return cls(float(u1), float(u2))
 
     @classmethod
     def from_quantities(cls, value, err) -> Uncertainty:
@@ -285,7 +285,9 @@ class Uncertainty(Generic[T]):
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
         if units is not None:
-            inst *= units
+            from auto_uncertainties.pint.extensions import UncertaintyQuantity
+
+            inst = UncertaintyQuantity(inst, units)
         return inst
 
     @classmethod

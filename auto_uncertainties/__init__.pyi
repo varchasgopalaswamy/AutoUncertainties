@@ -2,6 +2,7 @@ from . import display_format
 from . import exceptions
 from . import numpy
 from . import pandas
+from . import pint
 from . import uncertainty
 from . import util
 
@@ -48,6 +49,7 @@ __all__ = [
     "nominal_values",
     "numpy",
     "pandas",
+    "pint",
     "set_compare_error",
     "set_display_rounding",
     "set_downcast_error",
