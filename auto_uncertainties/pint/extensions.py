@@ -7,6 +7,64 @@ For usage with Pint, see `here <https://pint.readthedocs.io/en/stable/advanced/c
 
    The `pint` package must be installed in order to use these extensions.
 
+.. warning::
+
+   To use `Uncertainty` objects with `pint` quantities, always make sure to use
+   the `UncertaintyQuantity` extension. Simply passing an `Uncertainty` object
+   into `Quantity()` will *not* automatically use `UncertaintyQuantity`, and may cause
+   problems.
+
+   A small exception to this is when the `UncertaintyRegistry` class is used. In that case,
+   it is supported to pass `Uncertainty` objects directly into `Quantity()`.
+
+   See the examples below for clarification.
+
+.. code-block:: python
+   :caption: Supported use of UncertaintyQuantity
+
+   >>> from auto_uncertainties import Uncertainty
+   >>> from auto_uncertainties.pint import UncertaintyQuantity
+
+   # Units will be preserved when accessing the 'value' and 'error' attributes
+   >>> x = Uncertainty(1.0, 0.5)
+   >>> q = UncertaintyQuantity(x, 'radian')
+   >>> q.value
+   <Quantity(1.0, 'radian')>
+   >>> q.error
+   <Quantity(0.5, 'radian')>
+
+.. code-block:: python
+   :caption: Unsupported use example
+
+   >>> from auto_uncertainties import Uncertainty
+   >>> from pint import Quantity
+
+   # Units are NOT automatically preserved when accessing the 'value' and 'error' attributes
+   >>> x = Uncertainty(1.0, 0.5)
+   >>> q = Quantity(x, 'radian')
+   >>> q.value
+   1.0
+   >>> q.error
+   0.5
+
+.. code-block:: python
+   :caption: Supported use with the custom unit registry
+
+   >>> from auto_uncertainties import Uncertainty
+   >>> from auto_uncertainties.pint import UncertaintyQuantity, UncertaintyRegistry
+
+   # UncertaintyRegistry overrides the default Pint Quantity class
+   >>> reg = UncertaintyRegistry()
+   >>> x = Uncertainty(1.0, 0.5)
+   >>> q = reg.Quantity(x, 'radian')
+   >>> type(q)
+   <class 'pint.UncertaintyQuantity'>
+   >>> q.value
+   <Quantity(1.0, 'radian')>
+   >>> q.error
+   <Quantity(0.5, 'radian')>
+
+
 """
 
 from __future__ import annotations
