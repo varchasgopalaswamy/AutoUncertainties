@@ -10,9 +10,9 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
      >>> from auto_uncertainties import Uncertainty
      >>> value = 1.0
      >>> error = 0.1
-     >>> u = Uncertainty(value,error)
+     >>> u = Uncertainty(value, error)
      >>> u
-     1.0 +/- 0.1
+     1 +/- 0.1
 
   As is creating a `numpy` array of Uncertainties:
 
@@ -20,9 +20,9 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
 
      >>> from auto_uncertainties import Uncertainty
      >>> import numpy as np
-     >>> value = np.linspace(start=0,stop=10,num=5)
+     >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
-     >>> u = Uncertainty(value,error)
+     >>> u = Uncertainty(value, error)
 
   - (though, they are actually different classes!)
 
@@ -31,19 +31,19 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
        >>> from auto_uncertainties import Uncertainty
        >>> value = 1.0
        >>> error = 0.1
-       >>> u = Uncertainty(value,error)
+       >>> u = Uncertainty(value, error)
        >>> type(u)
-       auto_uncertainties.uncertainty.ScalarUncertainty
+       <class 'auto_uncertainties.uncertainty.uncertainty_containers.ScalarUncertainty'>
 
     .. code-blocK:: python
 
        >>> from auto_uncertainties import Uncertainty
        >>> import numpy as np
-       >>> value = np.linspace(start=0,stop=10,num=5)
+       >>> value = np.linspace(start=0, stop=10, num=5)
        >>> error = np.ones_like(value)*0.1
-       >>> u = Uncertainty(value,error)
-       >>> u
-       auto_uncertainties.uncertainty.VectorUncertainty
+       >>> u = Uncertainty(value, error)
+       >>> type(u)
+       <class 'auto_uncertainties.uncertainty.uncertainty_containers.VectorUncertainty'>
 
 * Scalar uncertainties implement all mathematical and logical
   `dunder methods <https://docs.python.org/3/reference/datamodel.html#object.__repr__>`_ explicitly using linear
@@ -55,7 +55,7 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
      >>> u = Uncertainty(10.0, 3.0)
      >>> v = Uncertainty(20.0, 4.0)
      >>> u + v
-     30.0 +/- 5.0
+     30 +/- 5
 
 * Array uncertainties implement a large subset of the numpy ufuncs and methods using `jax.grad` or
   `jax.jacfwd`, depending on the output shape.
@@ -64,21 +64,15 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
 
      >>> from auto_uncertainties import Uncertainty
      >>> import numpy as np
-     >>> value = np.linspace(start=0,stop=10,num=5)
+     >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
-     >>> u = Uncertainty(value,error)
+     >>> u = Uncertainty(value, error)
      >>> np.exp(u)
-     Magnitude
-
-     1, 12.182, 148.413, 1808.04, 22026.5
-
-     Error
-
-     0.1, 1.2, 15, 180, 2200
+     [1 +/- 0.1, 12.1825 +/- 1.21825, 148.413 +/- 14.8413, 1808.04 +/- 180.804, 22026.5 +/- 2202.65]
      >>> np.sum(u)
-     25.0 +/- 0.22
+     25 +/- 0.223607
      >>> u.sum()
-     25.0 +/- 0.22
+     25 +/- 0.223607
      >>> np.sqrt(np.sum(error**2))
      0.223606797749979
 
@@ -93,7 +87,7 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
      >>> u.error
      3.0
      >>> u.rel
-     0.33333
+     0.3
 
 * To strip central values and uncertainty from arbitrary variables, accessor functions `nominal_values`
   and `std_devs` are provided:
@@ -121,11 +115,11 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
      >>> set_display_rounding(False)
      >>> from auto_uncertainties import Uncertainty
      >>> import numpy as np
-     >>> value = np.linspace(start=0,stop=10,num=5)
+     >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
-     >>> u = Uncertainty(value,error)
+     >>> u = Uncertainty(value, error)
      >>> np.sum(u)
-     25.0 +/- 0.223606797749979
+     25 +/- 0.223607
 
 * If `numpy.array` is called on an `~auto_uncertainties.uncertainty.uncertainty_containers.Uncertainty` object, it will
   automatically get cast down to a `numpy` array (and lose uncertainty information!), and emit a warning.
@@ -134,13 +128,14 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
   .. code-block:: python
 
      >>> from auto_uncertainties import set_downcast_error
-     >>> set_downcast_error(False)
+     >>> set_downcast_error(True)
      >>> from auto_uncertainties import Uncertainty
      >>> import numpy as np
-     >>> value = np.linspace(start=0,stop=10,num=5)
+     >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
-     >>> u = Uncertainty(value,error)
+     >>> u = Uncertainty(value, error)
      >>> np.array(u)
-
-     Exception: The uncertainty is stripped when downcasting to ndarray.
+     Traceback (most recent call last):
+         ...
+     auto_uncertainties.exceptions.DowncastError: The uncertainty is stripped when downcasting to ndarray.
 

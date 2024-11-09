@@ -75,8 +75,8 @@ class VectorDisplay:
 
 class ScalarDisplay:
     default_format: str = ""
-    _nom: float
-    _err: float
+    _nom: float | int
+    _err: float | int
 
     def _repr_html_(self):
         val_ = self._nom
