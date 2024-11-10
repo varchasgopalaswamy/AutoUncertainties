@@ -294,6 +294,24 @@ class Uncertainty(Generic[T]):
 
         return inst
 
+    def as_quantity(self, unit=None) -> UncertaintyQuantity:
+        """
+        Returns the current object as an `UncertaintyQuantity`.
+
+        This is an alternative to calling `UncertaintyQuantity()` directly.
+
+        .. important:: The `pint` package must be installed for this to work.
+
+        :param unit: The Pint unit to apply. Can be a string, or a `pint.Unit` object. (Optional)
+        """
+
+        from auto_uncertainties.pint import UncertaintyQuantity
+
+        return UncertaintyQuantity(self, unit)
+
+        # TODO: Deal with potential object reference issues (i.e., because we aren't creating copies...)
+        # TODO: This could be an issue in more places too.
+
     @classmethod
     def from_list(cls, u_list: Sequence[Uncertainty]):  # pragma: no cover
         """
