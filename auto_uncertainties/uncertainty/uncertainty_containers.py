@@ -6,7 +6,7 @@ import copy
 import locale
 import math
 import operator
-from typing import Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
@@ -24,10 +24,9 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
-try:
+if TYPE_CHECKING:
     from auto_uncertainties.pint import UncertaintyQuantity
-except ImportError:
-    UncertaintyQuantity = None
+
 
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
@@ -256,7 +255,7 @@ class Uncertainty(Generic[T]):
             return cls(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err) -> UncertaintyQuantity | Uncertainty:
+    def from_quantities(cls, value, err) -> UncertaintyQuantity:
         """
         Create an `Uncertainty` object from one or more `pint.Quantity` objects.
 
@@ -283,6 +282,8 @@ class Uncertainty(Generic[T]):
 
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
+
+        from auto_uncertainties.pint import UncertaintyQuantity
 
         if units is not None:
             if UncertaintyQuantity is None:
