@@ -44,6 +44,16 @@ Usage
 
 * See :doc:`basic_usage`
 
+
+Quick Reference
+---------------
+
+* `~auto_uncertainties.uncertainty.uncertainty_containers.Uncertainty`
+* `~auto_uncertainties.uncertainty.uncertainty_containers.VectorUncertainty`
+* `~auto_uncertainties.uncertainty.uncertainty_containers.ScalarUncertainty`
+* :doc:`Exceptions <api/auto_uncertainties/exceptions/index>`
+
+
 Inspirations
 ------------
 
@@ -51,7 +61,7 @@ The class structure of `~auto_uncertainties.uncertainty.uncertainty_containers.U
 ufunc implementation is heavily inspired by the excellent package `Pint <https://github.com/hgrecco/pint>`_.
 
 
-Indices and tables
+Indices and Tables
 ==================
 
 .. toctree::

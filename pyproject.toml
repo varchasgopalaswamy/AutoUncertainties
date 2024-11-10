@@ -6,9 +6,9 @@ authors = [
 description = "Linear Uncertainty Propagation with Auto-Differentiation"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 dependencies = [
     "numpy >= 1.23.0",
@@ -21,7 +21,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-CI = ["pytest", "pytest-cov","hypothesis","pylint"]
+CI = ["pytest", "pytest-cov", "hypothesis", "pylint", "pint"]
 pandas = ["pandas >= 1.5.1"]
 docs = [
     "sphinx >= 4.1.2",
@@ -61,3 +61,12 @@ reportUntypedFunctionDecorator = true
 reportUntypedClassDecorator = true
 reportMissingImports = false
 exclude = ["install*", "public*", "**/tests*", "**/resources*"]
+
+[tool.coverage.run]
+source = ["./"]
+omit =  ["*/test*", "*/*__init__.py", "*/_version.py"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
