@@ -1,7 +1,6 @@
 # Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
 
-from collections.abc import Sequence
 import copy
 import locale
 import math
@@ -25,6 +24,8 @@ from auto_uncertainties.util import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from auto_uncertainties.pint import UncertaintyQuantity
 
 
