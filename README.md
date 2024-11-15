@@ -30,6 +30,18 @@ To install, simply run:
 pip install auto_uncertainties
 ```
 
+## Build Documentation
+
+To build the documentation locally, clone the repository, create a virtual Python environment 
+(if desired), and run the following commands within the repository directory:
+
+```bash
+pip install auto_uncertainties[docs]
+sphinx-build docs/source docs/build
+```
+
+Once built, the docs can be found under the `docs/build` subdirectory.
+
 ## Basic Usage
 
 * Creating a scalar `Uncertainty` variable is relatively simple:
