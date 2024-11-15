@@ -1,7 +1,8 @@
-from __future__ import annotations
+# from __future__ import annotations
 
 __private__ = ["util"]
-__protected__ = ["numpy"]
+__protected__ = ["numpy", "pint"]
+
 import lazy_loader
 
 
@@ -11,8 +12,10 @@ __all__ = [
     "DowncastError",
     "DowncastWarning",
     "NegativeStdDevError",
+    "SType",
     "ScalarDisplay",
     "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "UncertaintyArray",
     "UncertaintyDtype",
@@ -23,6 +26,7 @@ __all__ = [
     "nominal_values",
     "numpy",
     "pandas",
+    "pint",
     "set_compare_error",
     "set_display_rounding",
     "set_downcast_error",
