@@ -26,7 +26,10 @@ from auto_uncertainties.util import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from auto_uncertainties.pint import UncertaintyQuantity
+    from pint import Unit
+    from pint.facets.plain import PlainQuantity as Quantity
+
+    from auto_uncertainties.pint.extensions import UncertaintyQuantity
 
 
 ERROR_ON_DOWNCAST = False
@@ -40,14 +43,19 @@ __all__ = [
     "set_compare_error",
     "nominal_values",
     "std_devs",
+    "UType",
+    "SType",
 ]
 
 
-ST = TypeVar("ST", float, int)
-T = TypeVar("T", np.ndarray, float, int)
+UType: type(TypeVar) = TypeVar("UType", np.ndarray, float, int)
+"""`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
+
+SType: type(TypeVar) = TypeVar("SType", float, int)
+"""`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
-class Uncertainty(Generic[T]):
+class Uncertainty(Generic[UType]):
     """
     Base class for `Uncertainty` objects.
 
@@ -94,24 +102,24 @@ class Uncertainty(Generic[T]):
         * `from_quantities`
     """
 
-    _nom: T
-    _err: T
+    _nom: UType
+    _err: UType
 
-    def __getstate__(self) -> dict[str, T]:
+    def __getstate__(self) -> dict[str, UType]:
         return {"nominal_value": self._nom, "std_devs": self._err}
 
     def __setstate__(self, state) -> None:
         self._nom = state["nominal_value"]
         self._err = state["std_devs"]
 
-    def __getnewargs__(self) -> tuple[T, T]:
+    def __getnewargs__(self) -> tuple[UType, UType]:
         return self._nom, self._err
 
     @ignore_numpy_downcast_warnings
     def __new__(
         cls: type[Uncertainty],
-        value: T | Uncertainty | Sequence[Uncertainty],
-        err: T | None = None,
+        value: UType | Uncertainty | Sequence[Uncertainty],
+        err: UType | None = None,
     ):
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
@@ -177,8 +185,8 @@ class Uncertainty(Generic[T]):
 
     def __init__(
         self,
-        value: T | Uncertainty | Sequence[Uncertainty],
-        err: T | None = None,
+        value: UType | Uncertainty | Sequence[Uncertainty],
+        err: UType | None = None,
         *,
         trigger=False,
     ):
@@ -190,40 +198,40 @@ class Uncertainty(Generic[T]):
             self._nom = value
             self._err = err
 
-    def __copy__(self) -> Uncertainty[T]:
+    def __copy__(self) -> Uncertainty[UType]:
         return self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
-    def __deepcopy__(self, memo) -> Uncertainty[T]:
+    def __deepcopy__(self, memo) -> Uncertainty[UType]:
         return self.__class__(
             copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo)
         )
 
     @property
-    def value(self) -> T:
+    def value(self) -> UType:
         """The central value of the `Uncertainty` object."""
         return self._nom
 
     @property
-    def error(self) -> T:
+    def error(self) -> UType:
         """The uncertainty (error) value of the `Uncertainty` object."""
         return self._err
 
     @property
-    def relative(self) -> T:  # pragma: no cover
+    def relative(self) -> UType:  # pragma: no cover
         """The relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
     @property
-    def rel(self) -> T:
+    def rel(self) -> UType:
         """Alias for relative property."""
         return self.relative
 
     @property
-    def rel2(self) -> T:  # pragma: no cover
+    def rel2(self) -> UType:  # pragma: no cover
         """The square of the relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
-    def plus_minus(self, err: T):
+    def plus_minus(self, err: UType):
         """
         Add an error to the `Uncertainty` object.
 
@@ -256,7 +264,9 @@ class Uncertainty(Generic[T]):
             return cls(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err) -> UncertaintyQuantity:
+    def from_quantities(
+        cls, value: Quantity[UType] | UType, err: Quantity[UType] | UType
+    ) -> UncertaintyQuantity:
         """
         Create an `Uncertainty` object from one or more `pint.Quantity` objects.
 
@@ -284,33 +294,34 @@ class Uncertainty(Generic[T]):
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
 
-        from auto_uncertainties.pint import UncertaintyQuantity
+        from auto_uncertainties.pint.extensions import UncertaintyQuantity
 
         if units is not None:
-            if UncertaintyQuantity is None:
-                msg = "Failed to load Pint extensions (Pint is not currently installed). Run 'pip install pint' to install it."
-                raise ImportError(msg)
             inst = UncertaintyQuantity(inst, units)
 
         return inst
 
-    def as_quantity(self, unit=None) -> UncertaintyQuantity:
+    def as_quantity(self, unit: str | Unit | None = None) -> UncertaintyQuantity:
         """
         Returns the current object as an `UncertaintyQuantity`.
 
         This is an alternative to calling `UncertaintyQuantity()` directly.
+
+        .. attention::
+
+           This will **not** create a copy of the underlying `Uncertainty` object.
+           It simply returns the current object wrapped in `UncertaintyQuantity`.
+           Any changes to the underlying object (such as to the `numpy` arrays of a
+           `VectorUncertainty`) will be reflected in the `UncertaintyQuantity`, and vice versa.
 
         .. important:: The `pint` package must be installed for this to work.
 
         :param unit: The Pint unit to apply. Can be a string, or a `pint.Unit` object. (Optional)
         """
 
-        from auto_uncertainties.pint import UncertaintyQuantity
+        from auto_uncertainties.pint.extensions import UncertaintyQuantity
 
         return UncertaintyQuantity(self, unit)
-
-        # TODO: Deal with potential object reference issues (i.e., because we aren't creating copies...)
-        # TODO: This could be an issue in more places too.
 
     @classmethod
     def from_list(cls, u_list: Sequence[Uncertainty]):  # pragma: no cover
@@ -647,8 +658,8 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     def __init__(
         self,
-        value: T | Uncertainty | Sequence[Uncertainty],
-        err: T | None = None,
+        value: UType | Uncertainty | Sequence[Uncertainty],
+        err: UType | None = None,
         *,
         trigger=False,
     ):
@@ -821,7 +832,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
         return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
 
-class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
+class ScalarUncertainty(ScalarDisplay, Uncertainty[SType]):
     """Scalar `Uncertainty` class."""
 
     @property
@@ -938,7 +949,7 @@ def _check_units(value, err) -> tuple[Any, Any, Any]:
     return ret_val, ret_err, ret_units
 
 
-def nominal_values(x) -> T:
+def nominal_values(x) -> UType:
     """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
     # Is an Uncertainty
     if hasattr(x, "_nom"):
@@ -963,7 +974,7 @@ def nominal_values(x) -> T:
                     return x2.value
 
 
-def std_devs(x) -> T:
+def std_devs(x) -> UType:
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     # Is an Uncertainty
     if hasattr(x, "_err"):

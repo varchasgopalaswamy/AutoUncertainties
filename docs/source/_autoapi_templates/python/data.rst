@@ -5,7 +5,7 @@
 
    {% endif %}
 {% if obj.annotation and 'TypeAlias' in obj.annotation %}{% extends "python/typealias.rst" %}
-{% elif obj.annotation and 'TypeVar' in obj.annotation %}{% extends "python/typevar.rst" %}{% else %}
+{% elif obj.annotation and 'type(TypeVar)' in obj.annotation %}{% extends "python/typevar.rst" %}{% else %}
 .. py:{{ obj.type }}:: {% if is_own_page %}{{ obj.id }}{% else %}{{ obj.name }}{% endif %}
    {% if obj.annotation is not none %}
 

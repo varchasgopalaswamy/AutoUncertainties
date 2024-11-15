@@ -64,7 +64,6 @@ For usage with Pint, see `here <https://pint.readthedocs.io/en/stable/advanced/c
    >>> q.error
    <Quantity(0.5, 'radian')>
 
-
 """
 
 from __future__ import annotations
