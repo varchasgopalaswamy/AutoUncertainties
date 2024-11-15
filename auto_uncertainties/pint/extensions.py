@@ -69,10 +69,13 @@ For usage with Pint, see `here <https://pint.readthedocs.io/en/stable/advanced/c
 
 from __future__ import annotations
 
+from typing import Generic
+
 from auto_uncertainties import Uncertainty
 
 try:
     import pint
+    from pint.facets.plain import MagnitudeT, PlainQuantity
 except ImportError as e:
     msg = "Failed to load Pint extensions (Pint is not currently installed). Run 'pip install pint' to install it."
     raise ImportError(msg) from e
@@ -81,10 +84,10 @@ except ImportError as e:
 __all__ = ["UncertaintyQuantity", "UncertaintyUnit", "UncertaintyRegistry"]
 
 
-class UncertaintyQuantity(pint.UnitRegistry.Quantity):
+class UncertaintyQuantity(Generic[MagnitudeT], PlainQuantity[MagnitudeT]):
     """
-    Extension of `pint.Quantity` to allow the `value` and `error` attributes for an
-    `Uncertainty` to be returned with their proper units.
+    Extension of `pint.facets.plain.PlainQuantity` to allow the `value` and `error`
+    attributes for an `Uncertainty` to be returned with their proper units.
     """
 
     @property
