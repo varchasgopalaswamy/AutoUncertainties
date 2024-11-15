@@ -10,6 +10,7 @@ straightforward and automatic using auto-differentiation.
 
 - [x] Scalars
 - [x] Arrays, with support for most NumPy ufuncs and functions
+- [x] Integration with [Pint](https://pint.readthedocs.io/en/stable/user/defining-quantities.html) Quantity objects
 - [ ] Pandas Extension Type (see [here](https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html))
 
 ## Prerequisites
@@ -28,6 +29,18 @@ To install, simply run:
 ```
 pip install auto_uncertainties
 ```
+
+## Build Documentation
+
+To build the documentation locally, clone the repository, create a virtual Python environment 
+(if desired), and run the following commands within the repository directory:
+
+```bash
+pip install auto_uncertainties[docs]
+sphinx-build docs/source docs/build
+```
+
+Once built, the docs can be found under the `docs/build` subdirectory.
 
 ## Basic Usage
 

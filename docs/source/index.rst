@@ -34,6 +34,10 @@ Supported Features
     <label for="arrays">Arrays, with support for most NumPy ufuncs and functions</label>
   </div>
   <div>
+    <input type="checkbox" id="pint" name="pint" checked disabled />
+    <label for="arrays">Integration with <a href="https://pint.readthedocs.io/en/stable/user/defining-quantities.html">Pint</a> Quantity objects</label>
+  </div>
+  <div>
     <input type="checkbox" id="pandas" name="pandas" unchecked disabled />
     <label for="arrays">Pandas Extension Type (see <a href="https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html">here</a>)</label>
   </div>
@@ -43,6 +47,7 @@ Usage
 -----
 
 * See :doc:`basic_usage`
+* See :doc:`Pint extensions <api/auto_uncertainties/pint/extensions/index>`
 
 
 Quick Reference
