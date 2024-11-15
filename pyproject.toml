@@ -23,6 +23,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 CI = ["pytest", "pytest-cov", "hypothesis", "pylint", "pint"]
 pandas = ["pandas >= 1.5.1"]
+pint = ["pint >= 0.24.4"]
 docs = [
     "sphinx >= 4.1.2",
     "sphinx_rtd_theme >= 1.0.0",
