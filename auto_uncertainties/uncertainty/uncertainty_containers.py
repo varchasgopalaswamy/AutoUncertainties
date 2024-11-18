@@ -951,49 +951,65 @@ def _check_units(value, err) -> tuple[Any, Any, Any]:
 
 def nominal_values(x) -> UType:
     """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
-    # Is an Uncertainty
-    if hasattr(x, "_nom"):
-        return x.value
+    if hasattr(x, "units"):
+        x_used = x.m
+        x_units = x.units
     else:
-        if np.ndim(x) > 0:
+        x_used = x       
+        x_units = 1 
+    # Is an Uncertainty
+    if hasattr(x_used, "_nom"):
+        ret_val = x_used.value
+    else:
+        if np.ndim(x_used) > 0:
             try:
                 x2 = Uncertainty.from_sequence(x)
             except Exception:
-                return x
+                ret_val = x_used
             else:
-                return x2.value
+                ret_val = x2.value
         else:
             try:
-                x2 = Uncertainty(x)
+                x2 = Uncertainty(x_used)
             except Exception:
-                return x
+                ret_val = x_used
             else:
                 if isinstance(x2, float):
-                    return x2
+                    ret_val = x2
                 else:
-                    return x2.value
+                    ret_val = x2.value
 
+    return ret_val * x_units
 
 def std_devs(x) -> UType:
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     # Is an Uncertainty
-    if hasattr(x, "_err"):
-        return x.error
+    if hasattr(x, "units"):
+        x_used = x.m
+        x_units = x.units
     else:
-        if np.ndim(x) > 0:
+        x_used = x       
+        x_units = 1 
+    # Is an Uncertainty
+    if hasattr(x_used, "_nom"):
+        ret_val = x_used.error
+    else:
+        if np.ndim(x_used) > 0:
             try:
                 x2 = Uncertainty.from_sequence(x)
             except Exception:
-                return np.zeros_like(x)
+                ret_val = np.zeros_like(x)
             else:
-                return x2.error
+                ret_val = x2.error
         else:
             try:
-                x2 = Uncertainty(x)
+                x2 = Uncertainty(x_used)
             except Exception:
-                return 0
+                ret_val = 0
             else:
                 if isinstance(x2, float):
-                    return 0
+                    ret_val = 0
                 else:
-                    return x2.error
+                    ret_val = x2.error
+
+    return ret_val * x_units
