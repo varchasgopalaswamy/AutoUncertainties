@@ -141,6 +141,10 @@ class UncertaintyRegistry(
     """
     Alternative `pint` unit registry where the default `~pint.Quantity` class is
     `UncertaintyQuantity`.
+
+    TODO: This cannot be used with pint.set_application_registry because it is not
+    TODO: subclass of pint.UnitRegistry. We cannot directly subclass pint.UnitRegistry,
+    TODO: as it is not generic, and type checkers complain.
     """
 
     Quantity = UncertaintyQuantity

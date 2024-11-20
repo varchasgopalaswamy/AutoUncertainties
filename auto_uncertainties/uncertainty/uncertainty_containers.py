@@ -955,8 +955,8 @@ def nominal_values(x) -> UType:
         x_used = x.m
         x_units = x.units
     else:
-        x_used = x       
-        x_units = 1 
+        x_used = x
+        x_units = 1
     # Is an Uncertainty
     if hasattr(x_used, "_nom"):
         ret_val = x_used.value
@@ -981,6 +981,7 @@ def nominal_values(x) -> UType:
 
     return ret_val * x_units
 
+
 def std_devs(x) -> UType:
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     # Is an Uncertainty
@@ -988,8 +989,8 @@ def std_devs(x) -> UType:
         x_used = x.m
         x_units = x.units
     else:
-        x_used = x       
-        x_units = 1 
+        x_used = x
+        x_units = 1
     # Is an Uncertainty
     if hasattr(x_used, "_nom"):
         ret_val = x_used.error
