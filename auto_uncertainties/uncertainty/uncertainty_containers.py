@@ -48,10 +48,10 @@ __all__ = [
 ]
 
 
-UType: TypeVar = TypeVar("UType", np.ndarray, float, int)
+UType = TypeVar("UType", np.ndarray, float, int)
 """`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
 
-SType: TypeVar = TypeVar("SType", float, int)
+SType = TypeVar("SType", float, int)
 """`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
@@ -118,15 +118,15 @@ class Uncertainty(Generic[UType]):
     @ignore_numpy_downcast_warnings
     def __new__(
         cls: type[Uncertainty],
-        value: UType | Uncertainty | Sequence[Uncertainty],
+        value: UType | Uncertainty[UType] | Sequence[Uncertainty[UType]],
         err: UType | None = None,
-    ):
+    ) -> Uncertainty[UType] | UncertaintyQuantity:
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
             return cls.from_quantities(value, err)
 
         # If instantiated with an Uncertainty subclass
-        if isinstance(value, ScalarUncertainty | VectorUncertainty):
+        if isinstance(value, Uncertainty):
             err = value.error
             value = value.value
 
@@ -266,7 +266,7 @@ class Uncertainty(Generic[UType]):
     @classmethod
     def from_quantities(
         cls, value: Quantity[UType] | UType, err: Quantity[UType] | UType
-    ) -> UncertaintyQuantity:
+    ) -> UncertaintyQuantity | Uncertainty:
         """
         Create an `Uncertainty` object from one or more `pint.Quantity` objects.
 
@@ -324,7 +324,7 @@ class Uncertainty(Generic[UType]):
         return UncertaintyQuantity(self, unit)
 
     @classmethod
-    def from_list(cls, u_list: Sequence[Uncertainty]):  # pragma: no cover
+    def from_list(cls, u_list: Sequence[Uncertainty[UType]]) -> VectorUncertainty:  # pragma: no cover
         """
         Alias for `from_sequence`.
 
@@ -333,7 +333,7 @@ class Uncertainty(Generic[UType]):
         return cls.from_sequence(u_list)
 
     @classmethod
-    def from_sequence(cls, seq: Sequence[Uncertainty]):
+    def from_sequence(cls, seq: Sequence[Uncertainty[UType]]) -> VectorUncertainty:
         """
         Create an `Uncertainty` object from a sequence of `Uncertainty` objects.
 

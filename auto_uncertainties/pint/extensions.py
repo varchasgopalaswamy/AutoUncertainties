@@ -68,13 +68,19 @@ For usage with Pint, see `here <https://pint.readthedocs.io/en/stable/advanced/c
 
 from __future__ import annotations
 
-from typing import Generic
+from typing import Generic, TypeVar, Union
 
-from auto_uncertainties import Uncertainty
+from auto_uncertainties import Uncertainty, UType
 
 try:
-    import pint
-    from pint.facets.plain import MagnitudeT, PlainQuantity
+    from pint._typing import Magnitude, UnitLike
+    import pint.facets.system.objects
+    import pint.facets.context.objects
+    import pint.facets.dask
+    import pint.facets.numpy.quantity
+    import pint.facets.measurement.objects
+    import pint.facets.nonmultiplicative.objects
+    import pint.facets.plain
 except ImportError as e:
     msg = "Failed to load Pint extensions (Pint is not currently installed). Run 'pip install pint' to install it."
     raise ImportError(msg) from e
@@ -83,11 +89,29 @@ except ImportError as e:
 __all__ = ["UncertaintyQuantity", "UncertaintyUnit", "UncertaintyRegistry"]
 
 
-class UncertaintyQuantity(Generic[MagnitudeT], PlainQuantity[MagnitudeT]):
+UMagnitudeT = TypeVar("UMagnitudeT", bound=Union[Magnitude, Uncertainty])
+"""`TypeVar` extending `~pint.facets.plain.MagnitudeT` to include `Uncertainty`."""
+
+class UncertaintyQuantity(
+    Generic[UMagnitudeT],
+    pint.facets.system.objects.SystemQuantity[UMagnitudeT],                        # type: ignore
+    pint.facets.context.objects.ContextQuantity[UMagnitudeT],                      # type: ignore
+    pint.facets.dask.DaskQuantity[UMagnitudeT],                                    # type: ignore
+    pint.facets.numpy.quantity.NumpyQuantity[UMagnitudeT],                         # type: ignore
+    #pint.facets.measurement.objects.MeasurementQuantity[UMagnitudeT],              # type: ignore
+    pint.facets.nonmultiplicative.objects.NonMultiplicativeQuantity[UMagnitudeT],  # type: ignore
+    pint.facets.plain.PlainQuantity[UMagnitudeT],                                  # type: ignore
+):
     """
-    Extension of `pint.facets.plain.PlainQuantity` to allow the `value` and `error`
-    attributes for an `Uncertainty` to be returned with their proper units.
+    Generic extension of `pint.Quantity` to allow properties and methods
+    for an `Uncertainty` to be returned with their proper units.
     """
+
+    def __new__(
+        cls, value: Uncertainty[UType], units: UnitLike | None = None
+    ) -> UncertaintyQuantity[UMagnitudeT]:
+        return super().__new__(value, units)  # type: ignore
+
 
     @property
     def value(self):
