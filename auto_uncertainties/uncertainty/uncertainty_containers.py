@@ -48,10 +48,10 @@ __all__ = [
 ]
 
 
-UType: type(TypeVar) = TypeVar("UType", np.ndarray, float, int)
+UType: TypeVar = TypeVar("UType", np.ndarray, float, int)
 """`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
 
-SType: type(TypeVar) = TypeVar("SType", float, int)
+SType: TypeVar = TypeVar("SType", float, int)
 """`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
