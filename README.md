@@ -12,6 +12,13 @@ straightforward and automatic using auto-differentiation.
 - [x] Arrays, with support for most NumPy ufuncs and functions
 - [ ] Pandas Extension Type (see [here](https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html))
 
+## Prerequisites
+
+For array support:
+
+* `jax`
+* `jaxlib`
+* `numpy`
 
 ## Build Documentation
 
@@ -24,16 +31,6 @@ sphinx-build docs/source docs/build
 ```
 
 Once built, the docs can be found under the `docs/build` subdirectory.
-
-
-## Prerequisites
-
-For array support:
-
-* `jax`
-* `jaxlib`
-* `numpy`
-
 
 ## Installation
 
