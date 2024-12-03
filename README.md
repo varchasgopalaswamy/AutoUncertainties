@@ -20,6 +20,14 @@ For array support:
 * `jaxlib`
 * `numpy`
 
+## Installation
+
+To install, simply run:
+
+```
+pip install auto_uncertainties
+```
+
 ## Build Documentation
 
 To build the documentation locally, clone the repository, create a virtual Python environment 
@@ -31,14 +39,6 @@ sphinx-build docs/source docs/build
 ```
 
 Once built, the docs can be found under the `docs/build` subdirectory.
-
-## Installation
-
-To install, simply run:
-
-```
-pip install auto_uncertainties
-```
 
 ## Basic Usage
 
