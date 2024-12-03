@@ -26,7 +26,6 @@ from auto_uncertainties import (
     set_downcast_error,
 )
 from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS
-from auto_uncertainties.pint import UncertaintyQuantity
 from auto_uncertainties.uncertainty.uncertainty_containers import (
     ScalarUncertainty,
     Uncertainty,
@@ -429,7 +428,7 @@ class TestUncertainty:
         # Check proper handling of Quantity inputs
         # (further tests for from_quantities are handled in a separate function)
         from_quant = Uncertainty(Quantity(2, "radian"), Quantity(1, "radian"))
-        assert isinstance(from_quant, UncertaintyQuantity)
+        assert isinstance(from_quant, Quantity)
         assert isinstance(from_quant.m, Uncertainty)
         assert from_quant.units == Unit("radian")
 

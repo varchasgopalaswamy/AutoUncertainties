@@ -139,7 +139,7 @@ def _format_typevar(str_in: str) -> str:
     # Adjust this as desired if necessary
     replacements = (("np.", "~numpy."), ("npt.", "~numpy.typing."))
 
-    # Import the TypeVar get the TypeVar constraints
+    # Import lotus.core.type and get the TypeVar constraints
     mod, var = str_in.rsplit(".", 1)
     module = importlib.import_module(mod)
     constraints = getattr(module, var).__constraints__

@@ -2,7 +2,6 @@ from . import display_format
 from . import exceptions
 from . import numpy
 from . import pandas
-from . import pint
 from . import uncertainty
 from . import util
 
@@ -23,9 +22,7 @@ from .pandas import (
     unc_dtype,
 )
 from .uncertainty import (
-    SType,
     ScalarUncertainty,
-    UType,
     Uncertainty,
     VectorUncertainty,
     nominal_values,
@@ -39,10 +36,8 @@ __all__ = [
     "DowncastError",
     "DowncastWarning",
     "NegativeStdDevError",
-    "SType",
     "ScalarDisplay",
     "ScalarUncertainty",
-    "UType",
     "Uncertainty",
     "UncertaintyArray",
     "UncertaintyDtype",
@@ -53,7 +48,6 @@ __all__ = [
     "nominal_values",
     "numpy",
     "pandas",
-    "pint",
     "set_compare_error",
     "set_display_rounding",
     "set_downcast_error",
