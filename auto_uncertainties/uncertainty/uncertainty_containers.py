@@ -963,7 +963,7 @@ def nominal_values(x) -> UType:
     else:
         if np.ndim(x_used) > 0:
             try:
-                x2 = Uncertainty.from_sequence(x_used)
+                x2 = Uncertainty.from_sequence(x)
             except Exception:
                 ret_val = x_used
             else:
@@ -996,9 +996,9 @@ def std_devs(x) -> UType:
     else:
         if np.ndim(x_used) > 0:
             try:
-                x2 = Uncertainty.from_sequence(x_used)
+                x2 = Uncertainty.from_sequence(x)
             except Exception:
-                ret_val = np.zeros_like(x_used)
+                ret_val = np.zeros_like(x)
             else:
                 ret_val = x2.error
         else:
