@@ -99,7 +99,7 @@ class UncertaintyQuantity(
     pint.facets.context.objects.ContextQuantity[UMagnitudeT],  # type: ignore
     pint.facets.dask.DaskQuantity[UMagnitudeT],  # type: ignore
     pint.facets.numpy.quantity.NumpyQuantity[UMagnitudeT],  # type: ignore
-    # pint.facets.measurement.objects.MeasurementQuantity[UMagnitudeT],              # type: ignore
+    # pint.facets.measurement.objects.MeasurementQuantity[UMagnitudeT],  # type: ignore
     pint.facets.nonmultiplicative.objects.NonMultiplicativeQuantity[UMagnitudeT],  # type: ignore
     pint.facets.plain.PlainQuantity[UMagnitudeT],  # type: ignore
 ):
@@ -161,15 +161,16 @@ class UncertaintyUnit(pint.UnitRegistry.Unit):
 
 
 class UncertaintyRegistry(
-    pint.registry.GenericUnitRegistry[UncertaintyQuantity, pint.Unit]
+    # pint.registry.GenericUnitRegistry[UncertaintyQuantity, pint.Unit]
+    pint.UnitRegistry
 ):
     """
     Alternative `pint` unit registry where the default `~pint.Quantity` class is
     `UncertaintyQuantity`.
 
-    TODO: This cannot be used with pint.set_application_registry because it is not
-    TODO: subclass of pint.UnitRegistry. We cannot directly subclass pint.UnitRegistry,
-    TODO: as it is not generic, and type checkers complain.
+    TODO: Subclasses of GenericUnitRegistry cannot be used with pint.set_application_registry because
+    TODO: they are not subclasses of pint.UnitRegistry. We can directly subclass pint.UnitRegistry,
+    TODO: bu it is not generic, and type checkers complain.
     """
 
     Quantity = UncertaintyQuantity
