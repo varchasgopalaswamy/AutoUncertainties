@@ -12,6 +12,20 @@ straightforward and automatic using auto-differentiation.
 - [x] Arrays, with support for most NumPy ufuncs and functions
 - [ ] Pandas Extension Type (see [here](https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html))
 
+
+## Build Documentation
+
+To build the documentation locally, clone the repository, create a virtual Python environment 
+(if desired), and run the following commands within the repository directory:
+
+```bash
+pip install auto_uncertainties[docs]
+sphinx-build docs/source docs/build
+```
+
+Once built, the docs can be found under the `docs/build` subdirectory.
+
+
 ## Prerequisites
 
 For array support:
