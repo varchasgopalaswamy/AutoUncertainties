@@ -91,7 +91,7 @@ class Uncertainty(Generic[UType]):
        * If an `Uncertainty` is supplied for ``value``, its ``error`` attribute will
          override any ``err`` argument (if it is supplied).
 
-       * If the ``value`` parameter is `~np.nan`, returns `~np.nan`.
+       * If the ``value`` parameter is `~np.nan`, returns `~np.nan` (raw `float` value).
 
     .. seealso::
 
@@ -144,7 +144,7 @@ class Uncertainty(Generic[UType]):
         new_err = 0.0 if err is None else err
 
         nan = False
-        if np.isfinite(value):  # type: ignore
+        if np.isfinite(value):
             if np.isfinite(new_err) and new_err < 0:
                 msg = f"Found negative value ({err}) for the standard deviation!"
                 raise NegativeStdDevError(msg)
@@ -252,7 +252,7 @@ class Uncertainty(Generic[UType]):
         """The square of the relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
-    def plus_minus(self, err: UType):
+    def plus_minus(self, err: UType) -> Uncertainty:
         """
         Add an error to the `Uncertainty` object.
 
@@ -317,7 +317,7 @@ class Uncertainty(Generic[UType]):
     @classmethod
     def from_list(
         cls, u_list: Sequence[ScalarUncertainty]
-    ) -> Uncertainty:  # pragma: no cover
+    ) -> VectorUncertainty:  # pragma: no cover
         """
         Alias for `from_sequence`.
 
@@ -326,7 +326,7 @@ class Uncertainty(Generic[UType]):
         return cls.from_sequence(u_list)
 
     @classmethod
-    def from_sequence(cls, seq: Sequence[ScalarUncertainty]) -> Uncertainty:
+    def from_sequence(cls, seq: Sequence[ScalarUncertainty]) -> VectorUncertainty:
         """
         Create an `Uncertainty` object from a sequence of `Uncertainty` objects.
 
