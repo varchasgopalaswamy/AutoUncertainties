@@ -10,7 +10,6 @@ straightforward and automatic using auto-differentiation.
 
 - [x] Scalars
 - [x] Arrays, with support for most NumPy ufuncs and functions
-- [x] Integration with [Pint](https://pint.readthedocs.io/en/stable/user/defining-quantities.html) Quantity objects
 - [ ] Pandas Extension Type (see [here](https://pandas.pydata.org/docs/reference/api/pandas.api.extensions.ExtensionDtype.html))
 
 ## Prerequisites
@@ -20,7 +19,6 @@ For array support:
 * `jax`
 * `jaxlib`
 * `numpy`
-
 
 ## Installation
 

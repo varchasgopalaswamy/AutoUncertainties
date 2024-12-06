@@ -6,7 +6,7 @@ import copy
 import locale
 import math
 import operator
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
@@ -24,12 +24,6 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
-if TYPE_CHECKING:
-    from pint import Unit
-    from pint.facets.plain import PlainQuantity as Quantity
-
-    from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
@@ -41,8 +35,8 @@ __all__ = [
     "set_compare_error",
     "nominal_values",
     "std_devs",
-    "UType",
     "SType",
+    "UType",
 ]
 
 
@@ -290,65 +284,35 @@ class Uncertainty(Generic[UType]):
             u1, u2 = new_str.split("±")
             return Uncertainty(float(u1), float(u2))
 
-    @staticmethod
-    def from_quantities(
-        value: Quantity[UType] | UType, err: Quantity[UType] | UType
-    ) -> UncertaintyQuantity | Uncertainty:
+    @classmethod
+    def from_quantities(cls, value, err) -> Uncertainty:
         """
-        Create an `Uncertainty` object from one or more `pint.Quantity` objects.
+        Create an `Quantity` object with uncertainty from one or more `pint.Quantity` objects.
 
-        .. important:: The `pint` package must be installed for this to work.
-
-        :param value: The central value of the `Uncertainty` object
-        :param err: The uncertainty value of the `Uncertainty` object
+        :param value: The central value(s) of the `Uncertainty` object
+        :param err: The uncertainty value(s) of the `Uncertainty` object
 
         .. note::
 
-           * If **neither** argument is a `~pint.Quantity`, returns an
+           * If **neither** argument is a `~pint.Quantity`, returns a regular
              `Uncertainty` object.
 
-           * If **both** arguments are `~pint.Quantity` objects, returns an
-             `UncertaintyQuantity` with the same units as ``value`` (attempts
-             to convert ``err`` to ``value.units``).
+           * If **both** arguments are `~pint.Quantity` objects, returns a
+             `~pint.Quantity` (wrapped `Uncertainty`) with the same units as
+             ``value`` (attempts to convert ``err`` to ``value.units``).
 
            * If **only the** ``value`` argument is a `~pint.Quantity`, returns
-             an `UncertaintyQuantity` object with the same units as ``value``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``value``.
 
            * If **only the** ``err`` argument is a `~pint.Quantity`, returns
-             an `UncertaintyQuantity` object with the same units as ``err``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
         """
 
         value_, err_, units = _check_units(value, err)
-        inst = Uncertainty(value_, err_)
-
-        from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
+        inst = cls(value_, err_)
         if units is not None:
-            inst = UncertaintyQuantity(inst, units)
-
+            inst *= units
         return inst
-
-    def as_quantity(self, unit: str | Unit | None = None) -> UncertaintyQuantity:
-        """
-        Returns the current object as an `UncertaintyQuantity`.
-
-        This is an alternative to calling `UncertaintyQuantity()` directly.
-
-        .. attention::
-
-           This will **not** create a copy of the underlying `Uncertainty` object.
-           It simply returns the current object wrapped in `UncertaintyQuantity`.
-           Any changes to the underlying object (such as to the `numpy` arrays of a
-           `VectorUncertainty`) will be reflected in the `UncertaintyQuantity`, and vice versa.
-
-        .. important:: The `pint` package must be installed for this to work.
-
-        :param unit: The Pint unit to apply. Can be a string, or a `pint.Unit` object. (Optional)
-        """
-
-        from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
-        return UncertaintyQuantity(self, unit)
 
     @classmethod
     def from_list(
@@ -982,66 +946,49 @@ def _check_units(value, err) -> tuple[Any, Any, Any]:
 
 def nominal_values(x) -> UType:
     """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
-    if hasattr(x, "units"):
-        x_used = x.m
-        x_units = x.units
-    else:
-        x_used = x
-        x_units = 1
     # Is an Uncertainty
-    if hasattr(x_used, "_nom"):
-        ret_val = x_used.value
+    if hasattr(x, "_nom"):
+        return x.value
     else:
-        if np.ndim(x_used) > 0:
+        if np.ndim(x) > 0:
             try:
-                x2 = Uncertainty.from_sequence(x_used)
+                x2 = Uncertainty.from_sequence(x)
             except Exception:
-                ret_val = x_used
+                return x
             else:
-                ret_val = x2.value
+                return x2.value
         else:
             try:
-                x2 = Uncertainty(x_used)
+                x2 = Uncertainty(x)
             except Exception:
-                ret_val = x_used
+                return x
             else:
                 if isinstance(x2, float):
-                    ret_val = x2
+                    return x2
                 else:
-                    ret_val = x2.value
-
-    return ret_val * x_units
+                    return x2.value
 
 
 def std_devs(x) -> UType:
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     # Is an Uncertainty
-    if hasattr(x, "units"):
-        x_used = x.m
-        x_units = x.units
+    if hasattr(x, "_err"):
+        return x.error
     else:
-        x_used = x
-        x_units = 1
-    # Is an Uncertainty
-    if hasattr(x_used, "_nom"):
-        ret_val = x_used.error
-    else:
-        if np.ndim(x_used) > 0:
+        if np.ndim(x) > 0:
             try:
-                x2 = Uncertainty.from_sequence(x_used)
+                x2 = Uncertainty.from_sequence(x)
             except Exception:
-                ret_val = np.zeros_like(x_used)
+                return np.zeros_like(x)
             else:
-                ret_val = x2.error
+                return x2.error
         else:
             try:
-                x2 = Uncertainty(x_used)
+                x2 = Uncertainty(x)
             except Exception:
-                ret_val = 0
+                return 0
             else:
                 if isinstance(x2, float):
-                    ret_val = 0
+                    return 0
                 else:
-                    ret_val = x2.error
-
-    return ret_val * x_units
+                    return x2.error
