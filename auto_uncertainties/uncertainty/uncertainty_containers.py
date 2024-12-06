@@ -35,6 +35,8 @@ __all__ = [
     "set_compare_error",
     "nominal_values",
     "std_devs",
+    "SType",
+    "UType",
 ]
 
 
@@ -256,25 +258,25 @@ class Uncertainty(Generic[UType]):
     @classmethod
     def from_quantities(cls, value, err) -> Uncertainty:
         """
-        Create an `Uncertainty` object from one or more `pint.Quantity` objects.
+        Create an `Quantity` object with uncertainty from one or more `pint.Quantity` objects.
 
-        :param value: The central value of the `Uncertainty` object
-        :param err: The uncertainty value of the `Uncertainty` object
+        :param value: The central value(s) of the `Uncertainty` object
+        :param err: The uncertainty value(s) of the `Uncertainty` object
 
         .. note::
 
-           * If **neither** argument is a `~pint.Quantity`, returns a unitless
+           * If **neither** argument is a `~pint.Quantity`, returns a regular
              `Uncertainty` object.
 
-           * If **both** arguments are `~pint.Quantity` objects, returns an
-             `Uncertainty` with the same units as ``value`` (attempts to convert
-             ``err`` to ``value.units``).
+           * If **both** arguments are `~pint.Quantity` objects, returns a
+             `~pint.Quantity` (wrapped `Uncertainty`) with the same units as
+             ``value`` (attempts to convert ``err`` to ``value.units``).
 
            * If **only the** ``value`` argument is a `~pint.Quantity`, returns
-             an `Uncertainty` object with the same units as ``value``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``value``.
 
            * If **only the** ``err`` argument is a `~pint.Quantity`, returns
-             an `Uncertainty` object with the same units as ``err``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
         """
 
         value_, err_, units = _check_units(value, err)
