@@ -1,11 +1,12 @@
 # Based heavily on the implementation of pint's Quantity object
 from __future__ import annotations
 
+from collections.abc import Sequence
 import copy
 import locale
 import math
 import operator
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
@@ -23,15 +24,6 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from pint import Unit
-    from pint.facets.plain import PlainQuantity as Quantity
-
-    from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
-
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
@@ -43,15 +35,15 @@ __all__ = [
     "set_compare_error",
     "nominal_values",
     "std_devs",
-    "UType",
     "SType",
+    "UType",
 ]
 
 
-UType: type(TypeVar) = TypeVar("UType", np.ndarray, float, int)
+UType = TypeVar("UType", np.ndarray, float, int)
 """`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
 
-SType: type(TypeVar) = TypeVar("SType", float, int)
+SType = TypeVar("SType", float, int)
 """`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
@@ -264,64 +256,34 @@ class Uncertainty(Generic[UType]):
             return cls(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(
-        cls, value: Quantity[UType] | UType, err: Quantity[UType] | UType
-    ) -> UncertaintyQuantity:
+    def from_quantities(cls, value, err) -> Uncertainty:
         """
-        Create an `Uncertainty` object from one or more `pint.Quantity` objects.
+        Create an `Quantity` object with uncertainty from one or more `pint.Quantity` objects.
 
-        .. important:: The `pint` package must be installed for this to work.
-
-        :param value: The central value of the `Uncertainty` object
-        :param err: The uncertainty value of the `Uncertainty` object
+        :param value: The central value(s) of the `Uncertainty` object
+        :param err: The uncertainty value(s) of the `Uncertainty` object
 
         .. note::
 
-           * If **neither** argument is a `~pint.Quantity`, returns an
+           * If **neither** argument is a `~pint.Quantity`, returns a regular
              `Uncertainty` object.
 
-           * If **both** arguments are `~pint.Quantity` objects, returns an
-             `UncertaintyQuantity` with the same units as ``value`` (attempts
-             to convert ``err`` to ``value.units``).
+           * If **both** arguments are `~pint.Quantity` objects, returns a
+             `~pint.Quantity` (wrapped `Uncertainty`) with the same units as
+             ``value`` (attempts to convert ``err`` to ``value.units``).
 
            * If **only the** ``value`` argument is a `~pint.Quantity`, returns
-             an `UncertaintyQuantity` object with the same units as ``value``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``value``.
 
            * If **only the** ``err`` argument is a `~pint.Quantity`, returns
-             an `UncertaintyQuantity` object with the same units as ``err``.
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
         """
 
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
-
-        from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
         if units is not None:
-            inst = UncertaintyQuantity(inst, units)
-
+            inst *= units
         return inst
-
-    def as_quantity(self, unit: str | Unit | None = None) -> UncertaintyQuantity:
-        """
-        Returns the current object as an `UncertaintyQuantity`.
-
-        This is an alternative to calling `UncertaintyQuantity()` directly.
-
-        .. attention::
-
-           This will **not** create a copy of the underlying `Uncertainty` object.
-           It simply returns the current object wrapped in `UncertaintyQuantity`.
-           Any changes to the underlying object (such as to the `numpy` arrays of a
-           `VectorUncertainty`) will be reflected in the `UncertaintyQuantity`, and vice versa.
-
-        .. important:: The `pint` package must be installed for this to work.
-
-        :param unit: The Pint unit to apply. Can be a string, or a `pint.Unit` object. (Optional)
-        """
-
-        from auto_uncertainties.pint.extensions import UncertaintyQuantity
-
-        return UncertaintyQuantity(self, unit)
 
     @classmethod
     def from_list(cls, u_list: Sequence[Uncertainty]):  # pragma: no cover

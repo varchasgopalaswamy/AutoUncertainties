@@ -15,12 +15,6 @@ Getting Started
 
     pip install auto_uncertainties
 
-* The Pint extensions can be installed and enabled alongside AutoUncertainties using:
-
-.. code:: bash
-
-   pip install auto_uncertainties[pint]
-
 * The integration with `pandas` (still WIP) can be enabled by installing `pandas`, either separately or via:
 
 .. code:: bash
