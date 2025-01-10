@@ -1,4 +1,4 @@
-# Based heavily on the implementation of pint's Quantity object
+# Based heavily on the implementation of Pint's Quantity object
 from __future__ import annotations
 
 from collections.abc import Sequence
