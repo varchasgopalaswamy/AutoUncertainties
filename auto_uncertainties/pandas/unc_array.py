@@ -1,5 +1,5 @@
 """
-An implementation of ``Decimal`` as a ``DType``.
+An implementation of Decimal as a DType.
 
 .. seealso::
 
