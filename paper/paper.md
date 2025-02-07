@@ -19,7 +19,7 @@ affiliations:
    index: 1
 
 bibliography: paper.bib
-date: 2 February 2025
+date: 7 February 2025
 ---
 
 # Summary
@@ -81,7 +81,7 @@ automatic differentiaion provided by `JAX`. Calls to any `NumPy` array function 
 intercepted via the `__array_function__` and `__array_ufunc__` mechanism, and dispatched to a `NumPy` wrapper routine 
 that computes the Jacobian matrix via `jax.jacfwd`.
 
-The user API for the `Uncertainty` object exposes only a small set of properties:
+The user API for the `Uncertainty` object exposes a number of properties, of which some of the most important are:
 
 - `value -> float`: The central value of the object.
 - `error -> float`: The error of the object.
