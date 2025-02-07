@@ -303,6 +303,17 @@ class Uncertainty(Generic[UType]):
 
            * If **only the** ``err`` argument is a `~pint.Quantity`, returns
              a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
+
+        .. code-block:: python
+           :caption: Example
+
+           >>> from pint import Quantity
+           >>> val = Quantity(2.24, 'kg')
+           >>> err = Quantity(0.208, 'kg')
+           >>> new_quantity = Uncertainty.from_quantities(val, err)
+           >>> new_quantity
+           <Quantity(2.24 +/- 0.208, 'kilogram')>
+
         """
 
         value_, err_, units = _check_units(value, err)

@@ -13,12 +13,14 @@ authors:
   - name: Ethan Mentzer
     orcid: 0009-0003-8206-5050
     affiliation: "1"
+    equal-contrib: false
     
 affiliations:
  - name: Laboratory for Laser Energetics, Rochester, USA
    index: 1
 
-date: 3 April 2024
+bibliography: paper.bib
+date: 2 February 2025
 ---
 
 # Summary
@@ -35,8 +37,8 @@ The Python package `AutoUncertainties`, described here, provides a solution to t
 
 `AutoUncertainties` is Python package for uncertainty propagation. It provides
 a drop-in mechanism to add uncertainty information to Python scalar and `NumPy`
-array variables. It implements manual propagation rules for the Python dunder math
-methods, and uses automatic differentiation via `JAX` to propagate uncertainties
+[@harris2020array] array variables. It implements manual propagation rules for the Python dunder
+math methods, and uses automatic differentiation via `JAX` [@jax2018github] to propagate uncertainties
 for most `NumPy` methods applied to both scalar and `NumPy` array variables. In doing so,
 it eliminates the need for carrying around additional uncertainty variables,
 needing to implement custom propagation rules for any `NumPy` operator with a gradient
@@ -46,17 +48,18 @@ typically only when uncertainties are attached to central values.
 
 # Prior Work
 
-To the author's knowledge, the only existing error propagation library in Python is the `uncertainties` package,
-which inspired the current work. While extremely useful, the `uncertainties` package relies on hand-implemented 
-rules and functions for uncertainty propagation of array and scalar data. While this is transparent for the 
-intrinsic dunder methods such as `__add__`, it becomes problematic for advanced mathematical operators. 
-For instance, calculating the uncertainty propagation due to the cosine requires the import of separate math libraries
+To the author's knowledge, the only existing error propagation library in Python is the `uncertainties` 
+[@lebigot2024] package, which inspired the current work. While extremely useful, the `uncertainties` 
+package relies on hand-implemented rules and functions for uncertainty propagation of array and scalar data. 
+While this is transparent for the intrinsic dunder methods such as `__add__`, it becomes problematic for advanced 
+mathematical operators. For instance, calculating the uncertainty propagation due to the cosine requires the 
+import of separate math libraries
 
 ```python
 import numpy as np
 from uncertainties import unumpy, ufloat
 arr = np.array([ufloat(1, 0.1), ufloat(2, 0.002)])
-unumpy.cos(arr)
+unumpy.cos(arr)  # calculation succeeds
 ```
 
 rather than being able to use `NumPy` directly.
@@ -65,7 +68,7 @@ rather than being able to use `NumPy` directly.
 import numpy as np
 from uncertainties import ufloat
 arr = np.array([ufloat(1, 0.1), ufloat(2, 0.002)])
-np.cos(arr)
+np.cos(arr)  # raises an exception
 ```
 
 
@@ -84,7 +87,7 @@ The user API for the `Uncertainty` object exposes only a small set of properties
 - `value -> float`: The central value of the object.
 - `error -> float`: The error of the object.
 - `relative -> float`: The relative error (i.e. error / value) of the object.
-- `plus_minus(self, err:float) -> Uncertainty`: Adds error (in quadrature).
+- `plus_minus(self, err: float) -> Uncertainty`: Adds error (in quadrature).
 - `from_sequence(self, seq: List[ScalarUncertainty]) -> VectorUncertainty`: Constructs an array `Uncertainty` object 
   from a list of scalar `Uncertainty` objects.
 
@@ -116,9 +119,18 @@ set_downcast_error(True)
 ```
 
 
+## Pint
+
+`AutoUncertainties` provides some support for working with objects from the `Pint` package [@pint]. 
+For example, `Uncertainty` objects can be instantiated from `pint.Quantity` objects, and then 
+automatically wrapped into new `pint.Quantity` objects via the `from_quantities` method. This 
+guarantees that unit information is preserved when moving between `Uncertainty` objects and
+`pint.Quantity` objects.
+
+
 ## Pandas
 
-Support for `pandas` via the `ExtensionArray` mechanism is largely functional.
+Support for `pandas` [@pandas2024] via the `ExtensionArray` mechanism is largely functional.
 
 
 
@@ -138,3 +150,6 @@ rights. Reference herein to any specific commercial product, process, or service
 or otherwise does not necessarily constitute or imply its endorsement, recommendation, or favoring by the United States 
 Government or any agency thereof. The views and opinions of authors expressed herein do not necessarily state or reflect 
 those of the United States Government or any agency thereof.
+
+
+# References
