@@ -73,6 +73,8 @@ np.cos(arr)  # raises an exception
 
 # Implementation
 
+- TODO: Provide some small code examples here. 
+
 Linear uncertainty propagation of a function $f(x) : \mathbb{R}^n \rightarrow \mathbb{R}^m$ can be computed
 via the simple rule $$ \delta f_j (x)^2 = \left ( \dfrac{\partial f_j}{\partial x_i}\left( x \right ) \delta x_i  \right ) ^2. $$
 
@@ -126,10 +128,29 @@ automatically wrapped into new `pint.Quantity` objects via the `from_quantities`
 guarantees that unit information is preserved when moving between `Uncertainty` objects and
 `pint.Quantity` objects.
 
+- TODO: Provide code example.
+
 
 ## Pandas
 
 Support for `pandas` [@pandas2024] via the `ExtensionArray` mechanism is largely functional.
+
+
+
+# Current Limitations and Future Work
+
+- TODO: Note the i.i.d. assumption / limitation.
+- TODO: Note the typing system limitation / potential for improvement.
+
+
+
+# Further Information
+
+Additional API information and usage examples can be found on the 
+[documentation website](https://autouncertainties.readthedocs.io/en/latest/). All source
+code for the project is stored and maintained on the `AutoUncertainties` 
+[GitHub repository](https://github.com/varchasgopalaswamy/AutoUncertainties), where 
+contributions, suggestions, and bug reports are welcome. 
 
 
 
