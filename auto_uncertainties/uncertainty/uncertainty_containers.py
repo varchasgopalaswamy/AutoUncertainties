@@ -117,12 +117,8 @@ class Uncertainty(Generic[UType]):
         value: UType | Uncertainty | Sequence[ScalarUncertainty],
         err: UType | None = None,
     ) -> Uncertainty:
-        # TODO: Should we explicitly allow err to be a scalar, even when value is a NDArray?
-        # TODO: Perhaps we can do this with overloads of __new__.
-        # TODO: This behavior is currently implemented, however it does not agree with type checking right now.
-        # TODO: (would need to adjust VectorUncertainty __init__ function too).
-
-        # TODO: Also, figure out about float return NaN behavior...
+        # Note: some edge cases still need to be handled for typing purposes.
+        # See the comment in commit f652cc5 under this method.
 
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
@@ -345,7 +341,7 @@ class Uncertainty(Generic[UType]):
                 msg = f"Sequence elements of type {type(first_item)} don't support math operations!"
                 raise TypeError(msg) from None
             if hasattr(first_item, "units"):
-                # TODO: Should this just use from_quantities ?
+                # Note: This could use from_quantities at some point in the future.
                 val *= first_item.units  # type: ignore
                 err *= first_item.units  # type: ignore
             for i, seq_i in enumerate(seq):
