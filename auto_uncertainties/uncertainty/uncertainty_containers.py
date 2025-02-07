@@ -114,11 +114,12 @@ class Uncertainty(Generic[UType]):
     @ignore_numpy_downcast_warnings
     def __new__(
         cls: type[Uncertainty],
-        value: UType | Uncertainty | Sequence[ScalarUncertainty],
-        err: UType | None = None,
+        value: UType | Uncertainty | Sequence[ScalarUncertainty] | Any,
+        err: UType | Any | None = None,
     ) -> Uncertainty:
         # Note: some edge cases still need to be handled for typing purposes.
         # See the comment in commit f652cc5 under this method.
+        # For now, the "Any" type has been listed as an input parameter.
 
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
@@ -133,7 +134,7 @@ class Uncertainty(Generic[UType]):
             return cls(value.value, value.error)
 
         # Numpy arrays
-        elif isinstance(value, np.ndarray):
+        elif isinstance(value, np.ndarray) and value.ndim > 0:
             return cls._new_vec(value, err)
 
         # Zero error
@@ -159,8 +160,8 @@ class Uncertainty(Generic[UType]):
 
     def __init__(
         self,
-        value: UType | Uncertainty | Sequence[ScalarUncertainty],
-        err: UType | None = None,
+        value: UType | Uncertainty | Sequence[ScalarUncertainty] | Any,
+        err: UType | Any | None = None,
         *,
         trigger=False,
     ):
