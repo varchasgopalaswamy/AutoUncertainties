@@ -19,19 +19,19 @@ repos:
     types: ["text"]
     
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
+  rev: v5.0.0
   hooks:
   - id: check-executables-have-shebangs
   - id: check-symlinks
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.5
+  rev: v0.9.5
   hooks:
-    #Run the formatter.
-    - id: ruff-format
-      types_or: [ python, pyi, jupyter ]
     #Run the linter.
     - id: ruff
       types_or: [ python, pyi, jupyter ]
       args: [ --fix, --exit-zero ]
+    #Run the formatter.
+    - id: ruff-format
+      types_or: [ python, pyi, jupyter ]
