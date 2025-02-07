@@ -13,7 +13,6 @@ authors:
   - name: Ethan Mentzer
     orcid: 0009-0003-8206-5050
     affiliation: "1"
-    equal-contrib: false
     
 affiliations:
  - name: Laboratory for Laser Energetics, Rochester, USA
