@@ -28,15 +28,15 @@ ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
 __all__ = [
+    "SType",
+    "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "VectorUncertainty",
-    "ScalarUncertainty",
-    "set_downcast_error",
-    "set_compare_error",
     "nominal_values",
+    "set_compare_error",
+    "set_downcast_error",
     "std_devs",
-    "SType",
-    "UType",
 ]
 
 

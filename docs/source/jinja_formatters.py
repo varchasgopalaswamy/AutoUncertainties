@@ -23,8 +23,7 @@ def _format_function_defaults(docstring: str, obj_args: str) -> str:
             for j in range(i + 1, len(lines)):
                 if lines[j].startswith(":") or lines[j] == "":
                     break
-                else:
-                    num_lines += 1
+                num_lines += 1
 
             for k in range(i, i + num_lines):
                 description += lines[k]
