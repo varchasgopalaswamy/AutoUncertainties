@@ -1,4 +1,4 @@
-from auto_uncertainties import Uncertainty---
+---
 title: 'AutoUncertainties: A Python Package for Uncertainty Propagation'
 
 tags:
