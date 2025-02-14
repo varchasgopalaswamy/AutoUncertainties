@@ -1,4 +1,4 @@
----
+from auto_uncertainties import Uncertainty---
 title: 'AutoUncertainties: A Python Package for Uncertainty Propagation'
 
 tags:
@@ -73,8 +73,6 @@ np.cos(arr)  # raises an exception
 
 # Implementation
 
-- TODO: Provide some small code examples here. 
-
 Linear uncertainty propagation of a function $f(x) : \mathbb{R}^n \rightarrow \mathbb{R}^m$ can be computed
 via the simple rule $$ \delta f_j (x)^2 = \left ( \dfrac{\partial f_j}{\partial x_i}\left( x \right ) \delta x_i  \right ) ^2. $$
 
@@ -83,14 +81,32 @@ automatic differentiaion provided by `JAX`. Calls to any `NumPy` array function 
 intercepted via the `__array_function__` and `__array_ufunc__` mechanism, and dispatched to a `NumPy` wrapper routine 
 that computes the Jacobian matrix via `jax.jacfwd`.
 
-The user API for the `Uncertainty` object exposes a number of properties, of which some of the most important are:
+The user API for the `Uncertainty` object exposes a number of properties and methods, of which some of the most 
+important are:
 
 - `value -> float`: The central value of the object.
 - `error -> float`: The error of the object.
 - `relative -> float`: The relative error (i.e. error / value) of the object.
 - `plus_minus(self, err: float) -> Uncertainty`: Adds error (in quadrature).
-- `from_sequence(self, seq: List[ScalarUncertainty]) -> VectorUncertainty`: Constructs an array `Uncertainty` object 
-  from a list of scalar `Uncertainty` objects.
+- `from_sequence(self, seq: Sequence) -> VectorUncertainty`: Constructs an array `Uncertainty` object 
+  from some existing sequence.
+
+These attributes and methods can be used in the following manner:
+
+```python
+from auto_uncertainties import Uncertainty
+u1 = Uncertainty(5.25, 0.75)
+u2 = Uncertainty(1.85, 0.4)
+
+print(u1)                  # 5.25 +/- 0.75
+print(u1.value)            # 5.25
+print(u1.error)            # 0.75
+print(u1.relative)         # 0.142857
+print(u1.plus_minus(0.5))  # 5.25 +/- 0.901388
+
+seq = Uncertainty.from_sequence([u1, u2])
+print(seq)  # [5.25 +/- 0.75, 1.85 +/- 0.4]
+```
 
 To extract errors / central values from arbitrary objects, the accessors `nominal_values` and `std_devs` are provided. 
 These functions return:
@@ -120,7 +136,7 @@ set_downcast_error(True)
 ```
 
 
-## Pint
+## Support for Pint
 
 `AutoUncertainties` provides some support for working with objects from the `Pint` package [@pint]. 
 For example, `Uncertainty` objects can be instantiated from `pint.Quantity` objects, and then 
@@ -128,7 +144,17 @@ automatically wrapped into new `pint.Quantity` objects via the `from_quantities`
 guarantees that unit information is preserved when moving between `Uncertainty` objects and
 `pint.Quantity` objects.
 
-- TODO: Provide code example.
+```python
+from auto_uncertainties import Uncertainty
+from pint import Quantity
+
+val = Quantity(2.24, 'kg')
+err = Quantity(0.208, 'kg')
+new_quantity = Uncertainty.from_quantities(val, err)
+
+print(new_quantity)        # 2.24 +/- 0.208 kilogram
+print(type(new_quantity))  # <class 'pint.Quantity'>
+```
 
 
 ## Pandas
@@ -139,8 +165,25 @@ Support for `pandas` [@pandas2024] via the `ExtensionArray` mechanism is largely
 
 # Current Limitations and Future Work
 
-- TODO: Note the i.i.d. assumption / limitation.
-- TODO: Note the typing system limitation / potential for improvement.
+## Dependent Random Variables
+
+To simplify operations on `Uncertainty` objects, `AutoUncertainties` assumes all variables are independent
+and identically distributed (i.i.d.). This means that, in the case where the programmer assumes dependence
+between two or more `Uncertainty` objects, unexpected behavior may arise. For instance, subtracting an
+`Uncertainty` from itself will not result in a standard devation of zero:
+
+```python
+x = Uncertainty(5.0, 0.5)
+print(x - x)  # 0 +/- 0.707107
+```
+
+
+## Typing System
+
+Type hinting is employed throughout `AutoUncertainties` to aid static analysis of the package. At this time,
+however, many typing inconsistencies can be detected by tools like [Mypy](https://mypy-lang.org/) and 
+[Pyright](https://microsoft.github.io/pyright/). Future improvements to `AutoUncertainties` will likely 
+include typing adjustments to the code, in order to avoid subtle bugs.
 
 
 
