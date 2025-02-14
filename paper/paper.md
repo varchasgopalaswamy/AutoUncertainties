@@ -88,7 +88,7 @@ important are:
 - `error -> float`: The error of the object.
 - `relative -> float`: The relative error (i.e. error / value) of the object.
 - `plus_minus(self, err: float) -> Uncertainty`: Adds error (in quadrature).
-- `from_sequence(self, seq: Sequence) -> VectorUncertainty`: Constructs an array `Uncertainty` object 
+- `from_sequence(cls, seq: Sequence) -> VectorUncertainty`: Constructs an array `Uncertainty` object 
   from some existing sequence.
 
 These attributes and methods can be used in the following manner:
@@ -159,7 +159,8 @@ print(type(new_quantity))  # <class 'pint.Quantity'>
 
 ## Pandas
 
-Support for `pandas` [@pandas2024] via the `ExtensionArray` mechanism is largely functional.
+Support for `pandas` [@pandas2024] via the `ExtensionArray` mechanism is largely functional. Upcoming
+aditions to `AutoUncertainties` will further improve compatibility.
 
 
 
@@ -181,9 +182,9 @@ print(x - x)  # 0 +/- 0.707107
 ## Typing System
 
 Type hinting is employed throughout `AutoUncertainties` to aid static analysis of the package. At this time,
-however, many typing inconsistencies can be detected by tools like [Mypy](https://mypy-lang.org/) and 
-[Pyright](https://microsoft.github.io/pyright/). Future improvements to `AutoUncertainties` will likely 
-include typing adjustments to the code, in order to avoid subtle bugs.
+however, many typing inconsistencies can be detected by static type enforcement tools like 
+[Mypy](https://mypy-lang.org/) and [Pyright](https://microsoft.github.io/pyright/). Future improvements 
+to `AutoUncertainties` will likely include typing adjustments to the code, in order to avoid subtle bugs.
 
 
 
