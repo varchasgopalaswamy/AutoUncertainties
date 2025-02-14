@@ -32,7 +32,6 @@ ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
 __all__ = [
-    "SType",
     "ScalarUncertainty",
     "UType",
     "Uncertainty",
@@ -44,11 +43,8 @@ __all__ = [
 ]
 
 
-UType = TypeVar("UType", np.ndarray, float, int)
+UType = TypeVar("UType", np.ndarray, float)
 """`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
-
-SType = TypeVar("SType", float, int)
-"""`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
 class Uncertainty(Generic[UType]):
@@ -129,7 +125,7 @@ class Uncertainty(Generic[UType]):
 
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
-            return cls.from_quantities(value, err)  # type: ignore
+            return cls.from_quantities(value, err)
 
         # If instantiated with a list or tuple of uncertainties
         elif isinstance(value, Sequence):
@@ -145,6 +141,10 @@ class Uncertainty(Generic[UType]):
 
         # Zero error
         new_err = 0.0 if err is None else err
+
+        # Convert from int to float
+        new_err = float(new_err) if isinstance(new_err, int) else new_err
+        value = float(value) if isinstance(value, int) else value
 
         nan = False
         if np.isfinite(value):
@@ -847,7 +847,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
         return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
 
-class ScalarUncertainty(ScalarDisplay, Uncertainty[SType]):
+class ScalarUncertainty(ScalarDisplay, Uncertainty[float]):
     """Scalar `Uncertainty` class."""
 
     @property
@@ -1006,9 +1006,9 @@ def std_devs(x) -> UType:
             try:
                 x2 = Uncertainty(x)
             except Exception:
-                return 0
+                return 0.0
             else:
                 if isinstance(x2, float):
-                    return 0
+                    return 0.0
                 else:
                     return x2.error

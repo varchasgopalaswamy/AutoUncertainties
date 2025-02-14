@@ -178,6 +178,41 @@ x = Uncertainty(5.0, 0.5)
 print(x - x)  # 0 +/- 0.707107
 ```
 
+----------- TODO: CORRECT THIS SECTION TO MAKE MORE SENSE -- ONLY WHEN YOU WANT DEPENDENT i.e., like example --------
+----------- It's really for when you multiply the Uncertainty one over an array like below ---------------------
+
+---------- SEE MESSAGE: "multiply a vector by a scalar uncertainty" -------------------------
+
+Additionally, when taking the mean of a vector multiplied by a scalar `Uncertainty` object, each component 
+of the resulting vector is assumed to be i.i.d., which may or may not be the desired behavior. To take the 
+mean assuming full correlation between the components of the vector, one of two techniques can be used:
+
+- TODO: SHOW EXAMPLE OF WHAT NOT TO DO
+
+1. Initially separate the error from the central value, and recombine after taking the mean:
+   
+   TODO: MAKE THE DESCRIPTION FOR THIS EXAMPLE CLEARER (e.g., mention we are taking mean of scale_value * arr, etc.)
+
+   ```python
+   u = Uncertainty(5, 0.5)
+   scale_error = Uncertainty(1, u.relative)
+   scale_value = u.value 
+
+   arr = np.ones(10) * 10
+   result = np.mean(scale_value * arr) * scale_error
+   ```
+
+2. Take the mean of the vector, and then multiply by the `Uncertainty`:
+
+   ```python
+   u = Uncertainty(5, 0.5)
+   arr = np.ones(10) * 10
+   result = u * np.mean(arr)
+   ```
+
+- TODO: Discuss other case that Varchas mentioned, go through GH issue and summarize other bits.
+- TODO: Mention not theoretically impossible, just difficult to implement with the current code (per V message). 
+
 
 ## Typing System
 
