@@ -2,6 +2,7 @@
 name = "auto_uncertainties"
 authors = [
     {name = "Varchas Gopalaswamy", email = "vgop@lle.rochester.edu"},
+    {name = "Ethan Mentzer", email = "ementzer@u.rochester.edu"},
 ]
 description = "Linear Uncertainty Propagation with Auto-Differentiation"
 readme = "README.md"

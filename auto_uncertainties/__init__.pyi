@@ -22,7 +22,6 @@ from .pandas import (
     unc_dtype,
 )
 from .uncertainty import (
-    SType,
     ScalarUncertainty,
     UType,
     Uncertainty,
@@ -38,7 +37,6 @@ __all__ = [
     "DowncastError",
     "DowncastWarning",
     "NegativeStdDevError",
-    "SType",
     "ScalarDisplay",
     "ScalarUncertainty",
     "UType",

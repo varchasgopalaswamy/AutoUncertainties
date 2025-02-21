@@ -1,7 +1,6 @@
 from . import uncertainty_containers
 
 from .uncertainty_containers import (
-    SType,
     ScalarUncertainty,
     UType,
     Uncertainty,
@@ -13,7 +12,6 @@ from .uncertainty_containers import (
 )
 
 __all__ = [
-    "SType",
     "ScalarUncertainty",
     "UType",
     "Uncertainty",
