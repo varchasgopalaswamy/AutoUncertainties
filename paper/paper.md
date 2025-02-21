@@ -178,40 +178,43 @@ x = Uncertainty(5.0, 0.5)
 print(x - x)  # 0 +/- 0.707107
 ```
 
------------ TODO: CORRECT THIS SECTION TO MAKE MORE SENSE -- ONLY WHEN YOU WANT DEPENDENT i.e., like example --------
------------ It's really for when you multiply the Uncertainty one over an array like below ---------------------
-
----------- SEE MESSAGE: "multiply a vector by a scalar uncertainty" -------------------------
-
 Additionally, when taking the mean of a vector multiplied by a scalar `Uncertainty` object, each component 
-of the resulting vector is assumed to be i.i.d., which may or may not be the desired behavior. To take the 
-mean assuming full correlation between the components of the vector, one of two techniques can be used:
+of the resulting vector is assumed to be i.i.d., which may not be the desired behavior. In this scenario, the
+programmer can take the mean assuming *full correlation* between the components of the vector by using one 
+of two workaround techniques:
 
-- TODO: SHOW EXAMPLE OF WHAT NOT TO DO
-
-1. Initially separate the error from the central value, and recombine after taking the mean:
-   
-   TODO: MAKE THE DESCRIPTION FOR THIS EXAMPLE CLEARER (e.g., mention we are taking mean of scale_value * arr, etc.)
+1. Separate the central value from the relative error, multiply the vector by the central value, take the mean
+   of the resulting vector, and then multiply by the previously stored relative error.
 
    ```python
-   u = Uncertainty(5, 0.5)
-   scale_error = Uncertainty(1, u.relative)
-   scale_value = u.value 
+   u = Uncertainty(5.0, 0.5)
+   scale_error = Uncertainty(1, u.relative)  # collect relative error
+   scale_value = u.value                     # collect central value
 
    arr = np.ones(10) * 10
-   result = np.mean(scale_value * arr) * scale_error
+   result = np.mean(scale_value * arr) * scale_error  # 50 +/- 5
    ```
 
 2. Take the mean of the vector, and then multiply by the `Uncertainty`:
 
    ```python
-   u = Uncertainty(5, 0.5)
+   u = Uncertainty(5.0, 0.5)
    arr = np.ones(10) * 10
-   result = u * np.mean(arr)
+   result = u * np.mean(arr)  # 50 +/- 5
    ```
+   
+These two workarounds are in contrast to the following method of taking the mean of a vector multiplied
+by a scalar `Uncertainty`. Because `AutoUncertainties` assumes all variables to be i.i.d., the code shown below 
+will produce a result with an unexpectedly small standard deviation:
 
-- TODO: Discuss other case that Varchas mentioned, go through GH issue and summarize other bits.
-- TODO: Mention not theoretically impossible, just difficult to implement with the current code (per V message). 
+```python
+u = Uncertainty(5.0, 0.5)
+arr = np.ones(10) * 10
+result = np.mean(u * arr)  # 50 +/- 1.58114
+```
+
+While it would be theoretically possible for `AutoUncertainties` to automatically determine the dependence between
+variables, an implementation of this feature would likely come at the cost of reduced performance and high complexity.
 
 
 ## Typing System

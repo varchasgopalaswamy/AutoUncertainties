@@ -343,7 +343,7 @@ class Uncertainty(Generic[UType]):
     def from_sequence(cls, seq: Sequence | np.ndarray) -> Uncertainty:
         """
         Create an `Uncertainty` object from a sequence of `Uncertainty` objects,
-        a `np.ndarray`, or other sequence supporting math operations.
+        a `numpy.ndarray`, or other sequence supporting math operations.
 
         :param seq: A sequence of `Uncertainty` objects.
 
@@ -351,6 +351,9 @@ class Uncertainty(Generic[UType]):
 
            If a sequence of objects *other than* `Uncertainty` objects is passed, all
            errors in the resulting `VectorUncertainty` will be set to zero.
+
+           To instantiate a `VectorUncertainty` from two `~numpy.ndarray` objects (one for
+           the central values, one for the errors), call ``Uncertainty(vals, errs)`` directly.
         """
         _ = iter(seq)
 
