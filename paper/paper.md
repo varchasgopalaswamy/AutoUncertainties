@@ -170,18 +170,27 @@ aditions to `AutoUncertainties` will further improve compatibility.
 
 To simplify operations on `Uncertainty` objects, `AutoUncertainties` assumes all variables are independent
 and identically distributed (i.i.d.). This means that, in the case where the programmer assumes dependence
-between two or more `Uncertainty` objects, unexpected behavior may arise. For instance, subtracting an
-`Uncertainty` from itself will not result in a standard devation of zero:
+between two or more `Uncertainty` objects, unexpected behavior may arise. Some examples of this phenomenon are
+demonstrated in the following subsections, however programmers should be aware that there are likely many more 
+edge cases related to the i.i.d. assumption. 
+
+### Subtracting Equivalent Uncertainties
+
+Subtracting an `Uncertainty` from itself will not result in a standard devation of zero, as demonstrated
+in the following example.
 
 ```python
 x = Uncertainty(5.0, 0.5)
 print(x - x)  # 0 +/- 0.707107
 ```
 
-Additionally, when taking the mean of a vector multiplied by a scalar `Uncertainty` object, each component 
-of the resulting vector is assumed to be i.i.d., which may not be the desired behavior. In this scenario, the
-programmer can take the mean assuming *full correlation* between the components of the vector by using one 
-of two workaround techniques:
+### Mean Error Propagation
+
+When multiplying a vector by a scalar `Uncertainty` object, each component of the resulting vector 
+is assumed to be i.i.d., which may not be the desired behavior. For instance, taking the mean of such a 
+vector will return an `Uncertainty` object with an unexpectedly small standard deviation. To avoid this
+scenario, the programmer can take the mean assuming *full correlation* between the components of the vector
+by using one of two workaround techniques:
 
 1. Separate the central value from the relative error, multiply the vector by the central value, take the mean
    of the resulting vector, and then multiply by the previously stored relative error.
@@ -202,10 +211,10 @@ of two workaround techniques:
    arr = np.ones(10) * 10
    result = u * np.mean(arr)  # 50 +/- 5
    ```
-   
+
 These two workarounds are in contrast to the following method of taking the mean of a vector multiplied
-by a scalar `Uncertainty`. Because `AutoUncertainties` assumes all variables to be i.i.d., the code shown below 
-will produce a result with an unexpectedly small standard deviation:
+by a scalar `Uncertainty`, which, as previously mentioned, would result in a reduced standard deviation
+becase of the i.i.d. assumption.
 
 ```python
 u = Uncertainty(5.0, 0.5)
@@ -215,6 +224,7 @@ result = np.mean(u * arr)  # 50 +/- 1.58114
 
 While it would be theoretically possible for `AutoUncertainties` to automatically determine the dependence between
 variables, an implementation of this feature would likely come at the cost of reduced performance and high complexity.
+Therefore, programmers should exercise caution when working with dependent random variables.
 
 
 ## Typing System
