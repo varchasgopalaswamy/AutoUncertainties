@@ -11,7 +11,7 @@ from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
 
-__all__ = ["wrap_numpy", "HANDLED_UFUNCS", "HANDLED_FUNCTIONS"]
+__all__ = ["HANDLED_FUNCTIONS", "HANDLED_UFUNCS", "wrap_numpy"]
 
 
 def _is_uncertainty(obj) -> bool:

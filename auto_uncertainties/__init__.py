@@ -11,7 +11,6 @@ __all__ = [
     "DowncastError",
     "DowncastWarning",
     "NegativeStdDevError",
-    "SType",
     "ScalarDisplay",
     "ScalarUncertainty",
     "UType",

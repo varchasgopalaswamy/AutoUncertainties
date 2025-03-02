@@ -53,7 +53,7 @@ Once built, the docs can be found under the `docs/build` subdirectory.
   1 +/- 0.1
   ```
   
-  As is creating a `numpy` array of Uncertainties:
+  As is creating a NumPy array of Uncertainties:
 
   ```python
   >>> from auto_uncertainties import Uncertainty
@@ -96,7 +96,7 @@ Once built, the docs can be found under the `docs/build` subdirectory.
   30 +/- 5
   ```
 
-* Array uncertainties implement a large subset of the numpy ufuncs and methods using `jax.grad` or 
+* Array uncertainties implement a large subset of the NumPy ufuncs and methods using `jax.grad` or 
   `jax.jacfwd`, depending on the output shape.
 
   ```python
@@ -179,5 +179,5 @@ Once built, the docs can be found under the `docs/build` subdirectory.
 
 ## Inspirations
 
-The class structure of `Uncertainty`, and the `numpy` ufunc implementation is heavily inspired by the 
+The class structure of `Uncertainty` and the `NumPy` ufunc implementation is heavily inspired by the 
 excellent package [Pint](https://github.com/hgrecco/pint).

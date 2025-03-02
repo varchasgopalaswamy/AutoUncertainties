@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 ROUND_ON_DISPLAY = False
 
-__all__ = ["set_display_rounding", "VectorDisplay", "ScalarDisplay"]
+__all__ = ["ScalarDisplay", "VectorDisplay", "set_display_rounding"]
 
 
 def set_display_rounding(val: bool):
@@ -110,7 +110,7 @@ class ScalarDisplay:
         val_ = self._nom
         err_ = self._err
 
-        vformat, eformat = pdg_round(val_, err_)
+        vformat, eformat = pdg_round(val_, err_, format_spec=fmt, return_zero=True)
         if eformat == "":
             return f"{vformat}"
         else:

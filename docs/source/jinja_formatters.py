@@ -23,8 +23,7 @@ def _format_function_defaults(docstring: str, obj_args: str) -> str:
             for j in range(i + 1, len(lines)):
                 if lines[j].startswith(":") or lines[j] == "":
                     break
-                else:
-                    num_lines += 1
+                num_lines += 1
 
             for k in range(i, i + num_lines):
                 description += lines[k]
@@ -199,7 +198,7 @@ def format_function_defaults(docstring: str, obj_args: str) -> str:
 
 def format_alias(str_in: str) -> str:
     """
-    Assists with formatting type aliases in `lotus.core.type`.
+    Assists with formatting type aliases.
 
     Indentation and spaces are very important. Do not adjust unless you understand them fully.
 
@@ -218,7 +217,7 @@ def format_alias(str_in: str) -> str:
 
 def format_typevar(str_in: str) -> str:
     """
-    Assists with formatting type variables in `lotus.core.type`.
+    Assists with formatting type variables.
 
     Indentation and spaces are very important. Do not adjust unless you understand them fully.
 
