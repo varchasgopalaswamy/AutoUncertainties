@@ -6,7 +6,7 @@ import copy
 import locale
 import math
 import operator
-from typing import Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
@@ -24,11 +24,14 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
+if TYPE_CHECKING:
+    from pint.facets.plain import PlainQuantity
+
+
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
 __all__ = [
-    "SType",
     "ScalarUncertainty",
     "UType",
     "Uncertainty",
@@ -40,11 +43,8 @@ __all__ = [
 ]
 
 
-UType = TypeVar("UType", np.ndarray, float, int)
+UType = TypeVar("UType", np.ndarray, float)
 """`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
-
-SType = TypeVar("SType", float, int)
-"""`TypeVar` specifying the scalar types used by `ScalarUncertainty` objects."""
 
 
 class Uncertainty(Generic[UType]):
@@ -114,12 +114,14 @@ class Uncertainty(Generic[UType]):
     @ignore_numpy_downcast_warnings
     def __new__(
         cls: type[Uncertainty],
-        value: UType | Uncertainty | Sequence[ScalarUncertainty] | Any,
-        err: UType | Any | None = None,
+        value: UType | Uncertainty | Sequence[Uncertainty] | PlainQuantity,
+        err: UType | PlainQuantity | None = None,
     ) -> Uncertainty:
-        # Note: some edge cases still need to be handled for typing purposes.
-        # See the comment in commit f652cc5 under this method.
-        # For now, the "Any" type has been listed as an input parameter.
+        # Note: The typing system needs improvement, including some edge cases here
+        # (see the comment in commit f652cc5 under this method).
+        # Some of the issues are related to explicitly allowing Pint Quantities,
+        # without actually importing Pint for compatibility. In general, the logic
+        # works as intended, but sometimes confuses static type checkers.
 
         # If instantiated with Quantity objects, call from_quantities
         if hasattr(value, "units") or hasattr(err, "units"):
@@ -139,6 +141,10 @@ class Uncertainty(Generic[UType]):
 
         # Zero error
         new_err = 0.0 if err is None else err
+
+        # Convert from int to float
+        new_err = float(new_err) if isinstance(new_err, int) else new_err
+        value = float(value) if isinstance(value, int) else value
 
         nan = False
         if np.isfinite(value):
@@ -160,8 +166,8 @@ class Uncertainty(Generic[UType]):
 
     def __init__(
         self,
-        value: UType | Uncertainty | Sequence[ScalarUncertainty] | Any,
-        err: UType | Any | None = None,
+        value: UType | Uncertainty | Sequence[Uncertainty] | PlainQuantity,
+        err: UType | PlainQuantity | None = None,
         *,
         trigger=False,
     ):
@@ -282,9 +288,9 @@ class Uncertainty(Generic[UType]):
             return Uncertainty(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err) -> Uncertainty:
+    def from_quantities(cls, value, err) -> Uncertainty | PlainQuantity:
         """
-        Create an `Quantity` object with uncertainty from one or more `pint.Quantity` objects.
+        Create a `pint.Quantity` object with uncertainty from one or more `~pint.Quantity` objects.
 
         :param value: The central value(s) of the `Uncertainty` object
         :param err: The uncertainty value(s) of the `Uncertainty` object
@@ -303,6 +309,17 @@ class Uncertainty(Generic[UType]):
 
            * If **only the** ``err`` argument is a `~pint.Quantity`, returns
              a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
+
+        .. code-block:: python
+           :caption: Example
+
+           >>> from pint import Quantity
+           >>> val = Quantity(2.24, 'kg')
+           >>> err = Quantity(0.208, 'kg')
+           >>> new_quantity = Uncertainty.from_quantities(val, err)
+           >>> new_quantity
+           <Quantity(2.24 +/- 0.208, 'kilogram')>
+
         """
 
         value_, err_, units = _check_units(value, err)
@@ -313,21 +330,30 @@ class Uncertainty(Generic[UType]):
 
     @classmethod
     def from_list(
-        cls, u_list: Sequence[ScalarUncertainty]
-    ) -> VectorUncertainty:  # pragma: no cover
+        cls, u_list: Sequence | np.ndarray
+    ) -> Uncertainty:  # pragma: no cover
         """
         Alias for `from_sequence`.
 
-        :param u_list: A list of `Uncertainty` objects.
+        :param u_list: A list whose elments support math operations.
         """
         return cls.from_sequence(u_list)
 
     @classmethod
-    def from_sequence(cls, seq: Sequence[ScalarUncertainty]) -> VectorUncertainty:
+    def from_sequence(cls, seq: Sequence | np.ndarray) -> Uncertainty:
         """
-        Create an `Uncertainty` object from a sequence of `Uncertainty` objects.
+        Create an `Uncertainty` object from a sequence of `Uncertainty` objects,
+        a `numpy.ndarray`, or other sequence supporting math operations.
 
         :param seq: A sequence of `Uncertainty` objects.
+
+        .. note::
+
+           If a sequence of objects *other than* `Uncertainty` objects is passed, all
+           errors in the resulting `VectorUncertainty` will be set to zero.
+
+           To instantiate a `VectorUncertainty` from two `~numpy.ndarray` objects (one for
+           the central values, one for the errors), call ``Uncertainty(vals, errs)`` directly.
         """
         _ = iter(seq)
 
@@ -824,7 +850,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
         return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
 
-class ScalarUncertainty(ScalarDisplay, Uncertainty[SType]):
+class ScalarUncertainty(ScalarDisplay, Uncertainty[float]):
     """Scalar `Uncertainty` class."""
 
     @property
@@ -983,9 +1009,9 @@ def std_devs(x) -> UType:
             try:
                 x2 = Uncertainty(x)
             except Exception:
-                return 0
+                return 0.0
             else:
                 if isinstance(x2, float):
-                    return 0
+                    return 0.0
                 else:
                     return x2.error
