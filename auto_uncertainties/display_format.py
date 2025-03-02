@@ -110,7 +110,7 @@ class ScalarDisplay:
         val_ = self._nom
         err_ = self._err
 
-        vformat, eformat = pdg_round(val_, err_)
+        vformat, eformat = pdg_round(val_, err_, format_spec=fmt, return_zero=True)
         if eformat == "":
             return f"{vformat}"
         else:
