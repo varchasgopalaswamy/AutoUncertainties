@@ -3,14 +3,6 @@ repos:
 - repo: local
   hooks:
   
-  - id: generate-init
-    name: Generates __init__.py files
-    language: python
-    entry: python hooks/generate_init.py
-    always_run: true
-    require_serial: true 
-    additional_dependencies: ["mkinit", "ruff"]
-
   - id: fix-line-endings
     name: Convert CRLF/CR endings to LF
     language: python
