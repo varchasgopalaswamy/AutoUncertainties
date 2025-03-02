@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 ROUND_ON_DISPLAY = False
 
-__all__ = ["set_display_rounding", "VectorDisplay", "ScalarDisplay"]
+__all__ = ["ScalarDisplay", "VectorDisplay", "set_display_rounding"]
 
 
 def set_display_rounding(val: bool):
@@ -75,8 +75,8 @@ class VectorDisplay:
 
 class ScalarDisplay:
     default_format: str = ""
-    _nom: float
-    _err: float
+    _nom: float | int
+    _err: float | int
 
     def _repr_html_(self):
         val_ = self._nom
@@ -169,13 +169,13 @@ def PDG_precision(std_dev):
 
     # Rules:
     if digits <= 354:
-        return (2, std_dev)
+        return 2, std_dev
     elif digits <= 949:
-        return (1, std_dev)
+        return 1, std_dev
     else:
         # The parentheses matter, for very small or very large
         # std_dev:
-        return (2, 10.0**exponent * (1000 / factor))
+        return 2, 10.0**exponent * (1000 / factor)
 
 
 def pdg_round(
@@ -184,13 +184,14 @@ def pdg_round(
     """
     Format a value with uncertainty according to PDG rounding rules.
 
-    Args:
-        value (float): The central value.
-        uncertainty (float): The uncertainty of the value.
+    :param value: The central value
+    :param uncertainty: The uncertainty of the value
+    :param format_spec:
+    :param return_zero:
 
-    Returns:
-        str: The formatted value with uncertainty.
+    :return: The formatted value with uncertainty.
     """
+
     if ROUND_ON_DISPLAY:
         if uncertainty is not None and uncertainty > 0:
             _, pdg_unc = PDG_precision(uncertainty)

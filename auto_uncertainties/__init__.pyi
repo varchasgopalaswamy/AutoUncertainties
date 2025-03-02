@@ -23,6 +23,7 @@ from .pandas import (
 )
 from .uncertainty import (
     ScalarUncertainty,
+    UType,
     Uncertainty,
     VectorUncertainty,
     nominal_values,
@@ -38,6 +39,7 @@ __all__ = [
     "NegativeStdDevError",
     "ScalarDisplay",
     "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "UncertaintyArray",
     "UncertaintyDtype",

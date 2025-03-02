@@ -13,6 +13,7 @@ __all__ = [
     "NegativeStdDevError",
     "ScalarDisplay",
     "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "UncertaintyArray",
     "UncertaintyDtype",

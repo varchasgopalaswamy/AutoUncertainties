@@ -19,6 +19,8 @@ __all__ = ["UncertaintyDtype"]
 
 @register_extension_dtype
 class UncertaintyDtype(ExtensionDtype):
+    """ """
+
     type = Uncertainty
     name = "Uncertainty"
     _match = re.compile(r"^[U|u]ncertainty(\[([A-Za-z0-9]+)\])?$")
@@ -38,11 +40,8 @@ class UncertaintyDtype(ExtensionDtype):
     def construct_array_type(cls) -> type_t[UncertaintyArray]:
         """
         Return the array type associated with this dtype.
-
-        Returns
-        -------
-        type
         """
+
         from .unc_array import UncertaintyArray
 
         return UncertaintyArray
@@ -60,38 +59,13 @@ class UncertaintyDtype(ExtensionDtype):
         expected. But subclasses can overwrite this method to accept
         parameters.
 
-        Parameters
-        ----------
-        string : str
-            The name of the type, for example ``category``.
+        :param string: The name of the type, for example ``category``
 
-        Returns
-        -------
-        ExtensionDtype
-            Instance of the dtype.
+        :raise TypeError: If a class cannot be constructed from this 'string'
 
-        Raises
-        ------
-        TypeError
-            If a class cannot be constructed from this 'string'.
-
-        Examples
-        --------
-        For extension dtypes with arguments the following may be an
-        adequate implementation.
-
-        >>> import re
-        >>> @classmethod
-        ... def construct_from_string(cls, string):
-        ...     pattern = re.compile(r"^my_type\[(?P<arg_name>.+)\]$")
-        ...     match = pattern.match(string)
-        ...     if match:
-        ...         return cls(**match.groupdict())
-        ...     else:
-        ...         raise TypeError(
-        ...             f"Cannot construct a '{cls.__name__}' from '{string}'"
-        ...         )
+        :return: Instance of the dtype
         """
+
         if not isinstance(string, str):
             msg = f"'construct_from_string' expects a string, got {type(string)}"
             raise TypeError(msg)
@@ -121,14 +95,9 @@ class UncertaintyDtype(ExtensionDtype):
         * it's an instance of this type and all of the attributes
           in ``self._metadata`` are equal between `self` and `other`.
 
-        Parameters
-        ----------
-        other : Any
-
-        Returns
-        -------
-        bool
+        :param other:
         """
+
         if isinstance(other, str):
             try:
                 other = self.construct_from_string(other)

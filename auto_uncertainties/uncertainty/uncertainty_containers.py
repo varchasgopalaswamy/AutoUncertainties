@@ -1,4 +1,4 @@
-# Based heavily on the implementation of pint's Quantity object
+# Based heavily on the implementation of Pint's Quantity object
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -6,12 +6,11 @@ import copy
 import locale
 import math
 import operator
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 import warnings
 
 import joblib
 import numpy as np
-from numpy.typing import NDArray
 
 from auto_uncertainties import (
     DowncastError,
@@ -25,253 +24,261 @@ from auto_uncertainties.util import (
     ignore_runtime_warnings,
 )
 
+if TYPE_CHECKING:
+    from pint.facets.plain import PlainQuantity
+
+
 ERROR_ON_DOWNCAST = False
 COMPARE_RTOL = 1e-9
 
 __all__ = [
+    "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "VectorUncertainty",
-    "ScalarUncertainty",
-    "set_downcast_error",
-    "set_compare_error",
     "nominal_values",
+    "set_compare_error",
+    "set_downcast_error",
     "std_devs",
 ]
 
 
-def set_downcast_error(val: bool):
-    """Set whether errors occur when uncertainty is stripped"""
-    global ERROR_ON_DOWNCAST
-    ERROR_ON_DOWNCAST = val
+UType = TypeVar("UType", np.ndarray, float)
+"""`TypeVar` specifying the supported underlying types wrapped by `Uncertainty` objects."""
 
 
-def set_compare_error(val: float):
-    global COMPARE_RTOL
-    COMPARE_RTOL = val
+class Uncertainty(Generic[UType]):
+    """
+    Base class for `Uncertainty` objects.
 
+    Parameters can be numbers, `numpy` arrays, `pint.Quantity` objects,
+    other `Uncertainty` objects, or lists / tuples of `Uncertainty` objects.
 
-def _check_units(value, err):
-    mag_has_units = hasattr(value, "units")
-    mag_units = getattr(value, "units", None)
-    err_has_units = hasattr(err, "units")
-    err_units = getattr(err, "units", None)
+    Generally, it is sipmler to let AutoUncertainties determine whether to
+    instantiate a `VectorUncertainty` or a `ScalarUncertainty` based on the
+    arguments passed to `Uncertainty`:
 
-    if mag_has_units and mag_units is not None:
-        Q = mag_units._REGISTRY.Quantity
-        ret_val = Q(value).to(mag_units).m
-        ret_err = Q(err).to(mag_units).m if err is not None else None
-        ret_units = mag_units
-    # This branch will never actually work, but its here
-    # to raise a Dimensionality error without needing to import pint
-    elif err_has_units:
-        Q = err_units._REGISTRY.Quantity  # type: ignore
-        ret_val = Q(value).to(err_units).m
-        ret_err = Q(err).to(err_units).m
-        ret_units = err_units
-    else:
-        ret_units = None
-        ret_val = value
-        ret_err = err
+    .. code-block:: python
+       :caption: Example
 
-    return ret_val, ret_err, ret_units
+       # Creates a ScalarUncertainty
+       s = Uncertainty(10, 1.5)
 
+       # Creats a VectorUncertainty
+       v = Uncertainty(np.array([1, 2, 3]), np.array([1.5, 1.2, 1.1])
 
-def nominal_values(x) -> T:
-    """Return the central value of an Uncertainty object if it is one, otherwise returns the object"""
-    # Is an Uncertainty
-    if hasattr(x, "_nom"):
-        return x.value
-    else:
-        if np.ndim(x) > 0:
-            try:
-                x2 = Uncertainty.from_sequence(x)
-            except Exception:
-                return x
-            else:
-                return x2.value
-        else:
-            try:
-                x2 = Uncertainty(x)
-            except Exception:
-                return x
-            else:
-                if isinstance(x2, float):
-                    return x2
-                else:
-                    return x2.value
+    However, users can also directly instantiate `ScalarUncertainty` or
+    `VectorUncertainty` objects if necessary:
 
+    .. code-block:: python
+       :caption: Example
 
-def std_devs(x) -> T:
-    """Return the uncertainty of an Uncertainty object if it is one, otherwise returns zero"""
-    # Is an Uncertainty
-    if hasattr(x, "_err"):
-        return x.error
-    else:
-        if np.ndim(x) > 0:
-            try:
-                x2 = Uncertainty.from_sequence(x)
-            except Exception:
-                return np.zeros_like(x)
-            else:
-                return x2.error
-        else:
-            try:
-                x2 = Uncertainty(x)
-            except Exception:
-                return 0
-            else:
-                if isinstance(x2, float):
-                    return 0
-                else:
-                    return x2.error
+       s = ScalarUncertainty(10, 1.5)
+       v = VectorUncertainty(np.array([1, 2, 3]), np.array([1.5, 1.2, 1.1])
 
+    :param value: The central value(s)
+    :param err: The uncertainty value(s). Zero if not provided.
 
-ST = TypeVar("ST", float, int)
-T = TypeVar("T", NDArray, float, int)
+    :raise NegativeStdDevError: If ``err`` is negative, or contains negative values
 
+    :return: A `ScalarUncertainty`, `VectorUncertainty`, or `np.nan`
 
-class Uncertainty(Generic[T]):
-    """Base class for Uncertainty objects
+    .. note::
 
+       * If `pint.Quantity` objects are supplied for either parameter, the behavior
+         is exactly as described in the `from_quantities` method.
 
-    Parameters
-    ----------
+       * If an `Uncertainty` is supplied for ``value``, its ``error`` attribute will
+         override any ``err`` argument (if it is supplied).
 
-    value :
-        The central value(s)
+       * If the ``value`` parameter is `~np.nan`, returns `~np.nan` (raw `float` value).
 
-    err:
-        The uncertainty value(s). Zero if not provided. Negative numbers raise a RuntimeError.
+    .. seealso::
 
+        * `from_quantities`
     """
 
-    _nom: T
-    _err: T
+    _nom: UType
+    _err: UType
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, UType]:
         return {"nominal_value": self._nom, "std_devs": self._err}
 
-    def __setstate__(self, state):
+    def __setstate__(self, state) -> None:
         self._nom = state["nominal_value"]
         self._err = state["std_devs"]
 
-    def __getnewargs__(self):
-        return (self._nom, self._err)
+    def __getnewargs__(self) -> tuple[UType, UType]:
+        return self._nom, self._err
 
     @ignore_numpy_downcast_warnings
-    def __new__(cls: type[Uncertainty], value: T | Uncertainty, err=None):
-        # If instantiated with an Uncertainty subclass
-        if isinstance(value, ScalarUncertainty | VectorUncertainty):
-            err = value.error
-            value = value.value
+    def __new__(
+        cls: type[Uncertainty],
+        value: UType | Uncertainty | Sequence[Uncertainty] | PlainQuantity,
+        err: UType | PlainQuantity | None = None,
+    ) -> Uncertainty:
+        # Note: The typing system needs improvement, including some edge cases here
+        # (see the comment in commit f652cc5 under this method).
+        # Some of the issues are related to explicitly allowing Pint Quantities,
+        # without actually importing Pint for compatibility. In general, the logic
+        # works as intended, but sometimes confuses static type checkers.
+
+        # If instantiated with Quantity objects, call from_quantities
+        if hasattr(value, "units") or hasattr(err, "units"):
+            return cls.from_quantities(value, err)
+
         # If instantiated with a list or tuple of uncertainties
-        elif isinstance(value, list | tuple):
-            inst = cls.from_list(value)
-            value = inst.value
-            err = inst.error
+        elif isinstance(value, Sequence):
+            return cls.from_sequence(value)
+
+        # If instantiated with an Uncertainty subclass (even recursively)
+        elif isinstance(value, Uncertainty):
+            return cls(value.value, value.error)
+
+        # Numpy arrays
+        elif isinstance(value, np.ndarray) and value.ndim > 0:
+            return cls._new_vec(value, err)
+
+        # Zero error
+        new_err = 0.0 if err is None else err
+
+        # Convert from int to float
+        new_err = float(new_err) if isinstance(new_err, int) else new_err
+        value = float(value) if isinstance(value, int) else value
 
         nan = False
-        # Numpy arrays
-        if np.ndim(value) > 0:
-            vector = True
-            # Zero error
-            if err is None:
-                err = np.zeros_like(value)
-            else:
-                # Constant error
-                if np.ndim(err) == 0:
-                    err = np.ones_like(value) * err
-                else:
-                    assert np.ndim(value) == np.ndim(err)
-                    assert np.shape(value) == np.shape(err)
-            # replace NaN with zero in errors
-            err[~np.isfinite(err)] = 0
-
-            if np.any(err < 0):
-                msg = f"Found {np.count_nonzero(err < 0)} negative values for the standard deviation!"
+        if np.isfinite(value):
+            if np.isfinite(new_err) and new_err < 0:
+                msg = f"Found negative value ({err}) for the standard deviation!"
                 raise NegativeStdDevError(msg)
+            elif not np.isfinite(new_err):
+                new_err = 0.0
         else:
-            vector = False
-            if np.isfinite(value):
-                nan = False
-                if np.isfinite(err) and err < 0:
-                    msg = f"Found negative value ({err}) for the standard deviation!"
-                    raise NegativeStdDevError(msg)
-                elif err is None or not np.isfinite(err):
-                    err = 0.0
-            else:
-                nan = True
+            nan = True
 
         if nan:
             inst = np.nan
         else:
-            if vector:
-                inst = object.__new__(VectorUncertainty)
-            else:
-                inst = object.__new__(ScalarUncertainty)
+            inst = object.__new__(ScalarUncertainty)
+            inst.__init__(value, new_err, trigger=True)
 
-            inst.__init__(value, err, trigger=True)
         return inst
 
-    def __init__(self, value: T, err: T | None, *, trigger=False):
+    def __init__(
+        self,
+        value: UType | Uncertainty | Sequence[Uncertainty] | PlainQuantity,
+        err: UType | PlainQuantity | None = None,
+        *,
+        trigger=False,
+    ):
         if trigger:
             if hasattr(value, "units") or hasattr(err, "units"):
-                msg = "Uncertainty cannot have units! Call Uncertainty.from_quantities instead."
-                raise NotImplementedError(msg)
+                msg = "Parameters 'value' or 'err' should not have the 'units' attribute at this point."
+                raise ValueError(msg)
+
+            if isinstance(value, Uncertainty):
+                msg = "The 'value' parameter should not be an Uncertainty object at this point."
+                raise ValueError(msg)
+
+            if isinstance(value, Sequence):
+                msg = "The 'value' parameter should not be a Sequence subclass at this point."
+                raise ValueError(msg)
+
+            if err is None:
+                msg = "'err' should not be None at the point."
+                raise ValueError(msg)
 
             self._nom = value
             self._err = err
 
-    def __copy__(self) -> Uncertainty[T]:
+    @staticmethod
+    def _new_vec(value: np.ndarray, err: UType | None = None) -> VectorUncertainty:
+        # Zero error
+        if err is None:
+            new_err = np.zeros_like(value)
+
+        # Constant error
+        elif np.isscalar(err):
+            new_err = np.ones_like(value) * err
+
+        # Array of errors
+        elif isinstance(err, np.ndarray):
+            new_err = err
+            assert np.ndim(value) == np.ndim(new_err)
+            assert np.shape(value) == np.shape(new_err)
+
+        else:
+            msg = f"Unsupported value for 'err' (got {type(err)})"
+            raise ValueError(msg)
+
+        # replace NaN with zero in errors
+        new_err[~np.isfinite(new_err)] = 0
+
+        if np.any(new_err < 0):
+            msg = f"Found {np.count_nonzero(new_err < 0)} negative values for the standard deviation!"
+            raise NegativeStdDevError(msg)
+
+        inst = object.__new__(VectorUncertainty)
+        inst.__init__(value, new_err, trigger=True)
+        return inst
+
+    def __copy__(self) -> Uncertainty[UType]:
         return self.__class__(copy.copy(self._nom), copy.copy(self._err))
 
-    def __deepcopy__(self, memo) -> Uncertainty[T]:
+    def __deepcopy__(self, memo) -> Uncertainty[UType]:
         return self.__class__(
             copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo)
         )
 
     @property
-    def value(self) -> T:
-        """The central value of the Uncertainty object"""
+    def value(self) -> UType:
+        """The central value of the `Uncertainty` object."""
         return self._nom
 
     @property
-    def error(self) -> T:
-        """The uncertainty value of the Uncertainty object"""
+    def error(self) -> UType:
+        """The uncertainty (error) value of the `Uncertainty` object."""
         return self._err
 
     @property
-    def relative(self) -> T:
-        """The relative uncertainty of the Uncertainty object"""
+    def relative(self) -> UType:  # pragma: no cover
+        """The relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
     @property
-    def rel(self) -> T:
-        """Alias for relative property"""
+    def rel(self) -> UType:
+        """Alias for relative property."""
         return self.relative
 
     @property
-    def rel2(self) -> T:
-        """The square of the relative uncertainty of the Uncertainty object"""
+    def rel2(self) -> UType:  # pragma: no cover
+        """The square of the relative uncertainty of the `Uncertainty` object."""
         raise NotImplementedError
 
-    def plus_minus(self, err: T):
-        """Add an error to the Uncertainty object"""
+    def plus_minus(self, err: UType) -> Uncertainty:
+        """
+        Add an error to the `Uncertainty` object.
+
+        Returns a new instance.
+
+        :param err: Error value to add
+        """
+
         val = self._nom
         old_err = self._err
         new_err = np.sqrt(old_err**2 + err**2)
 
-        return self.__class__(val, new_err)
+        return Uncertainty(val, new_err)
 
-    @classmethod
-    def from_string(cls, string: str):
-        """Create an Uncertainty object from a string representation of the value and error.
-
-        Parameters
-        ----------
-        string : str
-            A string representation of the value and error. The error can be represented as "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
+    @staticmethod
+    def from_string(string: str) -> Uncertainty:
         """
+        Create an `Uncertainty` object from a string representation of the value and error.
+
+        :param string: A string representation of the value and error. The error can be represented as
+            "+/-" or "±". For instance, 5.0 +- 1.0 or 5.0 ± 1.0.
+        """
+
         new_str = string.replace("+/-", "±")
         new_str = new_str.replace("+-", "±")
         if "±" not in new_str:
@@ -281,16 +288,40 @@ class Uncertainty(Generic[T]):
             return Uncertainty(float(u1), float(u2))
 
     @classmethod
-    def from_quantities(cls, value, err):
-        """Create an Uncertainty object from two `Pint` quantities
-
-        Parameters
-        ----------
-        value : pint.Quantity
-            The central value of the Uncertainty object
-        err : pint.Quantity
-            The uncertainty value of the Uncertainty object
+    def from_quantities(cls, value, err) -> Uncertainty | PlainQuantity:
         """
+        Create a `pint.Quantity` object with uncertainty from one or more `~pint.Quantity` objects.
+
+        :param value: The central value(s) of the `Uncertainty` object
+        :param err: The uncertainty value(s) of the `Uncertainty` object
+
+        .. note::
+
+           * If **neither** argument is a `~pint.Quantity`, returns a regular
+             `Uncertainty` object.
+
+           * If **both** arguments are `~pint.Quantity` objects, returns a
+             `~pint.Quantity` (wrapped `Uncertainty`) with the same units as
+             ``value`` (attempts to convert ``err`` to ``value.units``).
+
+           * If **only the** ``value`` argument is a `~pint.Quantity`, returns
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``value``.
+
+           * If **only the** ``err`` argument is a `~pint.Quantity`, returns
+             a `~pint.Quantity` (wrapped `Uncertainty`) object with the same units as ``err``.
+
+        .. code-block:: python
+           :caption: Example
+
+           >>> from pint import Quantity
+           >>> val = Quantity(2.24, 'kg')
+           >>> err = Quantity(0.208, 'kg')
+           >>> new_quantity = Uncertainty.from_quantities(val, err)
+           >>> new_quantity
+           <Quantity(2.24 +/- 0.208, 'kilogram')>
+
+        """
+
         value_, err_, units = _check_units(value, err)
         inst = cls(value_, err_)
         if units is not None:
@@ -298,24 +329,31 @@ class Uncertainty(Generic[T]):
         return inst
 
     @classmethod
-    def from_list(cls, u_list: Sequence[Uncertainty]):
-        """Create an Uncertainty object from a list of Uncertainty objects
+    def from_list(
+        cls, u_list: Sequence | np.ndarray
+    ) -> Uncertainty:  # pragma: no cover
+        """
+        Alias for `from_sequence`.
 
-        Parameters
-        ----------
-        u_list :
-            A list of Uncertainty objects
+        :param u_list: A list whose elments support math operations.
         """
         return cls.from_sequence(u_list)
 
     @classmethod
-    def from_sequence(cls, seq: Sequence[Uncertainty]):
-        """Create an Uncertainty object from a sequence of Uncertainty objects
+    def from_sequence(cls, seq: Sequence | np.ndarray) -> Uncertainty:
+        """
+        Create an `Uncertainty` object from a sequence of `Uncertainty` objects,
+        a `numpy.ndarray`, or other sequence supporting math operations.
 
-        Parameters
-        ----------
-        seq :
-            A list of Uncertainty objects
+        :param seq: A sequence of `Uncertainty` objects.
+
+        .. note::
+
+           If a sequence of objects *other than* `Uncertainty` objects is passed, all
+           errors in the resulting `VectorUncertainty` will be set to zero.
+
+           To instantiate a `VectorUncertainty` from two `~numpy.ndarray` objects (one for
+           the central values, one for the errors), call ``Uncertainty(vals, errs)`` directly.
         """
         _ = iter(seq)
 
@@ -325,17 +363,18 @@ class Uncertainty(Generic[T]):
         if len_seq > 0:
             first_item = seq[0]
             try:
-                first_item + 1
+                _ = first_item + 1
             except TypeError:
-                msg = f"Sequence elements of type {type(first_item)} dont support math operations!"
+                msg = f"Sequence elements of type {type(first_item)} don't support math operations!"
                 raise TypeError(msg) from None
             if hasattr(first_item, "units"):
-                val *= first_item.units
-                err *= first_item.units
+                # Note: This could use from_quantities at some point in the future.
+                val *= first_item.units  # type: ignore
+                err *= first_item.units  # type: ignore
             for i, seq_i in enumerate(seq):
                 try:
-                    val[i] = float(seq_i._nom)
-                    err[i] = float(seq_i._err)
+                    val[i] = float(seq_i.value)
+                    err[i] = float(seq_i.error)
                 except AttributeError:
                     val[i] = float(seq_i)
                     err[i] = 0
@@ -444,7 +483,6 @@ class Uncertainty(Generic[T]):
         elif isinstance(other, self._HANDLED_TYPES):
             new_mag = other // self._nom
             new_err = self.__rdiv__(other).error
-
             return self.__class__(new_mag, new_err)
         else:
             return NotImplemented
@@ -460,19 +498,20 @@ class Uncertainty(Generic[T]):
         return self.__class__(new_mag, new_err)
 
     def __rmod__(self, other):
-        new_mag = other % self._nom
-        if np.ndim(new_mag) == 0:
-            new_err = 0.0
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_err = np.zeros_like(new_mag)
+        if isinstance(other, self._HANDLED_TYPES):
+            new_mag = other % self._nom
+            if np.ndim(new_mag) == 0:
+                new_err = 0.0
+            else:
+                new_err = np.zeros_like(new_mag)
+            return self.__class__(new_mag, new_err)
         else:
             return NotImplemented
-        return self.__class__(new_mag, new_err)
 
-    def __divmod__(self, other):
+    def __divmod__(self, other):  # pragma: no cover
         return self // other, self % other
 
-    def __rdivmod__(self, other):
+    def __rdivmod__(self, other):  # pragma: no cover
         return other // self, other % self
 
     @ignore_runtime_warnings
@@ -491,7 +530,7 @@ class Uncertainty(Generic[T]):
             return NotImplemented
 
         new_mag = A**B
-        new_err = new_err = np.abs(new_mag) * np.sqrt(
+        new_err = np.abs(new_mag) * np.sqrt(
             (B / A * sA) ** 2 + (np.log(np.abs(A)) * sB) ** 2
         )
 
@@ -590,6 +629,8 @@ class Uncertainty(Generic[T]):
 
 
 class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
+    """Vector `Uncertainty` class."""
+
     __apply_to_both_ndarray__ = (
         "flatten",
         "real",
@@ -632,10 +673,18 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             msg = f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
             raise AttributeError(msg) from None
 
-    def __init__(self, value: T, err: T | None = None, *, trigger=False):
+    def __init__(
+        self,
+        value: np.ndarray | VectorUncertainty,
+        err: np.ndarray | None = None,
+        *,
+        trigger=False,
+    ):
         if trigger:
-            super().__init__(value=value, err=err, trigger=trigger)
-            if np.ndim(self._nom) == 0:
+            super().__init__(value, err, trigger=trigger)
+
+            # This should not be executed, as the parent class should account for this
+            if np.ndim(self._nom) == 0:  # pragma: no cover
                 msg = "VectorUncertainty must have a dimension greater than 0!"
                 raise ValueError(msg)
 
@@ -683,16 +732,18 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             )
             return np.asarray(self._nom)
 
-    def clip(self, min=None, max=None, out=None, **kwargs):  # noqa: A002
-        """Numpy clip implementation"""
+    def clip(self, min=None, max=None, out=None, **kwargs) -> Uncertainty:  # noqa: A002
+        """NumPy `~numpy.ndarray.clip` implementation."""
         return self.__class__(self._nom.clip(min, max, out, **kwargs), self._err)
 
     def fill(self, value) -> None:
-        """Numpy fill implementation"""
+        """NumPy `~numpy.ndarray.fill` implementation."""
         return self._nom.fill(value)
 
-    def put(self, indices, values, mode="raise") -> None:
-        """Numpy put implementation"""
+    def put(
+        self, indices, values, mode: Literal["raise", "wrap", "clip"] = "raise"
+    ) -> None:
+        """NumPy `~numpy.ndarray.put` implementation."""
         if isinstance(values, self.__class__):
             self._nom.put(indices, values._nom, mode)
             self._err.put(indices, values._err, mode)
@@ -701,19 +752,19 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             raise TypeError(msg)
 
     def copy(self):
-        """Return a copy of the Uncertainty object"""
+        """Return a copy of the `Uncertainty` object."""
         return Uncertainty(self._nom.copy(), self._err.copy())
 
     # Special properties
     @property
     def flat(self):
-        """ "numpy flat implementation"""
-        for u, v in (self._nom.flat, self._err.flat):
+        """NumPy `~numpy.ndarray.flat` implementation."""
+        for u, v in zip(self._nom.flat, self._err.flat, strict=False):
             yield self.__class__(u, v)
 
     @property
     def shape(self):
-        """Numpy shape implemenetation"""
+        """NumPy `~numpy.ndarray.shape` implemenetation."""
         return self._nom.shape
 
     @shape.setter
@@ -723,11 +774,11 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def nbytes(self):
-        """Numpy nbytes implementation"""
+        """NumPy `~numpy.ndarray.nbytes` implementation."""
         return self._nom.nbytes + self._err.nbytes
 
-    def searchsorted(self, v, side="left", sorter=None):
-        """numpy searchsorted implementation"""
+    def searchsorted(self, v, side: Literal["left", "right"] = "left", sorter=None):
+        """NumPy `~numpy.ndarray.searchsorted` implementation."""
         return self._nom.searchsorted(v, side)
 
     def __len__(self) -> int:
@@ -736,9 +787,9 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
     def __getitem__(self, key):
         try:
             return Uncertainty(self._nom[key], self._err[key])
-        except TypeError:
+        except IndexError as e:
             msg = f"Index {key} not supported!"
-            raise TypeError(msg) from None
+            raise IndexError(msg) from e
 
     def __setitem__(self, key, value):
         # If value is nan, just set the value in those regions to nan and return. This is the only case where a scalar can be passed as an argument!
@@ -753,7 +804,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
         try:
             _ = self._nom[key]
-        except ValueError as exc:
+        except TypeError as exc:
             msg = f"Object {type(self._nom)} does not support indexing"
             raise ValueError(msg) from exc
 
@@ -765,7 +816,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
             self._err[key] = value._err
 
     def tolist(self):
-        """numpy tolist implementation"""
+        """NumPy `~numpy.ndarray.tolist` implementation."""
         try:
             nom = self._nom.tolist()
             err = self._err.tolist()
@@ -778,7 +829,7 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
                         if isinstance(n, list)
                         else self.__class__(n, e)
                     )
-                    for n, e in (nom, err)
+                    for n, e in zip(nom, err, strict=False)
                 ]
         except AttributeError:
             msg = f"{type(self._nom).__name__}' does not support tolist."
@@ -786,19 +837,22 @@ class VectorUncertainty(VectorDisplay, Uncertainty[np.ndarray]):
 
     @property
     def ndim(self):
-        """numpy ndim implementation"""
+        """NumPy `~numpy.ndarray.ndim` implementation."""
         return np.ndim(self._nom)
 
     def view(self):
-        """numpy view implementation"""
+        """NumPy `~numpy.ndarray.view` implementation."""
         return self.__class__(self._nom.view(), self._err.view())
 
     def __hash__(self) -> int:
         digest = joblib.hash((self._nom, self._err), hash_name="sha1")
+        digest = "" if digest is None else digest
         return int.from_bytes(bytes(digest, encoding="utf-8"), "big")
 
 
-class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
+class ScalarUncertainty(ScalarDisplay, Uncertainty[float]):
+    """Scalar `Uncertainty` class."""
+
     @property
     def relative(self):
         try:
@@ -823,11 +877,11 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
 
     def __int__(self):
         if ERROR_ON_DOWNCAST:
-            msg = "The uncertainty is stripped when downcasting to float."
+            msg = "The uncertainty is stripped when downcasting to int."
             raise DowncastError(msg)
         else:
             warnings.warn(
-                "The uncertainty is stripped when downcasting to float.",
+                "The uncertainty is stripped when downcasting to int.",
                 DowncastWarning,
                 stacklevel=2,
             )
@@ -846,7 +900,7 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
         return complex(self._nom)
 
     def __round__(self, ndigits):
-        return self.__class__(round(self._nom, ndigits=ndigits), self._err)
+        return Uncertainty(round(self._nom, ndigits=ndigits), self._err)
 
     @property
     def rel2(self):
@@ -874,3 +928,90 @@ class ScalarUncertainty(ScalarDisplay, Uncertainty[ST]):
 
     def __hash__(self) -> int:
         return hash((self._nom, self._err))
+
+
+def set_downcast_error(val: bool) -> None:
+    """Set whether errors occur when uncertainty is stripped."""
+    global ERROR_ON_DOWNCAST
+    ERROR_ON_DOWNCAST = val
+
+
+def set_compare_error(val: float) -> None:  # pragma: no cover
+    global COMPARE_RTOL
+    COMPARE_RTOL = val
+
+
+def _check_units(value, err) -> tuple[Any, Any, Any]:
+    mag_has_units = hasattr(value, "units")
+    mag_units = getattr(value, "units", None)
+    err_has_units = hasattr(err, "units")
+    err_units = getattr(err, "units", None)
+
+    if mag_has_units and mag_units is not None:
+        Q = mag_units._REGISTRY.Quantity
+        ret_val = Q(value.m, value.units).to(mag_units).m
+        ret_err = Q(err.m, err.units).to(mag_units).m if err_has_units else err
+        ret_units = mag_units
+    # This branch will never actually work, but it's here
+    # to raise a Dimensionality error without needing to import pint
+    elif err_has_units:
+        Q = err_units._REGISTRY.Quantity  # type: ignore
+        ret_val = Q(value).to(err_units).m
+        ret_err = Q(err.m, err.units).to(err_units).m
+        ret_units = err_units
+    else:
+        ret_units = None
+        ret_val = value
+        ret_err = err
+
+    return ret_val, ret_err, ret_units
+
+
+def nominal_values(x) -> UType:
+    """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
+    # Is an Uncertainty
+    if hasattr(x, "_nom"):
+        return x.value
+    else:
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return x
+            else:
+                return x2.value
+        else:
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return x
+            else:
+                if isinstance(x2, float):
+                    return x2
+                else:
+                    return x2.value
+
+
+def std_devs(x) -> UType:
+    """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
+    # Is an Uncertainty
+    if hasattr(x, "_err"):
+        return x.error
+    else:
+        if np.ndim(x) > 0:
+            try:
+                x2 = Uncertainty.from_sequence(x)
+            except Exception:
+                return np.zeros_like(x)
+            else:
+                return x2.error
+        else:
+            try:
+                x2 = Uncertainty(x)
+            except Exception:
+                return 0.0
+            else:
+                if isinstance(x2, float):
+                    return 0.0
+                else:
+                    return x2.error

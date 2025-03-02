@@ -2,6 +2,7 @@ from . import uncertainty_containers
 
 from .uncertainty_containers import (
     ScalarUncertainty,
+    UType,
     Uncertainty,
     VectorUncertainty,
     nominal_values,
@@ -12,6 +13,7 @@ from .uncertainty_containers import (
 
 __all__ = [
     "ScalarUncertainty",
+    "UType",
     "Uncertainty",
     "VectorUncertainty",
     "nominal_values",
