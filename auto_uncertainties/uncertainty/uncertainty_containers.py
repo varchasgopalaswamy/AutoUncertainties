@@ -62,10 +62,10 @@ class Uncertainty(Generic[UType]):
        :caption: Example
 
        # Creates a ScalarUncertainty
-       s = Uncertainty(10, 1.5)
+       s = Uncertainty(10.0, 1.5)
 
        # Creats a VectorUncertainty
-       v = Uncertainty(np.array([1, 2, 3]), np.array([1.5, 1.2, 1.1])
+       v = Uncertainty(np.array([1.0, 2.0, 3.0]), np.array([1.5, 1.2, 1.1])
 
     However, users can also directly instantiate `ScalarUncertainty` or
     `VectorUncertainty` objects if necessary:
@@ -73,8 +73,8 @@ class Uncertainty(Generic[UType]):
     .. code-block:: python
        :caption: Example
 
-       s = ScalarUncertainty(10, 1.5)
-       v = VectorUncertainty(np.array([1, 2, 3]), np.array([1.5, 1.2, 1.1])
+       s = ScalarUncertainty(10.0, 1.5)
+       v = VectorUncertainty(np.array([1.0, 2.0, 3.0]), np.array([1.5, 1.2, 1.1])
 
     :param value: The central value(s)
     :param err: The uncertainty value(s). Zero if not provided.
