@@ -121,7 +121,9 @@ class TestScalarDisplay:
         sd = ScalarDisplay()
         sd._nom = f1
         sd._err = f2
-        assert sd.__format__("") == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+        assert (
+            sd.__format__("g") == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+        )
 
     @staticmethod
     def test_edge_cases():
@@ -134,7 +136,7 @@ class TestScalarDisplay:
         assert sd._repr_html_() == "10"
         assert sd._repr_latex_() == "10"
         assert sd.__str__() == "10"
-        assert sd.__format__("") == "10"
+        assert sd.__format__("g") == "10 +/- 0"
 
         set_display_rounding(False)  # reset state for rest of tests
 
