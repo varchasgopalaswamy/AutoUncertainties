@@ -105,9 +105,9 @@ class UncertaintyArray(ExtensionArray, ExtensionScalarOpsMixin):
         copy: bool = False,
     ):
         if errors is not None:
-            assert len(values) == len(
-                errors
-            ), "values and errors must have the same length"
+            assert len(values) == len(errors), (
+                "values and errors must have the same length"
+            )
         else:
             # Passed a UncertaintyArray
             if isinstance(values, (UncertaintyArray)):

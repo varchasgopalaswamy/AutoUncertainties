@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["NegativeStdDevError", "DowncastError", "DowncastWarning"]
+__all__ = ["DowncastError", "DowncastWarning", "NegativeStdDevError"]
 
 
 class NegativeStdDevError(Exception):

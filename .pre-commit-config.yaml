@@ -3,14 +3,6 @@ repos:
 - repo: local
   hooks:
   
-  - id: generate-init
-    name: Generates __init__.py files
-    language: python
-    entry: python hooks/generate_init.py
-    always_run: true
-    require_serial: true 
-    additional_dependencies: ["mkinit", "ruff"]
-
   - id: fix-line-endings
     name: Convert CRLF/CR endings to LF
     language: python
@@ -19,19 +11,19 @@ repos:
     types: ["text"]
     
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.6.0
+  rev: v5.0.0
   hooks:
   - id: check-executables-have-shebangs
   - id: check-symlinks
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.5.5
+  rev: v0.9.5
   hooks:
-    #Run the formatter.
-    - id: ruff-format
-      types_or: [ python, pyi, jupyter ]
     #Run the linter.
     - id: ruff
       types_or: [ python, pyi, jupyter ]
       args: [ --fix, --exit-zero ]
+    #Run the formatter.
+    - id: ruff-format
+      types_or: [ python, pyi, jupyter ]

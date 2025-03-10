@@ -402,8 +402,12 @@ class TestUncertainty:
     def test_init():
         scalar = Uncertainty(2, 3)
         vector = Uncertainty(np.array([1, 2, 3]), np.array([4, 5, 6]))
+        fake_vector = Uncertainty(np.array(3), np.array(4))
         assert isinstance(scalar, ScalarUncertainty)  # verify scalar type was chosen
         assert isinstance(vector, VectorUncertainty)  # verify vector type was chosen
+        assert isinstance(
+            fake_vector, ScalarUncertainty
+        )  # verify zero-D vectors become scalars
 
         # Verify inheritance
         assert isinstance(scalar, Uncertainty)
@@ -417,7 +421,7 @@ class TestUncertainty:
 
         # Check creating from a Sequence
         from_list = Uncertainty(
-            [Uncertainty(1, 2), Uncertainty(4, 5), Uncertainty(1.5, 9.25)]
+            [ScalarUncertainty(1, 2), ScalarUncertainty(4, 5), ScalarUncertainty(1, 9)]
         )
         assert isinstance(from_list, Uncertainty)
 
