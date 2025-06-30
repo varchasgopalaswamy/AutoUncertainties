@@ -72,9 +72,9 @@ be operated on by the `unumpy` suite of functions.
 
 For a function $f : \mathbb{R}^n \rightarrow \mathbb{R}^m$ of $n$ independent
 variables, linear uncertainty propagation can be computed via the simple rule 
-$$ \delta f_j (\mathbf x)^2 = \sum_i^n \left(\dfrac{\partial f_j}{\partial x_i} \delta x_i \right)^2, \quad\quad j \in [1, m].$$
+$$ \delta f_j (\mathbf x)^2 = \sum_i^n \left(\frac{\partial f_j}{\partial x_i} \delta x_i \right)^2, \quad\quad j \in [1, m].$$
 
-To compute $\dfrac{\partial f_j}{\partial x_i}$ for arbitrary $f$, the implementation in `AutoUncertainties` relies on
+To compute $\frac{\partial f_j}{\partial x_i}$ for arbitrary $f$, the implementation in `AutoUncertainties` relies on
 automatic differentiation provided by `JAX`. Calls to any `NumPy` array function or universal function (ufunc) are 
 intercepted via the `__array_function__` and `__array_ufunc__` mechanism, and dispatched to a `NumPy` wrapper routine 
 that computes the Jacobian matrix via `jax.jacfwd`.
