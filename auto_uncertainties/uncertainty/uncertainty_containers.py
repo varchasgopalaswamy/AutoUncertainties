@@ -52,6 +52,7 @@ __all__ = [
     "std_devs",
 ]
 
+G = TypeVar("G")
 T = TypeVar("T", float, np.floating, npt.NDArray[np.floating])
 """`TypeVar` specifying the underlying data types supporting `Uncertainty` objects."""
 
@@ -1226,7 +1227,11 @@ VectorUncertainty = Uncertainty
 ScalarUncertainty = Uncertainty
 """Alias for `Uncertainty` to maintain backward compatibility."""
 
-
+@overload 
+def nominal_values(x: Uncertainty[UType]) -> UType : ... 
+@overload 
+def nominal_values(x: G) -> G:... 
+    
 def nominal_values(x: Any) -> UType | Any:
     """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
     if isinstance(x, Uncertainty):
@@ -1242,8 +1247,12 @@ def nominal_values(x: Any) -> UType | Any:
             else:
                 return x2.value
 
-
-def std_devs(x: Any) -> UType | Any:
+@overload 
+def std_devs(x: Uncertainty[UType]) -> UType : ... 
+@overload 
+def std_devs(x: G) -> G:... 
+    
+def std_devs(x):
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     if isinstance(x, Uncertainty):
         return x.error
