@@ -1227,11 +1227,13 @@ VectorUncertainty = Uncertainty
 ScalarUncertainty = Uncertainty
 """Alias for `Uncertainty` to maintain backward compatibility."""
 
-@overload 
-def nominal_values(x: Uncertainty[UType]) -> UType : ... 
-@overload 
-def nominal_values(x: G) -> G:... 
-    
+
+@overload
+def nominal_values(x: Uncertainty[UType]) -> UType: ...
+@overload
+def nominal_values(x: G) -> G: ...
+
+
 def nominal_values(x: Any) -> UType | Any:
     """Return the central value of an `Uncertainty` object if it is one, otherwise returns the object."""
     if isinstance(x, Uncertainty):
@@ -1247,11 +1249,13 @@ def nominal_values(x: Any) -> UType | Any:
             else:
                 return x2.value
 
-@overload 
-def std_devs(x: Uncertainty[UType]) -> UType : ... 
-@overload 
-def std_devs(x: G) -> G:... 
-    
+
+@overload
+def std_devs(x: Uncertainty[UType]) -> UType: ...
+@overload
+def std_devs(x: G) -> G: ...
+
+
 def std_devs(x):
     """Return the uncertainty of an `Uncertainty` object if it is one, otherwise returns zero."""
     if isinstance(x, Uncertainty):

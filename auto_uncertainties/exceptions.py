@@ -46,6 +46,17 @@ class EqualityError(RuntimeError):
     """
 
 
+def set_numpy_kwargs_propagate_error(val: bool) -> None:
+    """
+    Set whether `EqualityError` should be raised instead of a warning when performing
+    an equality check between two `Uncertainty` objects with identical central values,
+    but different standard deviations.
+    """
+    from auto_uncertainties.numpy import numpy_wrappers
+
+    numpy_wrappers.ERROR_ON_KWARGS_PROP = val
+
+
 def set_equality_error(val: bool) -> None:
     """
     Set whether `EqualityError` should be raised instead of a warning when performing

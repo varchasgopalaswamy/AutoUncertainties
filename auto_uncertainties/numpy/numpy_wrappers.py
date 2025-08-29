@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import loguru
 import numpy as np
 
 from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
+
+ERROR_ON_KWARGS_PROP = True
+WARN_ON_KWARGS_PROP = True
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
@@ -112,6 +116,20 @@ def classify_and_split_args_and_kwargs(*args, **kwargs) -> tuple:
             uncert_arg_err.append(jnp.zeros_like(uncert_arg_nom[aidx]))
     uncert_arg_err = tuple(uncert_arg_err)
     uncert_kwarg_nom = {key: convert_arg(arg, "_nom") for key, arg in kwargs.items()}
+    uncert_kwarg_err = {
+        key: v
+        for key, arg in kwargs.items()
+        if (v := convert_arg(arg, "_err")) is not None
+    }
+    if len(uncert_kwarg_err) > 0:
+        msg = (
+            "Uncertainty propagation for keyword arguments is not supported. "
+            f"Found uncertainty info in keyword arguments: {list(uncert_kwarg_err.keys())}"
+        )
+        if ERROR_ON_KWARGS_PROP:
+            raise ValueError(msg)
+        elif WARN_ON_KWARGS_PROP:
+            loguru.logger.warning(msg)
     return uncert_argnums, uncert_arg_nom, uncert_arg_err, uncert_kwarg_nom
 
 
