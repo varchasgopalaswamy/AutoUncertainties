@@ -11,6 +11,18 @@ straightforward and automatic using auto-differentiation.
 
 * View the [full documentation here](https://autouncertainties.readthedocs.io/en/latest/). 
 
+* If you find this package useful, please consider citing it!
+```
+@article{gopalaswamy2025autouncertainties,
+  title={AutoUncertainties: A Python Package for Uncertainty Propagation},
+  author={Gopalaswamy, Varchas and Mentzer, Ethan},
+  journal={Journal of Open Source Software},
+  volume={10},
+  number={111},
+  pages={8037},
+  year={2025}
+}
+```
   
 ## Statement of Need
 
