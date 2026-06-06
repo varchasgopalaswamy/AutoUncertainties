@@ -2,7 +2,7 @@ when:
   event: [push, pull_request, tag, manual]
 
 matrix:
-  python_version: ['3.11', '3.12', '3.13', '3.14', '3.15']
+  python_version: ['3.11', '3.12', '3.13', '3.14']
 
 steps:
   - name: test
