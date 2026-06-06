@@ -36,5 +36,4 @@ __all__ = [
     "std_devs",
     "uncertainty",
     "uncertainty_containers",
-    "util",
 ]
