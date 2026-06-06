@@ -1,0 +1,28 @@
+when:
+  event: [push, pull_request, tag]
+
+matrix:
+  python_version: ['3.11', '3.12', '3.13', '3.14', '3.15']
+
+steps:
+  - name: test
+    image: python:${python_version}
+    commands:
+      - curl -LsSf https://astral.sh/uv/install.sh | sh 
+      - export PATH="$HOME/.local/bin:$PATH"
+      - uv tool install prek 
+      - ./scripts/ci/test.sh
+    when:
+      - event: [push, pull_request, tag]
+
+  - name: publish-pypi
+    image: python:${python_version}
+    environment:
+      PYPI_TOKEN:
+        from_secret: pypi_token
+    commands:
+      - curl -LsSf https://astral.sh/uv/install.sh | sh 
+      - export PATH="$HOME/.local/bin:$PATH"
+      - ./scripts/ci/publish-pypi.sh
+    when:
+      - event: tag

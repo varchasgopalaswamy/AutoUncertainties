@@ -3,6 +3,7 @@ from . import exceptions
 from . import jittable_function_wrapper
 from . import numpy
 from . import uncertainty
+from . import util
 
 from .display_format import (
     ScalarDisplay,
@@ -65,4 +66,5 @@ __all__ = [
     "std_devs",
     "uncertainty",
     "uncertainty_containers",
+    "util",
 ]
