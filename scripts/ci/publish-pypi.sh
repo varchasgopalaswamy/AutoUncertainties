@@ -10,4 +10,4 @@ export UV_SYSTEM_PYTHON="${UV_SYSTEM_PYTHON:-1}"
 
 uv sync
 uv run --with build python -m build
-uv run --with twine twine upload -u __token__ -p "${PYPI_TOKEN}" dist/*
+uv run --with twine twine upload --verbose -u __token__ -p "${PYPI_TOKEN}" dist/*
