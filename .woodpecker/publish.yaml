@@ -1,6 +1,9 @@
 when:
   event: manual
 
+depends_on:
+  - test
+
 steps:
   - name: publish-pypi
     image: python:3.14
