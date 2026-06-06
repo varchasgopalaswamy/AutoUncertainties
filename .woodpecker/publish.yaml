@@ -1,9 +1,6 @@
 when:
   event: manual
 
-depends_on:
-  - test
-
 steps:
   - name: publish-pypi
     image: python:3.14
@@ -13,4 +10,5 @@ steps:
     commands:
       - curl -LsSf https://astral.sh/uv/install.sh | sh
       - export PATH="$HOME/.local/bin:$PATH"
+      - git fetch --unshallow
       - ./scripts/ci/publish-pypi.sh
