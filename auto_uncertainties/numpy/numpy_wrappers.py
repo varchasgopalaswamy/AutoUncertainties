@@ -237,7 +237,7 @@ def implement_func(
         from auto_uncertainties import Uncertainty
 
         (
-            uncert_argnums,
+            _,
             uncert_arg_nom,
             uncert_arg_err,
             uncert_kwarg_nom,
@@ -580,7 +580,7 @@ def wrap_numpy(func_type, func, args, kwargs):
         if isinstance(func, str):
             name = func
         else:
-            name = ".".join(func.__module__.split(".")[1:] + [func.__name__])
+            name = ".".join([*func.__module__.split(".")[1:], func.__name__])
     elif func_type == "ufunc":
         handled = HANDLED_UFUNCS
         # ufuncs do not have func.__module__

@@ -132,7 +132,7 @@ def first_digit(value):
     Return 0 for a null value.
     """
     try:
-        return int(math.floor(math.log10(abs(value))))
+        return math.floor(math.log10(abs(value)))
     except ValueError:  # Case of value == 0
         return 0
 
@@ -197,21 +197,19 @@ def pdg_round(
         if uncertainty is not None and uncertainty > 0:
             _, pdg_unc = PDG_precision(uncertainty)
             # Determine the order of magnitude of the uncertainty
-            order_of_magnitude = 10 ** (int(math.floor(math.log10(pdg_unc))) - 1)
+            order_of_magnitude = 10 ** (math.floor(math.log10(pdg_unc)) - 1)
 
             # Round the uncertainty based on how many digits we want to keep
             rounded_uncertainty = (
                 round(pdg_unc / order_of_magnitude) * order_of_magnitude
             )
             # Round the central value according to the rounded uncertainty
-            unc_impled_digits_to_keep = -int(
-                math.floor(math.log10(rounded_uncertainty))
-            )
+            unc_impled_digits_to_keep = -math.floor(math.log10(rounded_uncertainty))
             if value != 0:
                 # Keep at least two digits for the central value, even if the uncertainty is much larger
                 digits = max(
                     unc_impled_digits_to_keep,
-                    -int(math.floor(math.log10(abs(value)))) + 1,
+                    -math.floor(math.log10(abs(value))) + 1,
                 )
             else:
                 digits = unc_impled_digits_to_keep

@@ -69,7 +69,7 @@ def propagate_uncertainties(
     @wraps(func)
     def wrapper(*args, **kwargs) -> Uncertainty:
         (
-            uncert_argnums,
+            _,
             uncert_arg_nom,
             uncert_arg_err,
             uncert_kwarg_nom,
