@@ -1,5 +1,5 @@
 when:
-  event: [push, pull_request, tag, manual]
+  event: [push, pull_request, manual]
 
 matrix:
   python_version: ["3.11", "3.12", "3.13", "3.14"]

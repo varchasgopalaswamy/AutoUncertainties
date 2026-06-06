@@ -1,5 +1,5 @@
 when:
-  event: tag
+  event: manual
 
 depends_on:
   - test
