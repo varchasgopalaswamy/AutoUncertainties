@@ -6,20 +6,13 @@ import math
 import numpy as np
 import numpy.typing as npt
 
-ROUND_ON_DISPLAY = False
+from auto_uncertainties.config import get_settings
 
 __all__ = [
     "ScalarDisplay",
     "UncertaintyDisplay",
     "VectorDisplay",
-    "set_display_rounding",
 ]
-
-
-def set_display_rounding(val: bool):
-    """Set the rounding on display to PDG recommendations."""
-    global ROUND_ON_DISPLAY
-    ROUND_ON_DISPLAY = val
 
 
 class UncertaintyDisplay:
@@ -149,34 +142,22 @@ def PDG_precision(std_dev):
     display.
     """
 
-    exponent = first_digit(std_dev)
+    uncertainty = decimal.Decimal(str(std_dev))
+    if not uncertainty.is_finite() or uncertainty <= 0:
+        msg = "Standard deviation must be positive and finite"
+        raise ValueError(msg)
 
-    # The first three digits are what matters: we get them as an
-    # integer number in [100; 999).
-    #
-    # In order to prevent underflow or overflow when calculating
-    # 10**exponent, the exponent is slightly modified first and a
-    # factor to be applied after "removing" the new exponent is
-    # defined.
-    #
-    # Furthermore, 10**(-exponent) is not used because the exponent
-    # range for very small and very big floats is generally different.
-    if exponent >= 0:
-        # The -2 here means "take two additional digits":
-        (exponent, factor) = (exponent - 2, 1)
-    else:
-        (exponent, factor) = (exponent + 1, 1000)
-    digits = int(std_dev / 10.0**exponent * factor)  # int rounds towards zero
-
-    # Rules:
+    exponent = uncertainty.adjusted()
+    leading = uncertainty.as_tuple().digits[:3]
+    digits = int("".join(str(digit) for digit in leading).ljust(3, "0"))
     if digits <= 354:
         return 2, std_dev
-    elif digits <= 949:
+    if digits <= 949:
         return 1, std_dev
-    else:
-        # The parentheses matter, for very small or very large
-        # std_dev:
-        return 2, 10.0**exponent * (1000 / factor)
+
+    # Carry to the next decade, retaining two significant digits.
+    effective = decimal.Decimal((0, (1,), exponent + 1))
+    return 2, effective if isinstance(std_dev, decimal.Decimal) else float(effective)
 
 
 def pdg_round(
@@ -193,36 +174,35 @@ def pdg_round(
     :return: The formatted value with uncertainty.
     """
 
-    if ROUND_ON_DISPLAY:
+    if not np.isfinite(value) or (
+        uncertainty is not None and not np.isfinite(uncertainty)
+    ):
+        return (
+            f"{value:{format_spec}}",
+            f"{uncertainty:{format_spec}}" if uncertainty is not None else "",
+        )
+
+    if get_settings().round_on_display:
         if uncertainty is not None and uncertainty > 0:
-            _, pdg_unc = PDG_precision(uncertainty)
-            # Determine the order of magnitude of the uncertainty
-            order_of_magnitude = 10 ** (math.floor(math.log10(pdg_unc)) - 1)
+            # String conversion supports NumPy scalars and avoids introducing
+            # binary float artifacts at PDG thresholds and rounding ties.
+            value_dec = decimal.Decimal(str(value))
+            uncertainty_dec = decimal.Decimal(str(uncertainty))
+            significant_digits, pdg_unc = PDG_precision(uncertainty_dec)
+            place = pdg_unc.adjusted() - significant_digits + 1
+            quantum = decimal.Decimal((0, (1,), place))
 
-            # Round the uncertainty based on how many digits we want to keep
-            rounded_uncertainty = (
-                round(pdg_unc / order_of_magnitude) * order_of_magnitude
-            )
-            # Round the central value according to the rounded uncertainty
-            unc_impled_digits_to_keep = -math.floor(math.log10(rounded_uncertainty))
-            if value != 0:
-                # Keep at least two digits for the central value, even if the uncertainty is much larger
-                digits = max(
-                    unc_impled_digits_to_keep,
-                    -math.floor(math.log10(abs(value))) + 1,
-                )
-            else:
-                digits = unc_impled_digits_to_keep
+            # Both components end at the same decimal place. A larger context
+            # also supports finite values with very large or small uncertainties.
+            with decimal.localcontext() as context:
+                context.prec = max(28, value_dec.adjusted() - place + 2)
+                context.rounding = decimal.ROUND_HALF_EVEN
+                rounded_value = value_dec.quantize(quantum)
+                rounded_uncertainty = pdg_unc.quantize(quantum)
 
-            # Use decimal to keep trailing zeros
-            rounded_value_dec = round(decimal.Decimal(value), digits)
-            rounded_unc_dec = round(
-                decimal.Decimal(rounded_uncertainty),
-                unc_impled_digits_to_keep + 1,
-            )
             return (
-                f"{rounded_value_dec:{format_spec}}",
-                f"{rounded_unc_dec:{format_spec}}",
+                f"{rounded_value:{format_spec}}",
+                f"{rounded_uncertainty:{format_spec}}",
             )
 
         else:

@@ -32,16 +32,13 @@ from auto_uncertainties import (
     NegativeStdDevError,
     UncertaintyDisplay,
 )
+from auto_uncertainties.config import get_settings
 from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
 from auto_uncertainties.util import deprecated, ignore_runtime_warnings
 
 if TYPE_CHECKING:
     from pint.facets.plain import PlainQuantity
 
-
-ERROR_ON_DOWNCAST = False
-ERROR_ON_EQ = False
-COMPARE_RTOL = 1e-9
 
 __all__ = [
     "ScalarUncertainty",
@@ -168,8 +165,9 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
        * If an `Uncertainty` is supplied for ``value``, its ``error`` attribute will
          always override any ``error`` argument (if it is supplied).
 
-       * If the ``error`` parameter is not finite, the resulting `Uncertainty` object
-         will have its ``error`` attribute set to zero.
+       * The default ``nonfinite_error_policy="zero"`` replaces non-finite errors
+         with zero. With ``"propagate"``, a NaN in either component sets both
+         components to NaN, and positive infinite errors are preserved.
 
     .. seealso::
 
@@ -278,7 +276,8 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
             if error is not None and not isinstance(error, ScalarT):
                 msg = f"Error must be a scalar when value is a scalar (got {type(error)} instead)"
                 raise TypeError(msg)
-            if error is not None and np.isfinite(error) and error < 0:
+            propagate = get_settings().nonfinite_error_policy == "propagate"
+            if error is not None and error < 0 and (np.isfinite(error) or propagate):
                 msg = f"Got negative value ({error}) for the standard deviation"
                 raise NegativeStdDevError(msg)
 
@@ -288,7 +287,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
                 self._err = cast(
                     T,
                     caster(error)
-                    if (error is not None and np.isfinite(error))
+                    if (error is not None and (np.isfinite(error) or propagate))
                     else caster(0.0),
                 )
             else:
@@ -301,9 +300,13 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
                 self._err = cast(
                     T,
                     caster(error)
-                    if (error is not None and np.isfinite(error))
+                    if (error is not None and (np.isfinite(error) or propagate))
                     else caster(0.0),
                 )
+
+            if propagate and (np.isnan(self._nom) or np.isnan(self._err)):
+                self._nom = cast(T, type(self._nom)(np.nan))
+                self._err = cast(T, type(self._err)(np.nan))
 
         else:
             msg = f"Unsupported argument types (got type(value)={type(value)}, type(error)={type(error)})"
@@ -359,8 +362,11 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
             msg = f"Error must have the same shape as value (got value.shape={np.shape(value)}, error.shape={np.shape(error)})"
             raise ValueError(msg)
 
-        # Replace NaN with zero in errors
-        error[~np.isfinite(error)] = 0
+        # Normalize on copies only when needed, preserving caller-owned arrays.
+        if get_settings().nonfinite_error_policy == "zero":
+            invalid = ~np.isfinite(error)
+            if np.any(invalid):
+                error = np.where(invalid, 0, error)
 
         if np.any(error < 0):
             msg = f"Found {np.count_nonzero(error < 0)} negative values for the standard deviation"
@@ -371,6 +377,12 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
             value = value.astype(np.float64)
         if issubclass(error.dtype.type, np.integer):
             error = error.astype(np.float64)
+
+        if get_settings().nonfinite_error_policy == "propagate":
+            invalid = np.isnan(value) | np.isnan(error)
+            if np.any(invalid):
+                value = np.where(invalid, np.nan, value)
+                error = np.where(invalid, np.nan, error)
 
         self._nom = cast(T, value)
         self._err = cast(T, error)
@@ -815,7 +827,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
                 result = np.array_equal(self._nom, other._nom)
                 if result and not np.array_equal(self._err, other._err):
                     msg = "Uncertainty objects have identical values but different standard deviations."
-                    if ERROR_ON_EQ:
+                    if get_settings().error_on_equality:
                         raise EqualityError(msg)
                     else:
                         warnings.warn(msg, EqualityWarning, stacklevel=2)
@@ -825,7 +837,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
             result = np.array_equal(self._nom, other)
             if result:
                 msg = "Compared Uncertainty object with non-Uncertainty object."
-                if ERROR_ON_EQ:
+                if get_settings().error_on_equality:
                     raise EqualityError(msg)
                 else:
                     warnings.warn(msg, EqualityWarning, stacklevel=2)
@@ -836,17 +848,17 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
             if isinstance(other, Uncertainty):
                 try:
                     val_result = math.isclose(
-                        self._nom, other._nom, rel_tol=COMPARE_RTOL
+                        self._nom, other._nom, rel_tol=get_settings().compare_rtol
                     )
                     err_result = math.isclose(
-                        self._err, other._err, rel_tol=COMPARE_RTOL
+                        self._err, other._err, rel_tol=get_settings().compare_rtol
                     )
                 except TypeError:
                     val_result = self._nom == other._nom
                     err_result = self._err == other._err
                 if val_result and not err_result:
                     msg = "Uncertainty objects have identical values but different standard deviations."
-                    if ERROR_ON_EQ:
+                    if get_settings().error_on_equality:
                         raise EqualityError(msg)
                     else:
                         warnings.warn(msg, EqualityWarning, stacklevel=2)
@@ -854,12 +866,14 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
 
             # Compare scalar Uncertainty with other object.
             try:
-                result = math.isclose(self._nom, other, rel_tol=COMPARE_RTOL)
+                result = math.isclose(
+                    self._nom, other, rel_tol=get_settings().compare_rtol
+                )
             except TypeError:
                 result = self._nom == other
             if result:
                 msg = "Compared Uncertainty object with non-Uncertainty object."
-                if ERROR_ON_EQ:
+                if get_settings().error_on_equality:
                     raise EqualityError(msg)
                 else:
                     warnings.warn(msg, EqualityWarning, stacklevel=2)
@@ -905,7 +919,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
 
     def __array__(self, dtype=None, *, copy=None) -> np.ndarray:
         msg = "The uncertainty is stripped when downcasting to ndarray."
-        if ERROR_ON_DOWNCAST:
+        if get_settings().error_on_downcast:
             raise DowncastError(msg)
         else:
             warnings.warn(
@@ -1159,16 +1173,12 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
     @_unsupported_type("scal")
     def __setitem__(self, key: int, value: Uncertainty) -> None:
         if isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray):
-            # If value is nan, just set the value in those regions to nan and return. This is the only case where a scalar can be passed as an argument!
-            if not isinstance(value, Uncertainty):
-                if not np.isfinite(value):
-                    self._nom[key] = value
-                    self._err[key] = 0
-                    return
-                else:
-                    msg = f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
-                    raise TypeError(msg)
+            # Bare non-finite scalars are accepted for marking missing values.
+            if not isinstance(value, Uncertainty) and np.isfinite(value):
+                msg = f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
+                raise TypeError(msg)
 
+            value = self.__class__(value)
             if np.size(value._nom) == 1 and np.ndim(value._nom) > 0:
                 self._nom[key] = value._nom[0]
                 self._err[key] = value._err[0]
@@ -1183,7 +1193,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
     @_unsupported_type("vec")
     def __float__(self):
         msg = "The uncertainty is stripped when downcasting to float."
-        if ERROR_ON_DOWNCAST:
+        if get_settings().error_on_downcast:
             raise DowncastError(msg)
         else:
             warnings.warn(
@@ -1196,7 +1206,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
     @_unsupported_type("vec")
     def __int__(self):
         msg = "The uncertainty is stripped when downcasting to int."
-        if ERROR_ON_DOWNCAST:
+        if get_settings().error_on_downcast:
             raise DowncastError(msg)
         else:
             warnings.warn(
@@ -1209,7 +1219,7 @@ class Uncertainty(Generic[T], UncertaintyDisplay):
     @_unsupported_type("vec")
     def __complex__(self):
         msg = "The uncertainty is stripped when downcasting to float."
-        if ERROR_ON_DOWNCAST:
+        if get_settings().error_on_downcast:
             raise DowncastError(msg)
         else:
             warnings.warn(

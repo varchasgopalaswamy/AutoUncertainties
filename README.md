@@ -180,34 +180,33 @@ coverage run -m pytest --cov --cov-report=term
   ```
 
 * Displayed values are automatically rounded according to the `g` format specifier. To enable
-  rounding consistent with the Particle Data Group (PDG) standard, the `set_display_rounding` 
+  rounding consistent with the Particle Data Group (PDG) standard, the `configure`
   function can be called as follows:
 
   ```python
-  from auto_uncertainties import Uncertainty, set_display_rounding
+  from auto_uncertainties import Uncertainty, configure
   import numpy as np
   value = np.linspace(start=0, stop=10, num=5)
   error = np.ones_like(value)*0.1
   u = Uncertainty(value, error)
-  set_display_rounding(True)   # enable PDG rules
-  print(np.sum(u))  # 25.0 +/- 0.22
-  set_display_rounding(False)  # default behavior
+  configure(round_on_display=True)   # enable PDG rules
+  print(np.sum(u))  # 25.00 +/- 0.22
+  configure(round_on_display=False)  # default behavior
   print(np.sum(u))  # 25 +/- 0.223607
   ```
 
   If enabled, the PDG rounding rules will, in general, cause `Uncertainty` objects to be displayed with:
-    - Error to 2 significant digits.
-    - Central value to first signficant digit of error, or two significant figures (whichever is more 
-      significant digits).
+    - Error to one or two significant digits, following the PDG thresholds.
+    - Central value to the same decimal place as the rounded error.
 
 * If `numpy.array` is called on an `Uncertainty` object, it will automatically get cast down to a 
   numpy array (losing all uncertainty information!), and emit a warning. To force an exception to be raised
-  instead, use `set_downcast_error`:
+  instead, use `configure`:
 
   ```python
-  from auto_uncertainties import Uncertainty, set_downcast_error
+  from auto_uncertainties import Uncertainty, configure
   import numpy as np
-  set_downcast_error(True)
+  configure(error_on_downcast=True)
   value = np.linspace(start=0, stop=10, num=5)
   error = np.ones_like(value)*0.1
   u = Uncertainty(value, error)
@@ -288,3 +287,43 @@ variable, and adjust the computation as necessary. This is also currently out of
 
 The class structure of `Uncertainty` and the NumPy ufunc implementation is heavily inspired by the 
 excellent package [Pint](https://github.com/hgrecco/pint).
+
+## Configuration
+
+Settings are initialized from environment variables with the `AUTO_UNCERTAINTIES_`
+prefix when the configuration module is first imported. Environment variable names
+are case-insensitive.
+
+| Setting | Default | Environment variable |
+| --- | --- | --- |
+| `round_on_display` | `False` | `AUTO_UNCERTAINTIES_ROUND_ON_DISPLAY` |
+| `error_on_downcast` | `False` | `AUTO_UNCERTAINTIES_ERROR_ON_DOWNCAST` |
+| `error_on_equality` | `False` | `AUTO_UNCERTAINTIES_ERROR_ON_EQUALITY` |
+| `compare_rtol` | `1e-9` | `AUTO_UNCERTAINTIES_COMPARE_RTOL` |
+| `error_on_numpy_kwargs` | `True` | `AUTO_UNCERTAINTIES_ERROR_ON_NUMPY_KWARGS` |
+| `warn_on_numpy_kwargs` | `True` | `AUTO_UNCERTAINTIES_WARN_ON_NUMPY_KWARGS` |
+| `nonfinite_error_policy` | `"zero"` | `AUTO_UNCERTAINTIES_NONFINITE_ERROR_POLICY` |
+
+
+For example, set these variables before starting Python:
+
+```bash
+export AUTO_UNCERTAINTIES_NONFINITE_ERROR_POLICY=propagate
+export AUTO_UNCERTAINTIES_ROUND_ON_DISPLAY=true
+```
+
+Inspect or update configuration at runtime:
+
+```python
+from auto_uncertainties import Uncertainty, configure, get_settings
+
+configure(nonfinite_error_policy="propagate", round_on_display=True)
+print(get_settings().nonfinite_error_policy)  # propagate
+u = Uncertainty(1.0, float("nan"))
+print(u)  # nan +/- nan
+```
+
+
+The default `"zero"` policy replaces NaN and infinite errors with zero. Under `"propagate"`, NaN in either value or error sets
+both to NaN, element by element for arrays. Positive infinite errors are preserved;
+negative errors, including negative infinity, raise `NegativeStdDevError`. 

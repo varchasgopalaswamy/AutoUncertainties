@@ -94,39 +94,38 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
      0.0
 
 * Displayed values are automatically rounded according to the `g` format specifier. To enable
-  rounding consistent with the Particle Data Group (PDG) standard, the `~auto_uncertainties.display_format.set_display_rounding`
+  rounding consistent with the Particle Data Group (PDG) standard, the `~auto_uncertainties.config.configure`
   function can be called as follows:
 
   .. code-block:: python
 
-     >>> from auto_uncertainties import Uncertainty, set_display_rounding
+     >>> from auto_uncertainties import Uncertainty, configure
      >>> import numpy as np
      >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
      >>> u = Uncertainty(value, error)
-     >>> set_display_rounding(True)   # enable PDG rules
+     >>> configure(round_on_display=True)   # enable PDG rules
      >>> np.sum(u)
-     25.0 +/- 0.22
-     >>> set_display_rounding(False)  # default behavior
+     25.00 +/- 0.22
+     >>> configure(round_on_display=False)  # default behavior
      >>> np.sum(u)
      25 +/- 0.223607
 
   \
   If enabled, the PDG rounding rules will, in general, cause `Uncertainty` objects to be displayed with:
    
-  - Error to 2 significant digits.
-  - Central value to first signficant digit of error, or two significant figures (whichever is more 
-    significant digits).
+  - Error to one or two significant digits, following the PDG thresholds.
+  - Central value to the same decimal place as the rounded error.
 
 * If `numpy.array` is called on an `~auto_uncertainties.uncertainty.uncertainty_containers.Uncertainty` object, it will
   automatically get cast down to a `numpy` array (losing all uncertainty information!), and emit a warning.
-  To force an exception to be raised instead, use `~auto_uncertainties.uncertainty.uncertainty_containers.set_downcast_error`:
+  To force an exception to be raised instead, use `~auto_uncertainties.config.configure`:
 
   .. code-block:: python
 
-     >>> from auto_uncertainties import Uncertainty, set_downcast_error
+     >>> from auto_uncertainties import Uncertainty, configure
      >>> import numpy as np
-     >>> set_downcast_error(True)
+     >>> configure(error_on_downcast=True)
      >>> value = np.linspace(start=0, stop=10, num=5)
      >>> error = np.ones_like(value)*0.1
      >>> u = Uncertainty(value, error)
@@ -135,3 +134,66 @@ The goal is to have minimal changes to your code in order to enable uncertainty 
          ...
      auto_uncertainties.exceptions.DowncastError: The uncertainty is stripped when downcasting to ndarray.
 
+
+Configuration
+-------------
+
+All settings are managed by :func:`auto_uncertainties.config.configure` and
+:func:`auto_uncertainties.config.get_settings`. Initial values are read from
+case-insensitive ``AUTO_UNCERTAINTIES_*`` environment variables when configuration
+is first imported. 
+
+.. list-table:: Settings
+   :header-rows: 1
+
+   * - Setting (append uppercase name to ``AUTO_UNCERTAINTIES_``)
+     - Default
+   * - ``round_on_display``
+     - ``False``
+   * - ``error_on_downcast``
+     - ``False``
+   * - ``error_on_equality``
+     - ``False``
+   * - ``compare_rtol``
+     - ``1e-9``
+   * - ``error_on_numpy_kwargs``
+     - ``True``
+   * - ``warn_on_numpy_kwargs``
+     - ``True``
+   * - ``nonfinite_error_policy``
+     - ``"zero"``
+
+Comparison tolerance must be finite and nonnegative. NumPy keyword warnings apply
+when errors for those keywords are disabled.
+
+.. code-block:: bash
+
+   export AUTO_UNCERTAINTIES_NONFINITE_ERROR_POLICY=propagate
+   export AUTO_UNCERTAINTIES_ROUND_ON_DISPLAY=true
+
+.. code-block:: python
+
+   >>> from auto_uncertainties import Uncertainty, configure, get_settings
+   >>> configure(nonfinite_error_policy="propagate")
+   >>> get_settings().nonfinite_error_policy
+   'propagate'
+   >>> Uncertainty(1.0, float("nan"))
+   nan +/- nan
+
+The default ``"zero"`` policy replaces non-finite errors with zero. Under
+``"propagate"``, NaN in either component sets both to NaN, element by element for
+arrays. Positive infinite errors are preserved; negative errors, including negative
+infinity, raise ``NegativeStdDevError``. Omitted errors remain zero for valid values.
+Construction and array assignment use the same policy. Non-finite components are
+displayed explicitly, even with rounding enabled.
+
+Runtime updates are validated before any changes are applied. They affect subsequent
+operations and do not rewrite existing objects. Later changes to environment variables
+do not automatically update configuration. Settings are shared across the process.
+
+The public ``set_display_rounding``, ``set_downcast_error``, ``set_equality_error``,
+``set_compare_rtol``, and ``exceptions.set_numpy_kwargs_propagate_error`` functions
+have been removed. Replace calls with ``configure(round_on_display=...)``,
+``configure(error_on_downcast=...)``, ``configure(error_on_equality=...)``,
+``configure(compare_rtol=...)``, and ``configure(error_on_numpy_kwargs=...)``,
+respectively.

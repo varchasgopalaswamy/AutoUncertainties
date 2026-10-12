@@ -7,10 +7,8 @@ import jax.numpy as jnp
 import loguru
 import numpy as np
 
+from auto_uncertainties.config import get_settings
 from auto_uncertainties.util import has_length, is_iterable, ndarray_to_scalar
-
-ERROR_ON_KWARGS_PROP = True
-WARN_ON_KWARGS_PROP = True
 
 HANDLED_UFUNCS = {}
 HANDLED_FUNCTIONS = {}
@@ -126,9 +124,9 @@ def classify_and_split_args_and_kwargs(*args, **kwargs) -> tuple:
             "Uncertainty propagation for keyword arguments is not supported. "
             f"Found uncertainty info in keyword arguments: {list(uncert_kwarg_err.keys())}"
         )
-        if ERROR_ON_KWARGS_PROP:
+        if get_settings().error_on_numpy_kwargs:
             raise ValueError(msg)
-        elif WARN_ON_KWARGS_PROP:
+        elif get_settings().warn_on_numpy_kwargs:
             loguru.logger.warning(msg)
     return uncert_argnums, uncert_arg_nom, uncert_arg_err, uncert_kwarg_nom
 

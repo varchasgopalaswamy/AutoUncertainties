@@ -30,8 +30,7 @@ from auto_uncertainties import (
     Uncertainty,
     VectorUncertainty,
     nominal_values,
-    set_downcast_error,
-    set_equality_error,
+    configure,
     std_devs,
 )
 from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS
@@ -1003,14 +1002,14 @@ class TestVectorUncertainty:
         with pytest.warns(EqualityWarning):
             _ = s1 == np.array([1.0, 2.0, 3.0])
 
-        set_equality_error(True)
+        configure(error_on_equality=True)
 
         with pytest.raises(EqualityError):
             _ = s1 == s2
         with pytest.raises(EqualityError):
             _ = s1 == np.array([1.0, 2.0, 3.0])
 
-        set_equality_error(False)
+        configure(error_on_equality=False)
 
     @staticmethod
     @given(
@@ -1071,11 +1070,11 @@ class TestVectorUncertainty:
             result = np.array(v)
             assert np.array_equal(result, np.asarray(v._nom))
 
-        set_downcast_error(True)
+        configure(error_on_downcast=True)
         with pytest.raises(DowncastError):
             _ = np.array(v)
 
-        set_downcast_error(False)
+        configure(error_on_downcast=False)
 
     @staticmethod
     def test_clip():
@@ -1285,12 +1284,12 @@ class TestScalarUncertainty:
             f = float(s)
             assert f == float(s._nom)
 
-        set_downcast_error(True)
+        configure(error_on_downcast=True)
 
         with pytest.raises(DowncastError):
             _ = float(s)
 
-        set_downcast_error(False)
+        configure(error_on_downcast=False)
 
     @staticmethod
     @given(
@@ -1307,12 +1306,12 @@ class TestScalarUncertainty:
             i = int(s)
             assert i == int(s._nom)
 
-        set_downcast_error(True)
+        configure(error_on_downcast=True)
 
         with pytest.raises(DowncastError):
             _ = int(s)
 
-        set_downcast_error(False)
+        configure(error_on_downcast=False)
 
     @staticmethod
     @given(
@@ -1329,12 +1328,12 @@ class TestScalarUncertainty:
             f = complex(s)
             assert f == complex(s._nom)
 
-        set_downcast_error(True)
+        configure(error_on_downcast=True)
 
         with pytest.raises(DowncastError):
             _ = complex(s)
 
-        set_downcast_error(False)
+        configure(error_on_downcast=False)
 
     @staticmethod
     def test_round():
@@ -1388,14 +1387,14 @@ class TestScalarUncertainty:
         with pytest.warns(EqualityWarning):
             _ = s1 == 1.0
 
-        set_equality_error(True)
+        configure(error_on_equality=True)
 
         with pytest.raises(EqualityError):
             _ = s1 == s2
         with pytest.raises(EqualityError):
             _ = s1 == 1.0
 
-        set_equality_error(False)
+        configure(error_on_equality=False)
 
     @staticmethod
     def test_hash():

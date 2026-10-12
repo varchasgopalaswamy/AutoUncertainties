@@ -1,14 +1,16 @@
+from . import config
 from . import display_format
 from . import exceptions
 from . import jittable_function_wrapper
 from . import numpy
 from . import uncertainty
 
+from .config import Settings, configure, get_settings
+
 from .display_format import (
     ScalarDisplay,
     UncertaintyDisplay,
     VectorDisplay,
-    set_display_rounding,
 )
 from .exceptions import (
     DowncastError,
@@ -16,9 +18,6 @@ from .exceptions import (
     EqualityError,
     EqualityWarning,
     NegativeStdDevError,
-    set_compare_rtol,
-    set_downcast_error,
-    set_equality_error,
 )
 from .jittable_function_wrapper import (
     P,
@@ -46,22 +45,22 @@ __all__ = [
     "R",
     "ScalarDisplay",
     "ScalarUncertainty",
+    "Settings",
     "UType",
     "Uncertainty",
     "UncertaintyDisplay",
     "VectorDisplay",
     "VectorUncertainty",
+    "config",
+    "configure",
     "display_format",
     "elementwise_value_and_grad",
     "exceptions",
+    "get_settings",
     "jittable_function_wrapper",
     "nominal_values",
     "numpy",
     "propagate_uncertainties",
-    "set_compare_rtol",
-    "set_display_rounding",
-    "set_downcast_error",
-    "set_equality_error",
     "std_devs",
     "uncertainty",
     "uncertainty_containers",
