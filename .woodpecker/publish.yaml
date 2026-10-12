@@ -1,5 +1,7 @@
 when:
-  event: manual
+  - event: tag
+    ref: refs/tags/v*
+  - event: manual
 
 depends_on:
   - test
@@ -13,5 +15,6 @@ steps:
     commands:
       - curl -LsSf https://astral.sh/uv/install.sh | sh
       - export PATH="$HOME/.local/bin:$PATH"
-      - git fetch --unshallow
+      - git fetch --tags
+      - if [ "$(git rev-parse --is-shallow-repository)" = true ]; then git fetch --unshallow; fi
       - ./scripts/ci/publish-pypi.sh

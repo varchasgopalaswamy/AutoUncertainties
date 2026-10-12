@@ -326,4 +326,12 @@ print(u)  # nan +/- nan
 
 The default `"zero"` policy replaces NaN and infinite errors with zero. Under `"propagate"`, NaN in either value or error sets
 both to NaN, element by element for arrays. Positive infinite errors are preserved;
-negative errors, including negative infinity, raise `NegativeStdDevError`. 
+negative errors, including negative infinity, raise `NegativeStdDevError`.
+
+## Releases
+
+To publish a release, push an annotated version tag such as `v1.1.0` to Codeberg.
+Woodpecker runs the test matrix on Python 3.11–3.14, then builds and validates the
+wheel and source distribution before uploading them to PyPI using the CI secret
+`pypi_token`. Branch pushes and pull requests run tests without publishing.
+The publishing workflow can also be triggered manually.
