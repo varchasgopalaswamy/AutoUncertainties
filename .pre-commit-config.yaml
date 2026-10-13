@@ -2,28 +2,38 @@ repos:
 
 - repo: local
   hooks:
+  - id: geninit
+    name: Generate package initializers
+    entry: uv run --locked --group ci geninit
+    language: system
+    pass_filenames: false
+    always_run: true
+    stages: [pre-commit]
 
-  - id: generate-init
-    name: Generates __init__.py files
-    language: python
-    entry: python hooks/generate_init.py
-    require_serial: true
-    additional_dependencies: ["mkinit==1.2.0", "ruff==0.15.16", "rich"]
-    
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:
   - id: check-executables-have-shebangs
   - id: check-symlinks
 
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.15.16
+- repo: local
   hooks:
-    #Run the linter.
-    - id: ruff
-      types_or: [ python, pyi, jupyter ]
-      args: [ --fix, --exit-zero ]
-    #Run the formatter.
+    - id: ruff-check
+      name: Ruff check
+      entry: uv run --locked --group ci ruff check --force-exclude
+      language: system
+      types_or: [python, pyi, jupyter]
+      args: [--fix, --exit-non-zero-on-fix]
+      require_serial: true
     - id: ruff-format
-      types_or: [ python, pyi, jupyter ]
+      name: Ruff format
+      entry: uv run --locked --group ci ruff format --force-exclude
+      language: system
+      types_or: [python, pyi, jupyter]
+      require_serial: true
+    - id: pyrefly
+      name: Pyrefly
+      entry: uv run --locked --group ci pyrefly check
+      language: system
+      pass_filenames: false
+      always_run: true

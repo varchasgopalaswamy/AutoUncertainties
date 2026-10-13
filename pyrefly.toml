@@ -1,0 +1,3 @@
+project-includes = ["auto_uncertainties/**/*.py"]
+project-excludes = [".venv/**", "docs/**", "tests/**", "**/__pycache__/**"]
+python-version = "3.15"

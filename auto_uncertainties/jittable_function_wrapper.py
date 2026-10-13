@@ -1,118 +1,126 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar, cast, overload
+lazy from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 
-from auto_uncertainties import Uncertainty
-from auto_uncertainties.numpy.numpy_wrappers import (
-    classify_and_split_args_and_kwargs,
-    ndarray_to_scalar,
-)
+from auto_uncertainties._propagation import precision_context, propagate
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
+__all__ = ["P", "R", "elementwise_value_and_grad", "propagate_uncertainties"]
 
-def elementwise_value_and_grad(g):
-    def wrapped(*args, **kwargs):
-        y, g_vjp = jax.vjp(lambda *a: g(*a, **kwargs), *args)
-        return np.array(y), g_vjp(jnp.ones_like(y))
+
+def elementwise_value_and_grad(
+    g: Callable[P, Any],
+) -> Callable[P, tuple[npt.NDArray[Any], tuple[npt.NDArray[Any], ...]]]:
+    """
+    Wrap an elementwise function to return its values and derivatives.
+
+    This compatibility helper differentiates the sum of outputs; use
+    :func:`propagate_uncertainties` for functions that mix array elements.
+
+    :param g: JAX-compatible elementwise function whose positional operands are
+        differentiated.
+    :return: A wrapper returning the nominal result and one gradient per positional
+        operand.
+    """
+
+    @wraps(g)
+    def wrapped(
+        *args: P.args, **kwargs: P.kwargs
+    ) -> tuple[npt.NDArray[Any], tuple[npt.NDArray[Any], ...]]:
+        with precision_context(args, kwargs):
+            dtype = jnp.result_type(*args)
+            promoted = tuple(jnp.asarray(arg, dtype=dtype) for arg in args)
+            value, pullback = jax.vjp(
+                lambda *a: cast("Callable[..., Any]", g)(*a, **kwargs), *promoted
+            )
+            gradients = pullback(jnp.ones_like(value))
+            return np.asarray(value), tuple(np.asarray(gradient) for gradient in gradients)
 
     return wrapped
 
 
+@overload
 def propagate_uncertainties(
-    func: Callable[P, R], implement_mode: str = "same_shape"
-) -> Callable[P, Uncertainty]:
+    func: Callable[P, R], implement_mode: str | None = None
+) -> Callable[..., Any]: ...
+
+
+@overload
+def propagate_uncertainties(
+    func: None = None, implement_mode: str | None = None
+) -> Callable[[Callable[P, R]], Callable[..., Any]]: ...
+
+
+def propagate_uncertainties(
+    func: Callable[P, R] | None = None, implement_mode: str | None = None
+) -> Callable[..., Any] | Callable[[Callable[P, R]], Callable[..., Any]]:
     """
-    A decorator to propagate uncertainties through a given function using
-    first-order Taylor expansion.
+    Decorate a real-valued JAX function with first-order error propagation.
 
-    Parameters
-    ----------
-    func : callable
-        The function through which to propagate uncertainties. This function should
-        be compatible with JAX for automatic differentiation.
+    Inputs may contain ``Uncertainty`` objects in positional arguments, keyword
+    arguments, or nested lists, tuples and dictionaries. Exact arguments retain
+    their original types and positions. Outputs may be scalars, arrays of any
+    shape, or pytrees of these; each numeric output becomes an ``Uncertainty``.
+    Boolean outputs remain exact booleans.
 
-    Returns
-    -------
-    callable
-        A new function that propagates uncertainties when called with `Uncertainty`
-        objects.
+    Independent input errors are contracted with the full Jacobian, so array
+    permutations, reductions, broadcasting and coupled outputs are supported.
+    Each uncertainty occurrence in the input tree is an independent input;
+    reuse of a parameter inside the function retains its dependence. Correlations
+    are not retained between separately returned uncertainty objects.
+    The wrapped function must use JAX
+    operations when computing with uncertain inputs. The returned containers
+    are NumPy-backed; the wrapper itself is not intended for ``jax.jit``.
 
-    Notes
-    -----
-    This decorator uses JAX's automatic differentiation to compute gradients,
-    which are then used to propagate uncertainties. The function being decorated
-    should be compatible with JAX, meaning it should use JAX-compatible operations.
+    Both ``@propagate_uncertainties`` and ``@propagate_uncertainties()`` work.
+    ``implement_mode`` is accepted for compatibility with older callers; all
+    modes now use the same general propagation rule.
 
-    Examples
-    --------
-    >>> import numpy as np
+    :param func: JAX-compatible function to wrap, or ``None`` when configuring the
+        decorator first.
+    :param implement_mode: Legacy propagation mode. Accepted modes share the same
+        general propagation rule.
+    :return: The wrapped function, or a decorator when ``func`` is omitted.
+    :raises ValueError: The legacy propagation mode is not recognized.
+
+    .. rubric:: Examples
+
     >>> import jax.numpy as jnp
     >>> from auto_uncertainties import Uncertainty, propagate_uncertainties
     >>> @propagate_uncertainties
-    ... def my_function(x, y):
-    ...     return x * jnp.sin(y)
-    >>> x = Uncertainty(2.0, 0.1)  # Value 2.0 with uncertainty 0.1
-    >>> y = Uncertainty(np.pi / 4, 0.01)  # Value pi/4 with uncertainty 0.01
-    >>> result = my_function(x, y)
+    ... def centered(x):
+    ...     return x - jnp.mean(x)
+    >>> result = centered(Uncertainty([1.0, 2.0], [0.1, 0.2]))
     """
+    modes = {
+        None,
+        "same_shape",
+        "same_shape_bool",
+        "nograd",
+        "selection_operator",
+        "reduction_binary",
+        "reduction_unary",
+    }
+    if implement_mode not in modes:
+        msg = f"Invalid implement_mode {implement_mode}"
+        raise ValueError(msg)
 
-    grad_and_val = elementwise_value_and_grad(func)
+    # Uncertainty leaves change the accepted argument types and output tree.
+    # Python typing cannot map those replacements through a ParamSpec.
+    def decorate(function: Callable[P, R]) -> Callable[..., Any]:
+        @wraps(function)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return propagate(function, args, kwargs)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> Uncertainty:
-        (
-            _,
-            uncert_arg_nom,
-            uncert_arg_err,
-            uncert_kwarg_nom,
-        ) = classify_and_split_args_and_kwargs(*args, **kwargs)
-        # Determine result through base numpy function on stripped arguments
-        if implement_mode == "same_shape":
-            bcast_args_nom = np.broadcast_arrays(*uncert_arg_nom)
-            bcast_args_err = np.broadcast_arrays(*uncert_arg_err)
-            value, grads = grad_and_val(*bcast_args_nom, **uncert_kwarg_nom)
-            error_dot_grad_sqr = [
-                (e * g) ** 2 for e, g in zip(bcast_args_err, grads, strict=False)
-            ]
-            error = np.sum(error_dot_grad_sqr, axis=0) ** 0.5
-        elif (
-            implement_mode == "same_shape_bool"
-            or implement_mode == "nograd"
-            or implement_mode == "selection_operator"
-        ):
-            value = func(*uncert_arg_nom, **uncert_kwarg_nom)
-            error = 0
-        elif implement_mode in ["reduction_binary", "reduction_unary"]:
-            axis = uncert_kwarg_nom.get("axis", None)
+        return wrapper
 
-            bcast_args_nom = np.broadcast_arrays(*uncert_arg_nom)
-            bcast_args_err = np.broadcast_arrays(*uncert_arg_err)
-            value, grads = grad_and_val(*bcast_args_nom, **uncert_kwarg_nom)
-            if axis is not None:
-                axis = tuple(axis)
-                error_dot_grad_sqr = [
-                    np.sum((e * g) ** 2, axis=axis)
-                    for e, g in zip(bcast_args_err, grads, strict=False)
-                ]
-            else:
-                error_dot_grad_sqr = [
-                    np.sum((e * g) ** 2)
-                    for e, g in zip(bcast_args_err, grads, strict=False)
-                ]
-            value = ndarray_to_scalar(value)
-            error = ndarray_to_scalar(np.sum(error_dot_grad_sqr, axis=0) ** 0.5)
-        else:
-            msg = f"Invalid implement_mode {implement_mode}"
-            raise ValueError(msg)
-
-        return Uncertainty((value), (error))
-
-    return wrapper
+    return decorate if func is None else decorate(func)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import decimal
 import math
+from typing import Generic, TypeVar, cast, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -15,12 +16,22 @@ __all__ = [
 ]
 
 
-class UncertaintyDisplay:
-    default_format: str = ""
-    _nom: npt.NDArray[np.floating] | np.floating | float
-    _err: npt.NDArray[np.floating] | np.floating | float
+_DisplayT = TypeVar("_DisplayT", float, np.floating, npt.NDArray[np.floating])
 
-    def _repr_html_(self):
+
+class UncertaintyDisplay(Generic[_DisplayT]):
+    """Provide text, HTML, and LaTeX representations of nominal values and errors."""
+
+    default_format: str = ""
+    _nom: _DisplayT
+    _err: _DisplayT
+
+    def _repr_html_(self) -> str:
+        """
+        Format the uncertainty for HTML display.
+
+        :return: The formatted value and error, using a table for arrays.
+        """
         val_ = self._nom
         err_ = self._err
 
@@ -39,13 +50,20 @@ class UncertaintyDisplay:
             return header + val + err + footer
 
         # Scalar uncertainty
-        vformat, eformat = pdg_round(val_, err_)
+        vformat, eformat = pdg_round(
+            cast("float | np.floating", val_), cast("float | np.floating", err_)
+        )
         if eformat == "":
             return f"{vformat}"
         else:
             return f"{vformat} {chr(0x00B1)} {eformat}"
 
-    def _repr_latex_(self):
+    def _repr_latex_(self) -> str:
+        """
+        Format the uncertainty for LaTeX display.
+
+        :return: The formatted value and error with LaTeX uncertainty notation.
+        """
         val_ = self._nom
         err_ = self._err
 
@@ -61,13 +79,21 @@ class UncertaintyDisplay:
             return header + s + footer
 
         # Scalar uncertainty
-        vformat, eformat = pdg_round(val_, err_)
+        vformat, eformat = pdg_round(
+            cast("float | np.floating", val_), cast("float | np.floating", err_)
+        )
         if eformat == "":
             return f"{vformat}"
         else:
             return f"{vformat} \\pm {eformat}"
 
     def __str__(self) -> str:
+        """
+        Format the uncertainty for text display.
+
+        :return: The nominal value and error formatted using the current rounding
+            settings.
+        """
         val_ = self._nom
         err_ = self._err
 
@@ -80,13 +106,22 @@ class UncertaintyDisplay:
             return "[" + ", ".join(s) + "]"
 
         # Scalar uncertainty
-        vformat, eformat = pdg_round(val_, err_)
+        vformat, eformat = pdg_round(
+            cast("float | np.floating", val_), cast("float | np.floating", err_)
+        )
         if eformat == "":
             return f"{vformat}"
         else:
             return f"{vformat} +/- {eformat}"
 
-    def __format__(self, fmt):
+    def __format__(self, fmt: str) -> str:
+        """
+        Format nominal values and errors with a shared format specification.
+
+        :param fmt: Python numeric format specification applied after any configured PDG
+            rounding.
+        :return: The formatted uncertainty, including a zero error when applicable.
+        """
         val_ = self._nom
         err_ = self._err
 
@@ -99,13 +134,23 @@ class UncertaintyDisplay:
             return "[" + ", ".join(s) + "]"
 
         # Scalar uncertainty
-        vformat, eformat = pdg_round(val_, err_, format_spec=fmt, return_zero=True)
+        vformat, eformat = pdg_round(
+            cast("float | np.floating", val_),
+            cast("float | np.floating", err_),
+            format_spec=fmt,
+            return_zero=True,
+        )
         if eformat == "":
             return f"{vformat}"
         else:
             return f"{vformat} +/- {eformat}"
 
     def __repr__(self) -> str:
+        """
+        Return the text representation of the uncertainty.
+
+        :return: The same display text as :meth:`__str__`.
+        """
         return str(self)
 
 
@@ -115,14 +160,15 @@ VectorDisplay = UncertaintyDisplay
 
 
 # From https://github.com/lmfit/uncertainties/blob/master/uncertainties/core.py
-def first_digit(value):
+def first_digit(value: float | np.floating) -> int:
     """
-    Return the first digit position of the given value, as an integer.
+    Find the position of the first significant digit.
 
-    0 is the digit just before the decimal point. Digits to the right
-    of the decimal point have a negative position.
+    Position zero is immediately before the decimal point; positions to its
+    right are negative.
 
-    Return 0 for a null value.
+    :param value: Value whose magnitude determines the digit position.
+    :return: The first significant digit position, or zero when the value is zero.
     """
     try:
         return math.floor(math.log10(abs(value)))
@@ -131,17 +177,25 @@ def first_digit(value):
 
 
 # From https://github.com/lmfit/uncertainties/blob/master/uncertainties/core.py
-def PDG_precision(std_dev):
+@overload
+def PDG_precision(std_dev: decimal.Decimal) -> tuple[int, decimal.Decimal]: ...
+@overload
+def PDG_precision(std_dev: float | np.floating) -> tuple[int, float | np.floating]: ...
+def PDG_precision(
+    std_dev: decimal.Decimal | float | np.floating,
+) -> tuple[int, decimal.Decimal | float | np.floating]:
     """
-    Return the number of significant digits to be used for the given
-    standard deviation, according to the rounding rules of the
-    Particle Data Group (2010)
-    (http://pdg.lbl.gov/2010/reviews/rpp2010-rev-rpp-intro.pdf).
+    Choose display precision using the Particle Data Group rounding rules.
 
-    Also returns the effective standard deviation to be used for
-    display.
+    The rules are described in the `Particle Data Group review (2010)
+    <http://pdg.lbl.gov/2010/reviews/rpp2010-rev-rpp-intro.pdf>`_.
+    Errors with leading digits from 950 through 999 carry to the next decade.
+
+    :param std_dev: Positive, finite standard deviation to format.
+    :return: The number of significant digits and the effective standard deviation to
+        display.
+    :raises ValueError: The standard deviation is nonpositive or nonfinite.
     """
-
     uncertainty = decimal.Decimal(str(std_dev))
     if not uncertainty.is_finite() or uncertainty <= 0:
         msg = "Standard deviation must be positive and finite"
@@ -161,22 +215,28 @@ def PDG_precision(std_dev):
 
 
 def pdg_round(
-    value, uncertainty, format_spec="g", *, return_zero: bool = False
+    value: float | np.floating,
+    uncertainty: float | np.floating | None,
+    format_spec: str = "g",
+    *,
+    return_zero: bool = False,
 ) -> tuple[str, str]:
     """
-    Format a value with uncertainty according to PDG rounding rules.
+    Format a value and its uncertainty using the current display settings.
 
-    :param value: The central value
-    :param uncertainty: The uncertainty of the value
-    :param format_spec:
-    :param return_zero:
+    PDG rounding is enabled by default through ``round_on_display``. When enabled,
+    both components are rounded to the decimal place determined by the error.
+    Nonfinite components are formatted directly without PDG rounding.
 
-    :return: The formatted value with uncertainty.
+    :param value: Central value to display.
+    :param uncertainty: Standard deviation; ``None`` omits the error when PDG rounding
+        is enabled.
+    :param format_spec: Python numeric format specification applied to both components.
+    :param return_zero: Display ``"0"`` instead of an empty error for missing or
+        nonpositive errors when PDG rounding is enabled.
+    :return: The formatted nominal value and formatted error, in that order.
     """
-
-    if not np.isfinite(value) or (
-        uncertainty is not None and not np.isfinite(uncertainty)
-    ):
+    if not np.isfinite(value) or (uncertainty is not None and not np.isfinite(uncertainty)):
         return (
             f"{value:{format_spec}}",
             f"{uncertainty:{format_spec}}" if uncertainty is not None else "",
@@ -192,18 +252,27 @@ def pdg_round(
             place = pdg_unc.adjusted() - significant_digits + 1
             quantum = decimal.Decimal((0, (1,), place))
 
-            # Both components end at the same decimal place. A larger context
-            # also supports finite values with very large or small uncertainties.
-            with decimal.localcontext() as context:
-                context.prec = max(28, value_dec.adjusted() - place + 2)
-                context.rounding = decimal.ROUND_HALF_EVEN
+            # Isolate display rounding from the caller's precision, exponent
+            # limits and traps. Both components end at the same decimal place.
+            context = decimal.Context(
+                prec=max(28, value_dec.adjusted() - place + 2),
+                rounding=decimal.ROUND_HALF_EVEN,
+                Emin=decimal.MIN_EMIN,
+                Emax=decimal.MAX_EMAX,
+                traps=[
+                    decimal.InvalidOperation,
+                    decimal.DivisionByZero,
+                    decimal.Overflow,
+                ],
+            )
+            with decimal.localcontext(context):
                 rounded_value = value_dec.quantize(quantum)
                 rounded_uncertainty = pdg_unc.quantize(quantum)
 
-            return (
-                f"{rounded_value:{format_spec}}",
-                f"{rounded_uncertainty:{format_spec}}",
-            )
+                return (
+                    f"{rounded_value:{format_spec}}",
+                    f"{rounded_uncertainty:{format_spec}}",
+                )
 
         else:
             return f"{value:{format_spec}}", "0" if return_zero else ""

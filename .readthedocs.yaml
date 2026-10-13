@@ -11,11 +11,17 @@ build:
   apt_packages:
     - graphviz
   tools:
-    python: "3.11"
+    # Read the Docs currently offers Python through 3.14 as a bootstrap tool.
+    # The documentation environment below uses the required Python 3.15.
+    python: "3.14"
     # You can also specify other tool versions:
     # nodejs: "19"
     # rust: "1.64"
     # golang: "1.19"
+  jobs:
+    create_environment:
+      - python -m pip install uv
+      - python -m uv venv --python 3.15 --seed "$READTHEDOCS_VIRTUALENV_PATH"
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:

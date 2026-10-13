@@ -10,7 +10,7 @@ Welcome to AutoUncertainties's documentation!
    :target: https://github.com/varchasgopalaswamy/AutoUncertainties/releases
    :alt: GitHub Release
 
-.. image:: https://img.shields.io/badge/Python-3.11%20%7C%203.12-ffed57?logo=python&logoColor=white
+.. image:: https://img.shields.io/badge/Python-3.15%2B-ffed57?logo=python&logoColor=white
    :target: https://www.python.org/downloads/
    :alt: python
 
@@ -76,7 +76,7 @@ One of the most important aspects of AutoUncertainties is its seamless support f
    >>> errs = np.array([0.05, 0.3])
    >>> u = Uncertainty(vals, errs)
    >>> print(np.cos(u))
-   [0.877583 +/- 0.0239713, 0.731689 +/- 0.204492]
+   [0.878 +/- 0.024, 0.73 +/- 0.20]
 
 This is in contrast to the `uncertainties` package, which would have required the use of `unumpy`,
 a module containing several hand-implemented analogs of the true NumPy functions. 
@@ -104,7 +104,7 @@ implies dependence.
 
      >>> x = Uncertainty(5.0, 0.5)
      >>> x - x  
-     0 +/- 0.707107
+     0.0 +/- 0.7
 
 - **Mean Error Propagation**
 
@@ -119,7 +119,7 @@ implies dependence.
      >>> u = Uncertainty(5.0, 0.5)
      >>> arr = np.ones(10) * 10
      >>> np.mean(u * arr) 
-     50 +/- 1.58114, rather than 50 +/- 5 as expected
+     50.0 +/- 1.6, rather than 50 +/- 5 as expected
 
   To obtain the uncertainty corresponding to the case where each element of the array is fully correlated,
   two workaround techniques can be used:

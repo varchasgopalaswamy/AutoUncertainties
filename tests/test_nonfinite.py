@@ -9,8 +9,8 @@ import pytest
 from auto_uncertainties import NegativeStdDevError, Uncertainty, configure
 
 
-@pytest.mark.parametrize("dtype", [float, np.float32, np.float64])
-@pytest.mark.parametrize("value,error", [(1, np.nan), (np.nan, 2), (np.nan, np.nan)])
+@pytest.mark.parametrize("dtype", (float, np.float32, np.float64))
+@pytest.mark.parametrize(("value", "error"), ((1, np.nan), (np.nan, 2), (np.nan, np.nan)))
 def test_scalar_nan_propagation(dtype, value, error):
     configure(nonfinite_error_policy="propagate")
     u = Uncertainty(dtype(value), dtype(error))
@@ -18,8 +18,8 @@ def test_scalar_nan_propagation(dtype, value, error):
     assert type(u.value) is dtype and type(u.error) is dtype
 
 
-@pytest.mark.parametrize("policy", ["zero", "propagate"])
-@pytest.mark.parametrize("vector", [False, True])
+@pytest.mark.parametrize("policy", ("zero", "propagate"))
+@pytest.mark.parametrize("vector", (False, True))
 def test_infinite_errors(policy, vector):
     configure(nonfinite_error_policy=policy)
     value = np.array([1.0]) if vector else 1.0
@@ -33,7 +33,7 @@ def test_infinite_errors(policy, vector):
         np.testing.assert_equal(Uncertainty(value, -error).error, 0)
 
 
-@pytest.mark.parametrize("policy", ["zero", "propagate"])
+@pytest.mark.parametrize("policy", ("zero", "propagate"))
 def test_array_normalization_does_not_mutate_inputs(policy):
     configure(nonfinite_error_policy=policy)
     value = np.array([[1, np.nan], [3, 4]])
@@ -81,7 +81,7 @@ def test_copy_and_quantity_construction():
     assert q.units == Quantity(1, "m").units
 
 
-@pytest.mark.parametrize("policy", ["zero", "propagate"])
+@pytest.mark.parametrize("policy", ("zero", "propagate"))
 def test_assignment(policy):
     configure(nonfinite_error_policy=policy)
     u = Uncertainty([1, 2, 3], [0.1, 0.2, 0.3])
@@ -109,8 +109,8 @@ def test_arithmetic_and_numpy_propagation():
     assert v.value == 2 and np.isposinf(v.error)
 
 
-@pytest.mark.parametrize("rounding", [False, True])
-@pytest.mark.parametrize("value,error", [(np.nan, np.nan), (1, np.inf), (np.inf, 1)])
+@pytest.mark.parametrize("rounding", (False, True))
+@pytest.mark.parametrize(("value", "error"), ((np.nan, np.nan), (1, np.inf), (np.inf, 1)))
 def test_nonfinite_display(rounding, value, error):
     configure(nonfinite_error_policy="propagate", round_on_display=rounding)
     expected = f"{value:g} +/- {error:g}"
@@ -120,8 +120,4 @@ def test_nonfinite_display(rounding, value, error):
     assert format(scalar, "g") == expected
     assert str(vector) == f"[{expected}]"
     assert scalar._repr_html_() == expected.replace("+/-", "±")
-    assert (
-        "nan" in vector._repr_latex_()
-        if np.isnan(value)
-        else "inf" in vector._repr_latex_()
-    )
+    assert "nan" in vector._repr_latex_() if np.isnan(value) else "inf" in vector._repr_latex_()

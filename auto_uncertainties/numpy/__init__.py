@@ -1,8 +1,17 @@
-from __future__ import annotations
+"""NumPy dispatch with uncertainty propagation."""
 
-import lazy_loader
+__public__ = ("numpy_wrappers",)
 
+# <geninit>
+lazy from . import numpy_wrappers
+lazy from .numpy_wrappers import HANDLED_FUNCTIONS
+lazy from .numpy_wrappers import HANDLED_UFUNCS
+lazy from .numpy_wrappers import wrap_numpy
 
-__getattr__, __dir__, __all__ = lazy_loader.attach_stub(__name__, __file__)
-
-__all__ = ["HANDLED_FUNCTIONS", "HANDLED_UFUNCS", "numpy_wrappers", "wrap_numpy"]
+__all__ = (
+    "HANDLED_FUNCTIONS",
+    "HANDLED_UFUNCS",
+    "numpy_wrappers",
+    "wrap_numpy",
+)
+# </geninit>

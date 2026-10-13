@@ -3,10 +3,11 @@ set -euo pipefail
 
 export UV_SYSTEM_PYTHON="${UV_SYSTEM_PYTHON:-1}"
 
-uv sync --extra CI
+uv sync --locked --group ci
 
-# Run ruff to check for linting issues
-uv tool install "ruff==0.15.16"
-ruff check .
+uv run --locked --group ci ruff check .
+uv run --locked --group ci ruff format --check .
+uv run --locked --group ci pyrefly check
+uv run --locked --group ci geninit --check
 
-uv run coverage run -m pytest --cov --cov-report=xml --cov-report=html --cov-report=term
+uv run --locked --group ci pytest --cov --cov-report=xml --cov-report=html --cov-report=term

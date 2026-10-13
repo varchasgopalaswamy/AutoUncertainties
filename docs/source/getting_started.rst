@@ -5,9 +5,12 @@ Getting Started
    :target: https://pypi.org/project/auto-uncertainties/
    :alt: GitHub Release
 
-.. image:: https://img.shields.io/badge/Python-3.11%20%7C%203.12-ffed57?logo=python&logoColor=white
+.. image:: https://img.shields.io/badge/Python-3.15%2B-ffed57?logo=python&logoColor=white
    :target: https://www.python.org/downloads/
    :alt: python
+
+Python 3.15 or newer is required, together with NumPy 2.0 or newer and JAX/JAXlib
+0.9 or newer. The installer selects releases compatible with your Python version.
 
 * AutoUncertainties is easy to install via ``pip``:
 

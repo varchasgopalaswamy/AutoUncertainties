@@ -1,11 +1,17 @@
-from __future__ import annotations
+"""Scalar and vector uncertainty containers."""
 
-import lazy_loader
+__public__ = ("uncertainty_containers",)
 
+# <geninit>
+lazy from . import uncertainty_containers
+lazy from .uncertainty_containers import ScalarUncertainty
+lazy from .uncertainty_containers import UType
+lazy from .uncertainty_containers import Uncertainty
+lazy from .uncertainty_containers import VectorUncertainty
+lazy from .uncertainty_containers import nominal_values
+lazy from .uncertainty_containers import std_devs
 
-__getattr__, __dir__, __all__ = lazy_loader.attach_stub(__name__, __file__)
-
-__all__ = [
+__all__ = (
     "ScalarUncertainty",
     "UType",
     "Uncertainty",
@@ -13,4 +19,5 @@ __all__ = [
     "nominal_values",
     "std_devs",
     "uncertainty_containers",
-]
+)
+# </geninit>

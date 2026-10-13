@@ -26,14 +26,14 @@ def test_legacy_classes():
 class TestVectorDisplay:
     @staticmethod
     @pytest.mark.parametrize(
-        "arr1, arr2, expected",
-        [
+        ("arr1", "arr2", "expected"),
+        (
             (
                 np.array([1, 2, 3]),
                 np.array([4, 5, 6]),
                 "<table><tbody><tr><th>Magnitude</th><td style='text-align:left;'><pre>1, 2, 3</pre></td></tr><tr><th>Error</th><td style='text-align:left;'><pre>4, 5, 6</pre></td></tr></tbody></table>",
             ),
-        ],
+        ),
     )
     def test__repr_html_(arr1, arr2, expected):
         vd = VectorDisplay()
@@ -43,8 +43,8 @@ class TestVectorDisplay:
 
     @staticmethod
     @pytest.mark.parametrize(
-        "arr1, arr2, expected",
-        [(np.array([1, 2, 3]), np.array([4, 5, 6]), "$1 \\pm 4, 2 \\pm 5, 3 \\pm 6~$")],
+        ("arr1", "arr2", "expected"),
+        ((np.array([1, 2, 3]), np.array([4, 5, 6]), "$1 \\pm 4, 2 \\pm 5, 3 \\pm 6~$"),),
     )
     def test__repr_latex_(arr1, arr2, expected):
         vd = VectorDisplay()
@@ -54,8 +54,8 @@ class TestVectorDisplay:
 
     @staticmethod
     @pytest.mark.parametrize(
-        "arr1, arr2, expected",
-        [(np.array([1, 2, 3]), np.array([4, 5, 6]), "[1 +/- 4, 2 +/- 5, 3 +/- 6]")],
+        ("arr1", "arr2", "expected"),
+        ((np.array([1, 2, 3]), np.array([4, 5, 6]), "[1 +/- 4, 2 +/- 5, 3 +/- 6]"),),
     )
     def test_str_and_repr(arr1, arr2, expected):
         vd = VectorDisplay()
@@ -66,15 +66,15 @@ class TestVectorDisplay:
 
     @staticmethod
     @pytest.mark.parametrize(
-        "arr1, arr2, fmt, expected",
-        [
+        ("arr1", "arr2", "fmt", "expected"),
+        (
             (
                 np.array([1, 2, 3]),
                 np.array([4, 5, 6]),
                 "0.2f",
                 "[1.00 +/- 4.00, 2.00 +/- 5.00, 3.00 +/- 6.00]",
-            )
-        ],
+            ),
+        ),
     )
     def test___format__(arr1, arr2, fmt, expected):
         vd = VectorDisplay()
@@ -84,6 +84,10 @@ class TestVectorDisplay:
 
 
 class TestScalarDisplay:
+    @pytest.fixture(autouse=True, params=[False, True])
+    def rounding(self, request):
+        configure(round_on_display=request.param)
+
     @staticmethod
     @given(
         st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
@@ -93,7 +97,8 @@ class TestScalarDisplay:
         sd = ScalarDisplay()
         sd._nom = f1
         sd._err = f2
-        assert sd._repr_html_() == f"{pdg_round(f1, f2)[0]} ± {pdg_round(f1, f2)[1]}"
+        value, error = pdg_round(f1, f2)
+        assert sd._repr_html_() == (f"{value} ± {error}" if error else value)
 
     @staticmethod
     @given(
@@ -104,9 +109,8 @@ class TestScalarDisplay:
         sd = ScalarDisplay()
         sd._nom = f1
         sd._err = f2
-        assert (
-            sd._repr_latex_() == f"{pdg_round(f1, f2)[0]} \\pm {pdg_round(f1, f2)[1]}"
-        )
+        value, error = pdg_round(f1, f2)
+        assert sd._repr_latex_() == (f"{value} \\pm {error}" if error else value)
 
     @staticmethod
     @given(
@@ -117,8 +121,10 @@ class TestScalarDisplay:
         sd = ScalarDisplay()
         sd._nom = f1
         sd._err = f2
-        assert sd.__str__() == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
-        assert sd.__repr__() == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
+        value, error = pdg_round(f1, f2)
+        expected = f"{value} +/- {error}" if error else value
+        assert sd.__str__() == expected
+        assert sd.__repr__() == expected
 
     @staticmethod
     @given(
@@ -129,9 +135,8 @@ class TestScalarDisplay:
         sd = ScalarDisplay()
         sd._nom = f1
         sd._err = f2
-        assert (
-            sd.__format__("g") == f"{pdg_round(f1, f2)[0]} +/- {pdg_round(f1, f2)[1]}"
-        )
+        value, error = pdg_round(f1, f2, return_zero=True)
+        assert sd.__format__("g") == f"{value} +/- {error}"
 
     @staticmethod
     def test_edge_cases():
@@ -150,8 +155,8 @@ class TestScalarDisplay:
 
 
 @pytest.mark.parametrize(
-    "val, expected",
-    [
+    ("val", "expected"),
+    (
         (0, 0),
         (1, 0),
         (100, 2),
@@ -161,28 +166,27 @@ class TestScalarDisplay:
         (-10e5, 6),
         (1e-3, -3),
         (39.2e-12, -11),
-    ],
+    ),
 )
 def test_first_digit(val, expected):
     assert first_digit(val) == expected
 
 
-@pytest.mark.parametrize(
-    "val, expected", [(1, (2, 1)), (0.99, (2, 1.0)), (4.235, (1, 4.235))]
-)
+@pytest.mark.parametrize(("val", "expected"), ((1, (2, 1)), (0.99, (2, 1.0)), (4.235, (1, 4.235))))
 def test_PDG_precision(val, expected):
     assert PDG_precision(val) == expected
 
 
 @pytest.mark.parametrize(
-    "val1, val2, expected1, expected2",
-    [
+    ("val1", "val2", "expected1", "expected2"),
+    (
         (1, 2, ("1", "2"), ("1.0", "2.0")),
         (0, 0.125, ("0", "0.125"), ("0.00", "0.12")),
         (1, -0.1252, ("1", "-0.1252"), ("1", "")),
-    ],
+    ),
 )
 def test_pdg_round(val1, val2, expected1, expected2):
+    configure(round_on_display=False)
     assert pdg_round(val1, val2) == expected1
 
     configure(round_on_display=True)
@@ -192,8 +196,8 @@ def test_pdg_round(val1, val2, expected1, expected2):
 
 
 @pytest.mark.parametrize(
-    "value,error,expected",
-    [
+    ("value", "error", "expected"),
+    (
         # Examples from the PDG introduction, section 5.3.
         (0.827, 0.119, ("0.83", "0.12")),
         (0.827, 0.367, ("0.8", "0.4")),
@@ -215,7 +219,7 @@ def test_pdg_round(val1, val2, expected1, expected2):
         # Retain trailing zeros and use ties-to-even without double rounding.
         (1.225, 0.125, ("1.22", "0.12")),
         (1.235, 0.125, ("1.24", "0.12")),
-    ],
+    ),
 )
 def test_pdg_round_reference_cases(value, error, expected):
     configure(round_on_display=True)
@@ -223,8 +227,8 @@ def test_pdg_round_reference_cases(value, error, expected):
 
 
 @pytest.mark.parametrize(
-    "dtype,expected_value",
-    [(np.float16, "1.234"), (np.float32, "1.235"), (np.float64, "1.235")],
+    ("dtype", "expected_value"),
+    ((np.float16, "1.234"), (np.float32, "1.235"), (np.float64, "1.235")),
 )
 def test_pdg_round_numpy_scalars_and_display(dtype, expected_value):
     configure(round_on_display=True)
@@ -249,13 +253,13 @@ def test_pdg_round_explicit_format():
 
 
 @pytest.mark.parametrize(
-    "value,error,expected",
-    [
+    ("value", "error", "expected"),
+    (
         (1e-300, 1.23e-302, ("1.000e-300", "1.2e-302")),
         (1e300, 1.23e298, ("1.000e+300", "1.2e+298")),
         (0, 5e-324, ("0e-324", "5e-324")),
         (1e308, 9.99e307, ("1.0e+308", "1.0e+308")),
-    ],
+    ),
 )
 def test_pdg_round_extreme_magnitudes(value, error, expected):
     configure(round_on_display=True)
@@ -275,3 +279,22 @@ def test_pdg_round_ignores_external_decimal_precision():
     with decimal.localcontext() as context:
         context.prec = 2
         assert pdg_round(1.234567, 0.0949) == ("1.23", "0.09")
+
+
+def test_pdg_round_ignores_external_decimal_traps_and_exponent_limits():
+    configure(round_on_display=True)
+    with decimal.localcontext() as context:
+        context.prec = 2
+        context.rounding = decimal.ROUND_UP
+        context.Emin = -2
+        context.Emax = 2
+        for signal in context.traps:
+            context.traps[signal] = True
+        assert str(Uncertainty(1.2345, 0.012)) == "1.234 +/- 0.012"
+        assert pdg_round(1e300, 1.23e298) == ("1.000e+300", "1.2e+298")
+        assert pdg_round(1.225, 0.001, ".2f") == ("1.22", "0.00")
+        assert context.prec == 2
+        assert context.rounding == decimal.ROUND_UP
+        assert context.Emax == 2
+        assert all(context.traps.values())
+        assert not any(context.flags.values())

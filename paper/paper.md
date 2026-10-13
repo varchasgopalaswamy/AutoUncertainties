@@ -58,9 +58,10 @@ the cosine function requires the import of separate math libraries, rather than 
 # Using uncertainties v3.2.3
 import numpy as np
 from uncertainties import unumpy, ufloat
+
 arr = np.array([ufloat(1, 0.1), ufloat(2, 0.002)])
 unumpy.cos(arr)  # calculation succeeds
-np.cos(arr)      # raises an exception
+np.cos(arr)  # raises an exception
 ```
 
 The example above illustrates a primary limitation of the `uncertainties` package: arrays of 
@@ -91,17 +92,18 @@ These attributes and methods can be used in the following manner:
 
 ```python
 from auto_uncertainties import Uncertainty
+
 u1 = Uncertainty(5.25, 0.75)
 u2 = Uncertainty(1.85, 0.4)
 
-print(u1)                  # 5.25 +/- 0.75
-print(u1.value)            # 5.25
-print(u1.error)            # 0.75
-print(u1.relative)         # 0.142857
+print(u1)  # 5.25 +/- 0.75
+print(u1.value)  # 5.25
+print(u1.error)  # 0.75
+print(u1.relative)  # 0.142857
 print(u1.plus_minus(0.5))  # 5.25 +/- 0.901388
 
 # Construct a vector Uncertainty from a sequence.
-seq = Uncertainty([u1, u2]) 
+seq = Uncertainty([u1, u2])
 print(seq.value)  # [5.25 1.85]
 print(seq.error)  # [0.75 0.4 ]
 ```
@@ -111,6 +113,7 @@ Of course, one of the most important aspects of `AutoUncertainties` is its seaml
 ```python
 import numpy as np
 from auto_uncertainties import Uncertainty
+
 vals = np.array([0.5, 0.75])
 errs = np.array([0.05, 0.3])
 u = Uncertainty(vals, errs)
@@ -142,11 +145,11 @@ guarantees that unit information is preserved when moving between `Uncertainty` 
 from auto_uncertainties import Uncertainty
 from pint import Quantity
 
-val = Quantity(2.24, 'kg')
-err = Quantity(0.208, 'kg')
+val = Quantity(2.24, "kg")
+err = Quantity(0.208, "kg")
 new_quantity = Uncertainty.from_quantities(val, err)
 
-print(new_quantity)        # 2.24 +/- 0.208 kilogram
+print(new_quantity)  # 2.24 +/- 0.208 kilogram
 print(type(new_quantity))  # <class 'pint.Quantity'>
 ```
 

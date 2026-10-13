@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import re
 
-import loguru
+logger = logging.getLogger(__name__)
 
 
 def _format_function_defaults(docstring: str, obj_args: str) -> str:
-    """Backend function for format_function_docstring"""
+    """
+    Append signature defaults to rST parameter descriptions.
+
+    :param docstring: Existing rST function documentation.
+    :param obj_args: Rendered argument signature containing parameter defaults.
+    :return: The docstring with default values appended where not already documented.
+    """
     params = obj_args.split(", ")
     lines = docstring.splitlines()
 
@@ -71,8 +78,13 @@ def _format_function_defaults(docstring: str, obj_args: str) -> str:
     return result
 
 
-def _apply_regex_backticks(str_in) -> str:
-    """Helper function to add backticks using regex."""
+def _apply_regex_backticks(str_in: str) -> str:
+    """
+    Add cross-reference delimiters to a rendered type expression.
+
+    :param str_in: Partially formatted type expression.
+    :return: The expression with backticks around recognized components.
+    """
     str_in = re.sub(r"]+", lambda match: "`" + "]" * len(match.group(0)), str_in)
     str_in = re.sub(r"([a-zA-Z0-9~])\s", r"\1` ", str_in)
     str_in = re.sub(r"\s([a-zA-Z0-9~])", r" `\1", str_in)
@@ -80,8 +92,12 @@ def _apply_regex_backticks(str_in) -> str:
 
 
 def _format_alias(str_in: str) -> str:
-    """Backend function for format_alias"""
+    """
+    Render a type alias expression as indented rST references.
 
+    :param str_in: Rendered type alias expression.
+    :return: The indented rST representation, split into lines when needed.
+    """
     # Adjust this as desired if you import MODULE as ALIAS.
     # Don't forget to add the "." and any "~", if necessary.
     replacements = (
@@ -133,8 +149,12 @@ def _format_alias(str_in: str) -> str:
 
 
 def _format_typevar(str_in: str) -> str:
-    """Backend function for format_typevar"""
+    """
+    Render a type variable and its constraints as rST references.
 
+    :param str_in: Fully qualified name of the type variable to import.
+    :return: The indented rST representation of the variable and its constraints.
+    """
     # Adjust this as desired if necessary
     replacements = (("np.", "~numpy."), ("npt.", "~numpy.typing."))
 
@@ -146,15 +166,15 @@ def _format_typevar(str_in: str) -> str:
     # Start resulting string with "TypeVar("
     result = f'   | TypeVar(\n   |     "{var}",'
 
-    for constraint in constraints:
+    for constraint_type in constraints:
         # Isolate value from class wrapper
-        constraint = "`" + str(constraint).removeprefix("<class '").removesuffix("'>")
+        constraint = "`" + str(constraint_type).removeprefix("<class '").removesuffix("'>")
 
         # Replace constraint with alias if available in lotus.core.type
-        for key, value in module.__dict__.items():
+        for alias_name, alias_value in module.__dict__.items():
             key, value = (
-                str(key),
-                str(value).removeprefix("<class '").removesuffix("'>"),
+                str(alias_name),
+                str(alias_value).removeprefix("<class '").removesuffix("'>"),
             )
             if value in constraint:
                 constraint = constraint.replace(value, key)
@@ -181,54 +201,57 @@ def _format_typevar(str_in: str) -> str:
 
 def format_function_defaults(docstring: str, obj_args: str) -> str:
     """
-    Assists with formatting function docstrings by adding default values.
+    Add signature defaults to function documentation for the AutoAPI template.
 
-    The entire function is wrapped in a try-except block to ensure the docs never fail to build,
-    even if something changes that breaks this code.
+    :param docstring: Existing rST function documentation.
+    :param obj_args: Rendered argument signature containing parameter defaults.
+    :return: The updated docstring, or ``"ERROR"`` if formatting fails and a warning is
+        logged.
     """
     try:
         return _format_function_defaults(docstring, obj_args)
-    except Exception as e:
-        loguru.logger.warning(
+    except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
+        logger.warning(
             "Failed to format a function docstring. 'ERROR' will show up in the docs where this occured. "
-            f"The following exception was encountered: {e}"
+            "The following exception was encountered: %s",
+            e,
         )
         return "ERROR"
 
 
 def format_alias(str_in: str) -> str:
     """
-    Assists with formatting type aliases.
+    Format a type alias for the AutoAPI template.
 
-    Indentation and spaces are very important. Do not adjust unless you understand them fully.
-
-    The entire function is wrapped in a try-except block to ensure the docs never fail to build,
-    even if something changes that breaks this code.
+    :param str_in: Rendered type alias expression.
+    :return: The indented rST representation, or ``"ERROR"`` if formatting fails and a
+        warning is logged.
     """
     try:
         return _format_alias(str_in)
-    except Exception as e:
-        loguru.logger.warning(
+    except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
+        logger.warning(
             "Failed to format a TypeAlias. 'ERROR' will show up in the docs where this occured. "
-            f"The following exception was encountered: {e}"
+            "The following exception was encountered: %s",
+            e,
         )
         return "ERROR"
 
 
 def format_typevar(str_in: str) -> str:
     """
-    Assists with formatting type variables.
+    Format a type variable for the AutoAPI template.
 
-    Indentation and spaces are very important. Do not adjust unless you understand them fully.
-
-    The entire function is wrapped in a try-except block to ensure the docs never fail to build,
-    even if something changes that breaks this code.
+    :param str_in: Fully qualified name of the type variable.
+    :return: The indented rST representation, or ``"ERROR"`` if formatting fails and a
+        warning is logged.
     """
     try:
         return _format_typevar(str_in)
-    except Exception as e:
-        loguru.logger.warning(
+    except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
+        logger.warning(
             "Failed to format a TypeVar. 'ERROR' will show up in the docs where this occured. "
-            f"The following exception was encountered: {e}"
+            "The following exception was encountered: %s",
+            e,
         )
         return "ERROR"

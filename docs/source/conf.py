@@ -7,23 +7,30 @@ import importlib.metadata
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
+from pathlib import Path
 import sys
 
+from jinja2 import Environment
 import sphinx_rtd_theme  # noqa: F401
+
+lazy from docs.source.jinja_formatters import (
+    format_alias,
+    format_function_defaults,
+    format_typevar,
+)
 
 # -- Path setup --------------------------------------------------------------
 
 
-sys.path.insert(0, os.path.abspath("../../"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "auto_uncertainties"
 version = importlib.metadata.version(project)
 release = version
-this_year = datetime.date.today()
-copyright = f"2021-{this_year:%Y} Varchas Gopalaswamy"
+this_year = datetime.datetime.now(datetime.UTC)
+copyright = f"2021-{this_year:%Y} Varchas Gopalaswamy"  # noqa: A001 - Sphinx configuration name.
 author = "Varchas Gopalaswamy"
 
 # -- General configuration ---------------------------------------------------
@@ -96,7 +103,6 @@ intersphinx_mapping = {
     "dask": ("https://docs.dask.org/en/latest", None),
     "sparse": ("https://sparse.pydata.org/en/latest/", None),
     "pint": ("https://pint.readthedocs.io/en/stable", None),
-    "pandas": ("https://pandas.pydata.org/docs/", None),
     "jax": ("https://jax.readthedocs.io/en/latest/", None),
 }
 
@@ -133,13 +139,13 @@ autoapi_options = [
 
 
 # Custom jinja environment additions for AutoAPI
-def autoapi_prepare_jinja_env(jinja_env):
-    from docs.source.jinja_formatters import (
-        format_alias,
-        format_function_defaults,
-        format_typevar,
-    )
+def autoapi_prepare_jinja_env(jinja_env: Environment) -> None:
+    """
+    Register the documentation filters used by the AutoAPI templates.
 
+    :param jinja_env: Jinja environment to configure before rendering API documentation.
+    :return: ``None``.
+    """
     # Add custom jinja filters and functions
     jinja_env.filters["format_alias"] = format_alias
     jinja_env.filters["format_typevar"] = format_typevar

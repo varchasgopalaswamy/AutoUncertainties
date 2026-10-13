@@ -1,77 +1,78 @@
+target-version = "py315"
 
-target-version = "py311"
+line-length = 99
 
 [lint]
 select = [
-    "I",
-    "W291", 
-    "W292", 
-    "T100", 
-    "YTT",
-    "UP009", 
-    "E",
-    "F",
-    "UP",
-    "B",
-    "SIM",
-    "A",
-    "COM",
-    "C4",
-    "DTZ",
-    "EM",
-    "EXE",
-    "FA",
-    "ISC",
-    "ICN",
-    "LOG",
-    "G",
-    "INP",
-    "PIE",
-    "T20",
-    "PYI",
-    "PT",
-    "Q",
-    "RSE",
-    "RET",
-    "SLF",
-    "TID",
-    "INT",
-    "PTH",
-    "TD",
-    "PD",
-    "TRY",
-    "FLY",
-    "NPY",
-    "PERF",
-    "RUF",
-    "S",
+    "ALL",
 ]
-
-ignore = ["E501", "ISC002", "ISC001", 
-"COM819", "COM812", "Q003", "Q002", "Q001", "Q000", 
-"D300", "D206", "E117", "E114", "E111", "W191",
-"B008", "SIM300", "S101", "RET505", "SLF001", "RET506", "S607", "RET503", "PYI059"
+allowed-confusables = ["ρ"]
+extend-safe-fixes = ["EM102", "EM101", "SIM108", "RET504", "C408", "D200", "RUF052", "TC003", "ICN001"]
+ignore = [
+    "PLR",
+    "C",
+    "ARG001",
+    "E501", # line-too-long
+    "W291",
+    "TRY002",
+    "TRY301",
+    "SLF001",
+    "RUF015",
+    "PIE796",
+    "A005",
+    "UP040",
+    "COM812", # conflicts with formatter
+    "UP046", # disable until IDE supports it
+    "UP047", # disable until IDE supports it
+    "RUF005", # Bad interactions with numpy arrays
+    "RUF002", # Greek characters in docstrings
+    "D401", "D415", "D400", "D301", "D404", # Docstring style/grammar
+    "D103", "D100", "D104", "D102", "D105", "D107", "D101", "D417", # Missing docstring
+    "D205", # Reenable these
+    "D211", "D212", "D203",
+    "G004", # I dont care about the performance implication
+    "RUF031", # not sure about this one for now
+    "PT018", # I dont mind multi-part asserts
+    "UP037", "F722", # Needed for jaxtyping
+    "PLR0913", # I can use as many arguments as I want mom!
+    "T201",
+    "N806", # Uppercases in variable names make sense for physicists
+    "ERA001",
+    "ANN401",
+    "S101",
+    "TC002",
+    "TC001",
+    "N803",
+    "N802",
+    "PLC0105",
+    "RUF018",
+    "ANN204",
+    "N815",
+    "RET505",
+    "ARG002",
+    "CPY001",
 ]
-
-exclude = ["tests/**.py", "docs/**.py"]
-
+exclude = ["*.pyi", "*.ipynb", "doc/*"]
 [lint.per-file-ignores]
-"__init__.py" = ["F401", "E402", "I001", "I002", "F811"]
-"__init__.pyi" = ["F401", "E402", "I001", "I002"]
-"doc/source/conf.py" = ["INP001"]
+"__init__.py" = ["F401", "E402", "I001", "I002", "F811", "D419", "F822"]
+"__init__.pyi" = ["F401", "E402", "I001", "I002", "D419", "F822"]
+"docs/**/*.py" = ["INP001"]
+"tests/**/*.py" = ["D", "ANN", "INP001", "I002", "SIM102", "PLC0415"]
+# Report dependencies are optional and therefore intentionally imported only when rendering.
+
+[lint.isort]
+from-first = false
+force-sort-within-sections = true
 
 [format]
 docstring-code-format = true
 line-ending = "lf"
 
-[lint.isort]
-from-first = false
-known-first-party = ["hibiscus"]
-force-sort-within-sections = true
-required-imports = ["from __future__ import annotations"]
 
-[lint.flake8-bugbear]
-extend-immutable-calls = ["pylatex.utils.NoEscape"]
+[lint.flake8-import-conventions.aliases]
+"matplotlib.pyplot" = "plt"
+"numpy" = "np"
+"jax.numpy" = "jnp"
 
-[lint.flake8-self]
-ignore-names = []
+[lint.flake8-pytest-style]
+parametrize-values-type = "tuple"
