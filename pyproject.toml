@@ -7,59 +7,63 @@ authors = [
 description = "Linear Uncertainty Propagation with Auto-Differentiation"
 readme = "README.md"
 requires-python = ">=3.15"
+license = "GPL-3.0-or-later"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 dependencies = [
-    "numpy >= 2.0",
-    "jax >= 0.9",
-    "jaxlib >= 0.9",
-    "pydantic-settings >= 2.0, < 3",
+    "numpy>=2.5.4",
+    "jax>=0.11.2",
+    "jaxlib>=0.11.2",
+    "pydantic-settings>=2.15.0",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 docs = [
-    "sphinx >= 4.1.2",
-    "sphinx_rtd_theme >= 1.0.0",
-    "sphinxcontrib-bibtex >= 2.3.1",
-    "sphinxcontrib-napoleon >= 0.7",
-    "sphinx-autodoc-typehints",
-    "sphinx-copybutton",
-    "sphinx-design",
-    "graphviz",
-    "sphinx-autoapi",
-    "furo",
+    "sphinx>=9.1.0",
+    "sphinx_rtd_theme>=3.1.0",
+    "sphinxcontrib-bibtex>=2.7.0",
+    "sphinxcontrib-napoleon>=0.7",
+    "sphinx-autodoc-typehints>=3.13.10",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-design>=0.7.0",
+    "graphviz>=0.21",
+    "sphinx-autoapi>=3.8.1",
+    "furo>=2025.12.19",
 ]
 
 [dependency-groups]
 ci = [
-    "pytest",
-    "pytest-cov",
-    "hypothesis",
-    "pint",
-    "ruff>=0.17",
-    "pyrefly>=0.58.0",
-    "geninit>=0.2.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "hypothesis>=6.169.0",
+    "pint>=0.26.1",
+    "ruff>=0.17.0",
+    "pyrefly>=1.3.2",
+    "geninit>=0.3.1",
+    "prek>=0.5.5",
 ]
 
+release = ["build>=1.6.1", "twine>=7.0.0"]
+
 [build-system]
-requires = ["setuptools >= 67.0.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=84.0.0", "setuptools_scm>=10.3.4"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "auto_uncertainties/_version.py"
+write_to = "auto_uncertainties/version.py"
 
 [tool.setuptools.packages.find]
-exclude = ["tests/*"]
+include = ["auto_uncertainties", "auto_uncertainties.*"]
 
 [tool.geninit]
 roots = ["auto_uncertainties"]
+exclude = ["version.py"]
 
 [tool.coverage.run]
 source = ["./"]
-omit =  ["*/test*", "*/*__init__.py", "*/_version.py"]
+omit =  ["*/test*", "*/*__init__.py", "*/version.py"]
 
 
 [tool.pytest.ini_options]

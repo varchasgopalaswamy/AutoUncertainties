@@ -140,7 +140,7 @@ Custom functions
 ----------------
 
 Use :func:`auto_uncertainties.propagate_uncertainties` as
-``@propagate_uncertainties`` or ``@propagate_uncertainties()`` to propagate errors
+``@propagate_uncertainties`` to propagate errors
 through a JAX-compatible function. Write array operations using ``jax.numpy``;
 the function receives nominal values. Uncertain inputs can appear in positional
 or keyword arguments, including nested lists, tuples, and dictionaries. Outputs
@@ -171,7 +171,7 @@ Functions that mix array elements are supported. A tuple result preserves its st
 
 .. code-block:: python
 
-   >>> @propagate_uncertainties()
+   >>> @propagate_uncertainties
    ... def center_and_mean(values):
    ...     mean = jnp.mean(values)
    ...     return values - mean, mean
@@ -212,16 +212,11 @@ is first imported.
      - ``False``
    * - ``compare_rtol``
      - ``1e-9``
-   * - ``error_on_numpy_kwargs``
-     - ``True``
-   * - ``warn_on_numpy_kwargs``
-     - ``True``
    * - ``nonfinite_error_policy``
      - ``"zero"``
 
-Comparison tolerance must be finite and nonnegative. ``error_on_numpy_kwargs`` and
-``warn_on_numpy_kwargs`` remain accepted for configuration compatibility and no
-longer affect propagation. Uncertain keyword arguments are supported.
+Comparison tolerance must be finite and nonnegative. Uncertain keyword arguments
+are supported, and unsupported arguments raise an error.
 
 .. code-block:: bash
 
@@ -252,5 +247,5 @@ The public ``set_display_rounding``, ``set_downcast_error``, ``set_equality_erro
 ``set_compare_rtol``, and ``exceptions.set_numpy_kwargs_propagate_error`` functions
 have been removed. Replace calls with ``configure(round_on_display=...)``,
 ``configure(error_on_downcast=...)``, ``configure(error_on_equality=...)``,
-``configure(compare_rtol=...)``, and ``configure(error_on_numpy_kwargs=...)``,
-respectively.
+and ``configure(compare_rtol=...)``, respectively. The NumPy keyword setting has
+no replacement: argument validation is always enabled.

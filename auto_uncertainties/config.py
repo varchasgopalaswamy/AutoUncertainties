@@ -23,10 +23,6 @@ class Settings(BaseSettings):
     :param error_on_equality: Raise an error instead of warning when equal nominal
         values have different errors.
     :param compare_rtol: Nonnegative relative tolerance for scalar equality comparisons.
-    :param error_on_numpy_kwargs: Compatibility setting; argument validation is always
-        enabled.
-    :param warn_on_numpy_kwargs: Compatibility setting; unsupported arguments are
-        rejected.
     :param nonfinite_error_policy: Use ``"zero"`` to replace nonfinite errors with zero,
         or ``"propagate"`` to preserve infinite errors and propagate NaNs.
     """
@@ -39,12 +35,10 @@ class Settings(BaseSettings):
     error_on_downcast: bool = False
     error_on_equality: bool = False
     compare_rtol: float = Field(default=1e-9, ge=0, allow_inf_nan=False)
-    error_on_numpy_kwargs: bool = True
-    warn_on_numpy_kwargs: bool = True
     nonfinite_error_policy: Literal["zero", "propagate"] = "zero"
 
 
-_settings = Settings()
+settings = Settings()
 
 
 def get_settings() -> Settings:
@@ -53,7 +47,7 @@ def get_settings() -> Settings:
 
     :return: The settings used by subsequent library operations.
     """
-    return _settings
+    return settings
 
 
 def configure(**changes: Any) -> None:
@@ -71,6 +65,6 @@ def configure(**changes: Any) -> None:
     if unknown:
         msg = f"Unknown settings: {', '.join(sorted(unknown))}"
         raise ValueError(msg)
-    candidate = Settings(**(_settings.model_dump() | changes))
+    candidate = Settings(**(settings.model_dump() | changes))
     for name in changes:
-        setattr(_settings, name, getattr(candidate, name))
+        setattr(settings, name, getattr(candidate, name))

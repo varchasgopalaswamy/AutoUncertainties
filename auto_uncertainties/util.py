@@ -5,11 +5,9 @@ from typing import Any, ParamSpec, TypeGuard, TypeVar
 import warnings
 lazy from collections.abc import Callable, Iterable
 
-from jax import Array
-import numpy as np
-from numpy.typing import NDArray
-
 from .exceptions import DowncastWarning
+
+__all__ = ()
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -51,30 +49,6 @@ def ignore_numpy_downcast_warnings(f: Callable[P, R]) -> Callable[P, R]:
     return user_warn_inner
 
 
-def deprecated(
-    reason: str = "", category: type[Warning] = DeprecationWarning
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    """
-    Warn when a decorated function is called.
-
-    :param reason: Explanation appended to the deprecation warning.
-    :param category: Warning category to emit.
-    :return: A decorator that warns before forwarding each call.
-    """
-
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
-        msg = f"{func.__name__} is deprecated" + (f" ({reason})." if reason else ".")
-
-        @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            warnings.warn(msg, category, stacklevel=2)
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 def is_iterable(y: Any) -> TypeGuard[Iterable[Any]]:
     """
     Check whether an object supports iteration.
@@ -101,24 +75,3 @@ def has_length(y: Any) -> bool:
     except TypeError:
         return False
     return True
-
-
-def ndarray_to_scalar(value: NDArray[Any]) -> Any:
-    """
-    Extract the only element of an array.
-
-    :param value: Array containing exactly one element.
-    :return: The array element converted to a scalar.
-    :raises ValueError: The array does not contain exactly one element.
-    """
-    return np.ndarray.item(strip_device_array(value))
-
-
-def strip_device_array(value: Array | NDArray[Any] | float) -> NDArray[Any]:
-    """
-    Copy values into a NumPy array on the host.
-
-    :param value: Values to copy, potentially stored on a JAX device.
-    :return: A NumPy array containing the values.
-    """
-    return np.array(value)

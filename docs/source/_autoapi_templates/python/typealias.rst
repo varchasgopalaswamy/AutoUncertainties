@@ -11,7 +11,8 @@
    {{ obj.docstring|indent(3) }}
    {% endif %}
 
-   :TYPE ALIAS:
+   .. rubric:: Type alias
+
 {{ obj.value|format_alias() }}
 
 {% endif %}

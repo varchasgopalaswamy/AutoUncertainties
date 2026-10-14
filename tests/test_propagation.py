@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from auto_uncertainties import Uncertainty, propagate_uncertainties
-from auto_uncertainties._propagation import precision_context
+from auto_uncertainties.propagation import precision_context
 
 
 def test_permutations_and_coupled_outputs():
@@ -29,7 +29,7 @@ def test_reused_input_and_scalar_broadcast_preserve_internal_dependence():
 
 
 def test_different_input_shapes_and_keyword_uncertainty():
-    @propagate_uncertainties()
+    @propagate_uncertainties
     def scaled(x, *, gain):
         return {"scaled": x * gain, "total": jnp.sum(x * gain)}
 
@@ -126,17 +126,19 @@ def test_no_uncertain_inputs_and_output_metadata():
     assert index.value == 1 and index.error == 0
 
 
-def test_legacy_modes_use_general_propagation_and_preserve_metadata():
+def test_decorator_preserves_metadata_and_rejects_removed_options():
     def reverse(x):
         """Original documentation."""
         return x[::-1]
 
-    fn = propagate_uncertainties(reverse, "same_shape")
+    fn = propagate_uncertainties(reverse)
     assert fn.__name__ == "reverse"
     assert fn.__doc__ == reverse.__doc__
     np.testing.assert_allclose(fn(Uncertainty([1, 2], [0.1, 0.2])).error, [0.2, 0.1])
-    with pytest.raises(ValueError, match="Invalid implement_mode"):
-        propagate_uncertainties(reverse, "invalid")
+    with pytest.raises(TypeError):
+        propagate_uncertainties(reverse, implement_mode="same_shape")
+    with pytest.raises(TypeError, match="required positional argument: 'func'"):
+        propagate_uncertainties()
 
 
 def test_empty_input_and_output_arrays():

@@ -13,36 +13,24 @@ import numpy.typing as npt
 
 lazy from auto_uncertainties.uncertainty.uncertainty_containers import Uncertainty
 
+__all__ = ()
 
-class _UncertaintyLike(Protocol):
+
+class UncertaintyLike(Protocol):
     """Describe the nominal values and errors used by propagation helpers."""
 
-    _nom: Any
-    _err: Any
+    nom: Any
+    err: Any
 
 
-def is_uncertainty(value: object) -> TypeGuard[_UncertaintyLike]:
+def is_uncertainty(value: object) -> TypeGuard[UncertaintyLike]:
     """
     Check for the nominal-value and error attributes of an uncertainty.
 
     :param value: Object to inspect.
-    :return: Whether the object exposes both ``_nom`` and ``_err``.
+    :return: Whether the object exposes both ``nom`` and ``err``.
     """
-    return hasattr(value, "_nom") and hasattr(value, "_err")
-
-
-def nominal_tree(tree: Any) -> Any:
-    """
-    Replace uncertainty leaves with nominal values, preserving tree structure.
-
-    :param tree: Argument pytree that may contain uncertainty objects.
-    :return: The pytree with exact leaves unchanged and uncertainties replaced.
-    """
-    return jax.tree_util.tree_map(
-        lambda value: value._nom if is_uncertainty(value) else value,
-        tree,
-        is_leaf=is_uncertainty,
-    )
+    return hasattr(value, "nom") and hasattr(value, "err")
 
 
 @contextmanager
@@ -62,7 +50,7 @@ def precision_context(*trees: Any) -> Iterator[None]:
     leaves = jax.tree_util.tree_leaves(trees, is_leaf=is_uncertainty)
     numeric = []
     for leaf in leaves:
-        candidates = (leaf._nom, leaf._err) if is_uncertainty(leaf) else (leaf,)
+        candidates = (leaf.nom, leaf.err) if is_uncertainty(leaf) else (leaf,)
         for value in candidates:
             if isinstance(value, np.dtype | type):
                 try:
@@ -95,7 +83,7 @@ def precision_context(*trees: Any) -> Iterator[None]:
         yield
 
 
-def _weighted_derivative(derivative: npt.ArrayLike, error: npt.ArrayLike) -> npt.NDArray[Any]:
+def weighted_derivative(derivative: npt.ArrayLike, error: npt.ArrayLike) -> npt.NDArray[Any]:
     """
     Scale a derivative by its input error without introducing spurious NaNs.
 
@@ -117,7 +105,7 @@ def _weighted_derivative(derivative: npt.ArrayLike, error: npt.ArrayLike) -> npt
     return result
 
 
-def _wrap_result(
+def wrap_result(
     value: npt.ArrayLike, error: npt.ArrayLike
 ) -> Uncertainty[Any] | np.bool_ | npt.NDArray[np.bool_]:
     """
@@ -133,7 +121,7 @@ def _wrap_result(
     return Uncertainty(value, np.asarray(error))
 
 
-def _elementwise(
+def propagate_elementwise(
     func: Callable[..., Any],
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
@@ -150,7 +138,7 @@ def _elementwise(
     :raises TypeError: Operand promotion does not produce an inexact dtype.
     """
     nominal = tuple(
-        arg._nom
+        arg.nom
         if is_uncertainty(arg)
         else np.asarray(arg)
         if isinstance(arg, tuple | list)
@@ -177,13 +165,13 @@ def _elementwise(
         gradients = pullback(jnp.ones_like(value))
         error = np.zeros(np.shape(value), dtype=np.asarray(value).dtype)
         for position, gradient in zip(positions, gradients, strict=True):
-            error = np.hypot(error, _weighted_derivative(gradient, args[position]._err))
+            error = np.hypot(error, weighted_derivative(gradient, args[position].err))
     else:
         value = func(*promoted, **kwargs)
         error = np.zeros(np.shape(value))
     if nominal_func is not None:
         value = nominal_func(*nominal, **kwargs)
-    return _wrap_result(value, error)
+    return wrap_result(value, error)
 
 
 def propagate(
@@ -215,13 +203,13 @@ def propagate(
     """
     with precision_context(args, kwargs):
         if elementwise:
-            return _elementwise(func, args, kwargs, nominal_func)
+            return propagate_elementwise(func, args, kwargs, nominal_func)
 
         leaves, structure = jax.tree_util.tree_flatten((args, kwargs), is_leaf=is_uncertainty)
         positions = tuple(i for i, leaf in enumerate(leaves) if is_uncertainty(leaf))
-        nominal_leaves = [leaf._nom if is_uncertainty(leaf) else leaf for leaf in leaves]
+        nominal_leaves = [leaf.nom if is_uncertainty(leaf) else leaf for leaf in leaves]
         values = tuple(jnp.asarray(nominal_leaves[i]) for i in positions)
-        errors = tuple(np.asarray(leaves[i]._err) for i in positions)
+        errors = tuple(np.asarray(leaves[i].err) for i in positions)
         for value in values:
             if not jnp.issubdtype(value.dtype, jnp.floating):
                 msg = f"Uncertain inputs must have real floating-point values, got {value.dtype}"
@@ -236,7 +224,7 @@ def propagate(
 
         if not positions:
             value = (nominal_func or func)(*args, **kwargs)
-            return jax.tree_util.tree_map(lambda val: _wrap_result(val, np.zeros_like(val)), value)
+            return jax.tree_util.tree_map(lambda val: wrap_result(val, np.zeros_like(val)), value)
 
         def value_with_aux(*dynamic: jax.Array) -> tuple[Any, Any]:
             value = evaluate(*dynamic)
@@ -287,9 +275,9 @@ def propagate(
             output = np.asarray(output_value)
             error = np.zeros(output.shape, dtype=np.result_type(output, *errors))
             for derivative, input_error in zip(derivatives, errors, strict=True):
-                weighted = _weighted_derivative(derivative, input_error)
+                weighted = weighted_derivative(derivative, input_error)
                 weighted = weighted.reshape((*output.shape, input_error.size))
                 contribution = np.hypot.reduce(np.abs(weighted), axis=-1, initial=0)
                 error = np.hypot(error, contribution)
-            results.append(_wrap_result(output, error))
+            results.append(wrap_result(output, error))
         return jax.tree_util.tree_unflatten(output_structure, results)

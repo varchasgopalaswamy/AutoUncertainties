@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import warnings
 
 import numpy as np
 from pydantic import ValidationError
@@ -16,7 +15,6 @@ from auto_uncertainties import (
     configure,
     get_settings,
 )
-from auto_uncertainties.numpy.numpy_wrappers import classify_and_split_args_and_kwargs
 
 
 def test_environment_initialization():
@@ -66,8 +64,6 @@ def test_environment_validation(monkeypatch):
         ("error_on_downcast", "1", True),
         ("error_on_equality", "true", True),
         ("compare_rtol", "0.01", 0.01),
-        ("error_on_numpy_kwargs", "false", False),
-        ("warn_on_numpy_kwargs", "false", False),
         ("nonfinite_error_policy", "propagate", "propagate"),
     ),
 )
@@ -113,17 +109,7 @@ def test_comparison_tolerance():
         assert u == 1.01
 
 
-@pytest.mark.parametrize("enabled", (False, True))
-def test_legacy_numpy_keyword_settings_do_not_reject_uncertainties(enabled):
-    arg = Uncertainty(1.0, 0.1)
-    configure(
-        error_on_numpy_kwargs=enabled,
-        warn_on_numpy_kwargs=enabled,
-    )
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter("always")
-        _, values, errors, kwargs = classify_and_split_args_and_kwargs(arg, other=arg)
-    assert values == (1.0,)
-    assert errors == (0.1,)
-    assert kwargs == {"other": 1.0}
-    assert not seen
+@pytest.mark.parametrize("name", ("error_on_numpy_kwargs", "warn_on_numpy_kwargs"))
+def test_removed_numpy_keyword_settings_are_rejected(name):
+    with pytest.raises(ValueError, match="Unknown settings"):
+        configure(**{name: True})

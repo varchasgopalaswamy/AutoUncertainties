@@ -9,22 +9,17 @@ import numpy.typing as npt
 
 from auto_uncertainties.config import get_settings
 
-__all__ = [
-    "ScalarDisplay",
-    "UncertaintyDisplay",
-    "VectorDisplay",
-]
+__all__ = ()
+
+DisplayT = TypeVar("DisplayT", float, np.floating, npt.NDArray[np.floating])
 
 
-_DisplayT = TypeVar("_DisplayT", float, np.floating, npt.NDArray[np.floating])
-
-
-class UncertaintyDisplay(Generic[_DisplayT]):
+class UncertaintyDisplay(Generic[DisplayT]):
     """Provide text, HTML, and LaTeX representations of nominal values and errors."""
 
     default_format: str = ""
-    _nom: _DisplayT
-    _err: _DisplayT
+    nom: DisplayT
+    err: DisplayT
 
     def _repr_html_(self) -> str:
         """
@@ -32,8 +27,8 @@ class UncertaintyDisplay(Generic[_DisplayT]):
 
         :return: The formatted value and error, using a table for arrays.
         """
-        val_ = self._nom
-        err_ = self._err
+        val_ = self.nom
+        err_ = self.err
 
         # Vector uncertainty
         if isinstance(val_, np.ndarray) and isinstance(err_, np.ndarray):
@@ -64,8 +59,8 @@ class UncertaintyDisplay(Generic[_DisplayT]):
 
         :return: The formatted value and error with LaTeX uncertainty notation.
         """
-        val_ = self._nom
-        err_ = self._err
+        val_ = self.nom
+        err_ = self.err
 
         # Vector uncertainty
         if isinstance(val_, np.ndarray) and isinstance(err_, np.ndarray):
@@ -94,8 +89,8 @@ class UncertaintyDisplay(Generic[_DisplayT]):
         :return: The nominal value and error formatted using the current rounding
             settings.
         """
-        val_ = self._nom
-        err_ = self._err
+        val_ = self.nom
+        err_ = self.err
 
         # Vector uncertainty
         if isinstance(val_, np.ndarray) and isinstance(err_, np.ndarray):
@@ -122,8 +117,8 @@ class UncertaintyDisplay(Generic[_DisplayT]):
             rounding.
         :return: The formatted uncertainty, including a zero error when applicable.
         """
-        val_ = self._nom
-        err_ = self._err
+        val_ = self.nom
+        err_ = self.err
 
         if isinstance(val_, np.ndarray) and isinstance(err_, np.ndarray):
             s = []
@@ -152,11 +147,6 @@ class UncertaintyDisplay(Generic[_DisplayT]):
         :return: The same display text as :meth:`__str__`.
         """
         return str(self)
-
-
-# Kept for compatibility.
-ScalarDisplay = UncertaintyDisplay
-VectorDisplay = UncertaintyDisplay
 
 
 # From https://github.com/lmfit/uncertainties/blob/master/uncertainties/core.py

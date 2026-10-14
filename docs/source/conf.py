@@ -63,7 +63,7 @@ exclude_patterns = [
     "_autoapi_templates",
 ]
 
-autoapi_ignore = ["tests*", "*_version.py"]
+autoapi_ignore = ["tests*", "*version.py"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = "sphinx"
@@ -88,7 +88,7 @@ html_title = f"{project} v{version} Manual"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 default_role = "py:obj"
 
@@ -134,7 +134,6 @@ autoapi_options = [
     "show-module-summary",
     "special-members",
     "imported-members",
-    "show-inheritance-diagram",
 ]
 
 

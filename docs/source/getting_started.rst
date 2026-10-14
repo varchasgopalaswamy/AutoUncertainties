@@ -9,8 +9,8 @@ Getting Started
    :target: https://www.python.org/downloads/
    :alt: python
 
-Python 3.15 or newer is required, together with NumPy 2.0 or newer and JAX/JAXlib
-0.9 or newer. The installer selects releases compatible with your Python version.
+Python 3.15 or newer is required, together with NumPy 2.5.4 or newer and JAX/JAXlib
+0.11.2 or newer. The installer selects releases compatible with your Python version.
 
 * AutoUncertainties is easy to install via ``pip``:
 

@@ -176,6 +176,7 @@ Indices and Tables
    basic_usage
    numpy_integration
    contribution
+   migration
 
 .. toctree::
    :maxdepth: 2

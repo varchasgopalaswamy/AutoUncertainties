@@ -24,6 +24,7 @@ import numpy as np
 import numpy.typing as npt
 lazy from pint.facets.plain import PlainQuantity
 
+from auto_uncertainties.arithmetic import binary
 from auto_uncertainties.config import get_settings
 from auto_uncertainties.display_format import UncertaintyDisplay
 from auto_uncertainties.exceptions import (
@@ -33,20 +34,19 @@ from auto_uncertainties.exceptions import (
     EqualityWarning,
     NegativeStdDevError,
 )
-from auto_uncertainties.numpy import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
-from auto_uncertainties.util import deprecated, ignore_runtime_warnings
+from auto_uncertainties.numpy.numpy_wrappers import HANDLED_FUNCTIONS, HANDLED_UFUNCS, wrap_numpy
+from auto_uncertainties.units import split_units
+from auto_uncertainties.util import ignore_runtime_warnings
 
 __all__ = [
-    "ScalarUncertainty",
     "UType",
     "Uncertainty",
-    "VectorUncertainty",
     "nominal_values",
     "std_devs",
 ]
 
-_F = TypeVar("_F", bound=Callable[..., Any])
-T = TypeVar("T", float, np.floating, npt.NDArray[np.floating])
+F = TypeVar("F", bound=Callable[..., Any])
+ValueT = TypeVar("ValueT", float, np.floating, npt.NDArray[np.floating])
 """`TypeVar` specifying the underlying data types supporting `Uncertainty` objects."""
 
 UType: TypeAlias = float | np.floating | npt.NDArray[np.floating]
@@ -66,7 +66,7 @@ ErrT: TypeAlias = ScalarT | Sequence[ScalarT] | npt.NDArray[np.number]
 
 
 # Helper decorator to raise an informative TypeError when an operation is unsupported.
-def _unsupported_type(t: str) -> Callable[[_F], _F]:
+def unsupported_type(t: str) -> Callable[[F], F]:
     """
     Restrict a method to scalar or vector uncertainties.
 
@@ -76,87 +76,34 @@ def _unsupported_type(t: str) -> Callable[[_F], _F]:
         selector is invalid.
     """
 
-    def decorator(func: _F) -> _F:
+    def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(self: Uncertainty[Any], *args: Any, **kwargs: Any) -> Any:
             if t == "vec":
                 if self.is_vector:
-                    raise TypeError(_type_error_msg("Vector", func.__qualname__))
+                    raise TypeError(type_error_msg("Vector", func.__qualname__))
             elif t == "scal":
                 if not self.is_vector:
-                    raise TypeError(_type_error_msg("Scalar", func.__qualname__))
+                    raise TypeError(type_error_msg("Scalar", func.__qualname__))
             else:
-                msg = "Invalid arguments passed to _unsupported_type decorator"
+                msg = "Invalid arguments passed to unsupported_type decorator"
                 raise TypeError(msg)
             return func(self, *args, **kwargs)
 
-        return cast("_F", wrapper)
+        return cast("F", wrapper)
 
     return decorator
 
 
-def _power_uncertainty(
-    value: npt.ArrayLike,
-    error: npt.ArrayLike,
-    exponent: npt.ArrayLike,
-    exponent_error: npt.ArrayLike,
-) -> tuple[np.number | npt.NDArray[np.number], np.number | npt.NDArray[np.number]]:
-    """
-    Evaluate a real power and propagate independent errors at the nominal values.
-
-    :param value: Nominal base values.
-    :param error: Base standard deviations.
-    :param exponent: Nominal exponents.
-    :param exponent_error: Exponent standard deviations.
-    :return: The nominal power and its propagated standard deviation, with broadcast
-        operand shapes.
-    """
-    with np.errstate(all="ignore"):
-        # Preserve NumPy's scalar promotion rules before broadcasting operands.
-        nominal = np.power(value, exponent)
-        dtype = np.result_type(nominal, error, exponent_error)
-        value, error, exponent, exponent_error = np.broadcast_arrays(
-            value, error, exponent, exponent_error
-        )
-        base_derivative = np.where(exponent == 0, 0, exponent * np.power(value, exponent - 1))
-        exponent_derivative = np.where(
-            (value == 0) & (exponent > 0),
-            0,
-            nominal * np.log(np.abs(value)),
-        )
-        base_term = np.zeros(nominal.shape, dtype=dtype)
-        exponent_term = np.zeros(nominal.shape, dtype=dtype)
-        # Exact operands and zero derivatives contribute no error, including at
-        # boundaries or when the corresponding standard deviation is infinite.
-        np.multiply(
-            base_derivative,
-            error,
-            out=base_term,
-            where=(error != 0) & (base_derivative != 0),
-        )
-        np.multiply(
-            exponent_derivative,
-            exponent_error,
-            out=exponent_term,
-            where=(exponent_error != 0) & (exponent_derivative != 0),
-        )
-        propagated = np.hypot(base_term, exponent_term)
-    if nominal.ndim == 0:
-        return nominal[()], propagated[()]
-    return nominal, propagated
-
-
-class Uncertainty(UncertaintyDisplay[T]):
+class Uncertainty(UncertaintyDisplay[ValueT]):
     """
     Represent a central value and its associated uncertainty.
 
     Parameters can be numbers, sequences, `numpy` arrays, `pint.Quantity` objects,
     other `Uncertainty` objects, or lists / tuples of `Uncertainty` objects.
 
-    The `Uncertainty` class automatically determines which methods should be implemented based on
-    whether it represents a vector uncertainty, or a scalar uncertainty. When instantiated with
-    sequences or `numpy` arrays, vector-based operations are enabled; when instantiated with scalars,
-    only scalar operations are permitted.
+    Array methods have explicit signatures. Indexing, mutation, and storage-view
+    methods require array inputs; NumPy operations also support scalar values.
 
     `Uncertainty` objects only support float-based data types. If integers or
     integer arrays are passed as parameters to the `Uncertainty` constructor,
@@ -167,7 +114,7 @@ class Uncertainty(UncertaintyDisplay[T]):
     :param error: Standard deviations; omitted errors are zero. Existing
         uncertainties in ``value`` supply their own errors.
     :return: An initialized uncertainty, wrapped in a quantity when units are supplied.
-    :raises NegativeStdDevError: An error is negative under the configured
+    :raises auto_uncertainties.exceptions.NegativeStdDevError: An error is negative under the configured
         nonfinite policy.
     :raises TypeError: The parameter types are unsupported or incompatible.
     :raises ValueError: The value and error shapes or sequence lengths differ.
@@ -224,10 +171,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         * `from_quantities`
     """
 
-    _nom: T
-    _err: T
+    nom: ValueT
+    err: ValueT
 
-    # __new__ intercepts non-finite values, Pint Quantity inputs, and sequences of Quantity objects.
+    # Only quantity inputs need to replace the object returned by construction.
     @overload
     def __new__(
         cls,
@@ -245,7 +192,6 @@ class Uncertainty(UncertaintyDisplay[T]):
         value: ValT | PlainQuantity | Sequence[PlainQuantity],
         error: ErrT | PlainQuantity | Sequence[PlainQuantity] | None = None,
     ) -> Uncertainty[Any] | PlainQuantity:
-        # Use from_quantities if one or more Pint Quantity objects were supplied.
         """
         Construct an uncertainty, preserving quantity units where present.
 
@@ -254,16 +200,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: An initialized uncertainty, wrapped in a quantity when the inputs
             supply units.
         """
-        if _check_units(value, error)[2] is not None:
-            return cls.from_quantities(value, error)
-
-        # Use from_sequence if a sequence is supplied.
-        if isinstance(value, Sequence):
-            return cls.from_sequence(value, error)
-
-        instance = super().__new__(cls)
-        instance.__init__(cast("ValT", value), cast("ErrT | None", error), skip=False)
-        return instance
+        magnitude, deviation, units = split_units(value, error)
+        if units is not None:
+            return units._REGISTRY.Quantity(cls(magnitude, deviation), units)
+        return super().__new__(cls)
 
     # List of __init__ overloads for static type checking.
     @overload
@@ -287,196 +227,30 @@ class Uncertainty(UncertaintyDisplay[T]):
         self: Uncertainty[npt.NDArray[np.floating]], value: Uncertainty[npt.NDArray[np.floating]]
     ) -> None: ...
     @overload
-    def __init__(self: Self, value: T, error: ErrT | None = ...) -> None: ...
+    def __init__(self: Self, value: ValueT, error: ErrT | None = ...) -> None: ...
     @overload
-    def __init__(self, value: ValT, error: ErrT | None = ..., skip: bool = ...) -> None: ...  # noqa: FBT001
-    # Preserve the historical positional initializer flag for compatibility.
-    def __init__(self, value: ValT, error: ErrT | None = None, skip: bool = True) -> None:  # noqa: FBT001, FBT002
+    def __init__(
+        self,
+        value: ValT | PlainQuantity | Sequence[PlainQuantity],
+        error: ErrT | PlainQuantity | Sequence[PlainQuantity] | None = ...,
+    ) -> None: ...
+    def __init__(
+        self,
+        value: ValT | PlainQuantity | Sequence[PlainQuantity],
+        error: ErrT | PlainQuantity | Sequence[PlainQuantity] | None = None,
+    ) -> None:
         """
-        Initialize and validate nominal values and standard deviations.
+        Initialize and validate nominal values and standard deviations once.
 
-        Construction normally initializes the instance in :meth:`__new__`; the
-        subsequent automatic initializer call is skipped.
-
-        :param value: Central values or an uncertainty whose values and errors are
-            reused.
-        :param error: Standard deviations; omitted errors are zero and existing
-            uncertainties supply their own errors.
-        :param skip: Leave the initialized instance unchanged; internal construction
-            passes ``False``.
+        :param value: Central values or an uncertainty whose components are reused.
+        :param error: Standard deviations; omitted errors are zero.
         :return: ``None``.
-        :raises NegativeStdDevError: An error is negative under the configured nonfinite
-            policy.
-        :raises TypeError: The input types are unsupported or incompatible.
+        :raises auto_uncertainties.exceptions.NegativeStdDevError: A standard deviation is negative.
+        :raises TypeError: Input types are unsupported or incompatible.
         :raises ValueError: Value and error shapes or sequence lengths differ.
         """
-        if skip:
-            return
-
-        # Avoid zero-dimensional arrays.
-        value = value[()] if (isinstance(value, np.ndarray) and np.ndim(value) == 0) else value
-        error = error[()] if (isinstance(error, np.ndarray) and np.ndim(error) == 0) else error
-
-        # Case where __init__ acts as a sort of copy constructor.
-        if isinstance(value, Uncertainty):
-            self.__init__(value.value, value.error, skip=False)
-
-        # Case where a sequence of values was passed.
-        elif isinstance(value, Sequence):
-            if (
-                error is not None
-                and not isinstance(error, Sequence)
-                and not isinstance(error, ScalarT)
-            ):
-                msg = f"Error must be a sequence or scalar when value is a sequence (got {type(error)} instead)"
-                raise TypeError(msg)
-            self._init_seq(value, error)
-
-        # Case where a vector uncertainty is instantiated.
-        elif isinstance(value, np.ndarray):
-            if (
-                error is not None
-                and not isinstance(error, np.ndarray)
-                and not isinstance(error, ScalarT)
-            ):
-                msg = f"Error must be a NumPy array or scalar when value is a NumPy array (got {type(error)} instead)"
-                raise TypeError(msg)
-            self._init_vec(value, error)
-
-        # Scalar case. Maintains NumPy data types if detected. Converts ints to floating point.
-        elif isinstance(value, ScalarT):
-            if error is not None and not isinstance(error, ScalarT):
-                msg = f"Error must be a scalar when value is a scalar (got {type(error)} instead)"
-                raise TypeError(msg)
-            propagate = get_settings().nonfinite_error_policy == "propagate"
-            if error is not None and error < 0 and (np.isfinite(error) or propagate):
-                msg = f"Got negative value ({error}) for the standard deviation"
-                raise NegativeStdDevError(msg)
-
-            caster = np.float64 if isinstance(value, np.number) else float
-            if isinstance(value, int | np.integer):
-                self._nom = cast("T", caster(value))
-                self._err = cast(
-                    "T",
-                    caster(error)
-                    if (error is not None and (np.isfinite(error) or propagate))
-                    else caster(0.0),
-                )
-            else:
-                caster = (
-                    (lambda x: x)
-                    if isinstance(error, np.floating) and isinstance(value, np.floating)
-                    else caster
-                )
-                self._nom = cast("T", value)
-                self._err = cast(
-                    "T",
-                    caster(error)
-                    if (error is not None and (np.isfinite(error) or propagate))
-                    else caster(0.0),
-                )
-
-            if propagate and (np.isnan(self._nom) or np.isnan(self._err)):
-                self._nom = cast("T", type(self._nom)(np.nan))
-                self._err = cast("T", type(self._err)(np.nan))
-
-        else:
-            msg = f"Unsupported argument types (got type(value)={type(value)}, type(error)={type(error)})"
-            raise TypeError(msg)
-
-    def _init_seq(
-        self, value: SupportedSequence, error: Sequence[ScalarT] | ScalarT | None
-    ) -> None:
-        """
-        Initialize array storage from a sequence of values or uncertainties.
-
-        :param value: Sequence of central values or scalar uncertainties.
-        :param error: Matching errors, a shared error, or ``None`` for zero errors;
-            uncertain elements supply their own errors.
-        :return: ``None``.
-        :raises TypeError: A sequence element has an unsupported type.
-        :raises ValueError: The value and error sequence lengths differ.
-        """
-        if isinstance(error, Sequence) and len(error) != len(value):
-            msg = f"Error sequence must be the same length as value sequence (got len(value)={len(value)}, len(error)={len(error)})"
-            raise ValueError(msg)
-
-        val = np.empty(len(value), dtype=np.float64)
-        err = np.empty(len(value), dtype=np.float64)
-
-        if len(value) > 0:
-            error = 0.0 if error is None else error
-            reshaped_error = (
-                (np.ones(len(value), dtype=np.float64) * error)
-                if isinstance(error, ScalarT)
-                else error
-            )
-            for i, v in enumerate(value):
-                if isinstance(v, Uncertainty):
-                    val[i] = v.value
-                    err[i] = v.error
-                elif isinstance(v, ScalarT):
-                    val[i] = v
-                    if not isinstance(reshaped_error[i], ScalarT):
-                        msg = f"Error sequence must be of scalars (found element of type {type(err[i])} instead)"
-                        raise TypeError(msg)
-                    err[i] = reshaped_error[i]
-                else:
-                    msg = f"Value sequence must be of scalars or Uncertainty objects (found element of type {type(v)} instead)"
-                    raise TypeError(msg)
-
-        self.__init__(val, err, skip=False)
-
-    def _init_vec(
-        self,
-        value: npt.NDArray[np.number],
-        error: npt.NDArray[np.number] | ScalarT | None,
-    ) -> None:
-        # Zero error.
-        """
-        Initialize array storage and normalize errors according to the settings.
-
-        :param value: Array of central values.
-        :param error: Matching error array, shared error, or ``None`` for zero errors.
-        :return: ``None``.
-        :raises ValueError: The value and error arrays have different shapes.
-        :raises NegativeStdDevError: An error remains negative after normalization.
-        """
-        if error is None:
-            error = np.zeros_like(value)
-
-        # Constant error.
-        elif isinstance(error, ScalarT):
-            error = np.ones_like(value) * error
-
-        elif np.ndim(error) != np.ndim(value) or np.shape(error) != np.shape(value):
-            msg = f"Error must have the same shape as value (got value.shape={np.shape(value)}, error.shape={np.shape(error)})"
-            raise ValueError(msg)
-
-        # Normalize on copies only when needed, preserving caller-owned arrays.
-        if get_settings().nonfinite_error_policy == "zero":
-            invalid = ~np.isfinite(error)
-            if np.any(invalid):
-                error = np.where(invalid, 0, error)
-
-        if np.any(error < 0):
-            msg = f"Found {np.count_nonzero(error < 0)} negative values for the standard deviation"
-            raise NegativeStdDevError(msg)
-
-        # Convert int data to float
-        if issubclass(value.dtype.type, np.integer):
-            value = value.astype(np.float64)
-        if issubclass(error.dtype.type, np.integer):
-            error = error.astype(np.float64)
-
-        if get_settings().nonfinite_error_policy == "propagate":
-            invalid = np.isnan(value) | np.isnan(error)
-            if np.any(invalid):
-                value = np.where(invalid, np.nan, value)
-                error = np.where(invalid, np.nan, error)
-
-        self._nom = cast("T", value)
-        self._err = cast("T", error)
+        nominal, deviation = normalize(value, error)
+        self.nom, self.err = cast("ValueT", nominal), cast("ValueT", deviation)
 
     @property
     def is_vector(self) -> bool:
@@ -485,28 +259,28 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :return: Whether both nominal values and errors are NumPy arrays.
         """
-        return isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
+        return isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
 
     @property
-    def value(self) -> T:
+    def value(self) -> ValueT:
         """
         Access the central values.
 
         :return: The stored nominal values.
         """
-        return self._nom
+        return self.nom
 
     @property
-    def error(self) -> T:
+    def error(self) -> ValueT:
         """
         Access the absolute uncertainties.
 
         :return: The stored standard deviations.
         """
-        return self._err
+        return self.err
 
     @property
-    def relative(self) -> T:
+    def relative(self) -> ValueT:
         """
         Compute uncertainty relative to the nominal magnitude.
 
@@ -514,26 +288,26 @@ class Uncertainty(UncertaintyDisplay[T]):
             nominal values.
         """
         # Vector uncertainty
-        if isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray):
-            rel = np.zeros_like(self._nom)
-            inf = np.isinf(self._nom)
-            nan = self._nom == 0
+        if isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray):
+            rel = np.zeros_like(self.nom)
+            inf = np.isinf(self.nom)
+            nan = self.nom == 0
             valid = ~inf & ~nan
-            rel[valid] = self._err[valid] / np.abs(self._nom[valid])
+            rel[valid] = self.err[valid] / np.abs(self.nom[valid])
             rel[inf] = np.inf
             rel[nan] = np.nan
             return rel
 
         # Scalar uncertainty
         try:
-            return cast("T", self._err / abs(self._nom))
+            return cast("ValueT", self.err / abs(self.nom))
         except OverflowError:
-            return cast("T", float("inf") if isinstance(self._err, float) else np.inf)
+            return cast("ValueT", float("inf") if isinstance(self.err, float) else np.inf)
         except ZeroDivisionError:
-            return cast("T", float("nan") if isinstance(self._err, float) else np.nan)
+            return cast("ValueT", float("nan") if isinstance(self.err, float) else np.nan)
 
     @property
-    def rel(self) -> T:
+    def rel(self) -> ValueT:
         """
         Access the relative uncertainty through its short alias.
 
@@ -542,34 +316,38 @@ class Uncertainty(UncertaintyDisplay[T]):
         return self.relative
 
     @property
-    def rel2(self) -> T:
+    def rel2(self) -> ValueT:
         """
         Compute the squared relative uncertainty.
 
         :return: The square of :attr:`relative`.
         """
         if self.is_vector:
-            return cast("T", self.relative**2)
+            return cast("ValueT", self.relative**2)
         try:
-            return cast("T", self.relative**2)
+            return cast("ValueT", self.relative**2)
         except OverflowError:
-            return cast("T", float("inf") if isinstance(self._err, float) else np.inf)
+            return cast("ValueT", float("inf") if isinstance(self.err, float) else np.inf)
 
-    def plus_minus(self, error: UType) -> Uncertainty[T]:
+    def plus_minus(self, error: UType) -> Uncertainty[ValueT]:
         """
         Combine an additional independent error with the existing uncertainty.
 
         :param error: Additional standard deviation to combine in quadrature.
         :return: A new uncertainty with unchanged nominal values and the combined error.
         """
-        old_err: T = self._err
-        new_err: T
+        old_err: ValueT = self.err
+        new_err: ValueT
         result = np.sqrt(old_err**2 + error**2)
 
         # Check if float, NumPy float, or NumPy array.
-        new_err = cast("T", float(result)) if isinstance(self._err, float) else cast("T", result)
+        new_err = (
+            cast("ValueT", float(result))
+            if isinstance(self.err, float)
+            else cast("ValueT", result)
+        )
 
-        return self.__class__(self._nom, new_err)
+        return self.__class__(self.nom, new_err)
 
     @classmethod
     def from_string(cls, string: str) -> Uncertainty:
@@ -580,7 +358,7 @@ class Uncertainty(UncertaintyDisplay[T]):
             error, such as ``5.0 +/- 1.0``.
         :return: The parsed scalar uncertainty, with zero error if none is supplied.
         :raises ValueError: The components cannot be parsed as numbers.
-        :raises NegativeStdDevError: The parsed error is negative under the configured
+        :raises auto_uncertainties.exceptions.NegativeStdDevError: The parsed error is negative under the configured
             nonfinite policy.
         """
         new_str = string.replace("+/-", "±")
@@ -618,11 +396,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :raises pint.errors.DimensionalityError: The nominal values and errors have
             incompatible units.
         """
-        value_, error_, units = _check_units(value, error)
-        instance = cls(value_, error_)
-        if units is not None:
-            instance *= units
-        return instance
+        return cls(value, error)
 
     @classmethod
     def from_sequence(
@@ -647,101 +421,56 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param error: Matching errors, a shared error, or ``None`` for zero errors.
         :return: The constructed uncertainty, wrapped in quantity units when present.
         """
-        if not isinstance(value, Sequence):
-            return cls(cast("ValT", value), cast("ErrT | None", error))
-
-        mag_units = err_units = None
-        if len(value) > 0 and hasattr(value[0], "units"):
-            # Converts all values to the same unit.
-            mag_units = value[0].units
-            value = cast(
-                "ValT",
-                [
-                    cast("PlainQuantity", item).to(mag_units).m if hasattr(item, "units") else item
-                    for item in value
-                ],
-            )
-        if isinstance(error, Sequence) and len(error) > 0 and hasattr(error[0], "units"):
-            # Convert all error units to value units, if possible. Otherwise, make sure all errors use same units.
-            err_units = error[0].units
-            to_units = err_units if mag_units is None else mag_units
-            error = cast(
-                "ErrT",
-                [
-                    cast("PlainQuantity", item).to(to_units).m if hasattr(item, "units") else item
-                    for item in error
-                ],
-            )
-
-        instance = super().__new__(cls)
-        instance.__init__(cast("ValT", value), cast("ErrT | None", error), skip=False)
-        units = err_units if mag_units is None else mag_units
-        return instance if units is None else (instance * units)
-
-    @classmethod
-    @deprecated("call Uncertainty() directly instead")
-    def from_list(cls, value: ValT, error: ErrT | None = None) -> Uncertainty:  # pragma: no cover
-        """
-        Construct an uncertainty using the deprecated sequence constructor alias.
-
-        .. warning::
-
-           This method is deprecated. Call ``Uncertainty(value, error)`` directly instead.
-
-        :param value: Central values or existing uncertainties.
-        :param error: Standard deviations, or ``None`` for zero errors.
-        :return: The constructed uncertainty.
-        """
         return cls(value, error)
 
-    def __getstate__(self) -> dict[str, T]:
+    def __getstate__(self) -> dict[str, ValueT]:
         """
         Collect the state used to serialize an uncertainty.
 
         :return: The nominal values and errors under ``nominal_value`` and ``std_devs``.
         """
-        return {"nominal_value": self._nom, "std_devs": self._err}
+        return {"nominal_value": self.nom, "std_devs": self.err}
 
-    def __setstate__(self, state: dict[str, T]) -> None:
+    def __setstate__(self, state: dict[str, ValueT]) -> None:
         """
         Restore previously serialized nominal values and errors.
 
         :param state: State containing the ``nominal_value`` and ``std_devs`` entries.
         :return: ``None``.
         """
-        self._nom = state["nominal_value"]
-        self._err = state["std_devs"]
+        self.nom = state["nominal_value"]
+        self.err = state["std_devs"]
 
-    def __getnewargs__(self) -> tuple[T, T]:
+    def __getnewargs__(self) -> tuple[ValueT, ValueT]:
         """
         Provide constructor arguments for deserialization.
 
         :return: The nominal values and errors, in constructor order.
         """
-        return self._nom, self._err
+        return self.nom, self.err
 
-    def __copy__(self) -> Uncertainty[T]:
+    def __copy__(self) -> Uncertainty[ValueT]:
         """
         Copy the nominal values and errors.
 
         :return: A new uncertainty with shallow copies of both components.
         """
-        return self.__class__(copy.copy(self._nom), copy.copy(self._err))
+        return self.__class__(copy.copy(self.nom), copy.copy(self.err))
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> Uncertainty[T]:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Uncertainty[ValueT]:
         """
         Deep-copy the nominal values and errors.
 
         :param memo: Objects already copied during the current deep-copy operation.
         :return: A new uncertainty with recursively copied components.
         """
-        return self.__class__(copy.deepcopy(self._nom, memo), copy.deepcopy(self._err, memo))
+        return self.__class__(copy.deepcopy(self.nom, memo), copy.deepcopy(self.err, memo))
 
     # =====================================================
     # ------------------ MATH OPERATIONS ------------------
     # =====================================================
 
-    _HANDLED_TYPES = (float, int, np.ndarray)
+    HANDLED_TYPES = (float, int, np.ndarray)
 
     def __add__(self, other: Any) -> Uncertainty[Any] | NotImplementedType:
         """
@@ -754,21 +483,12 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom + other._nom
-            new_err = np.sqrt(self._err**2 + other._err**2)
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom + other
-            new_err = (
-                np.broadcast_to(self._err, np.shape(new_mag)).copy()
-                if np.ndim(new_mag)
-                else self._err
-            )
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        try:
-            return self.__class__(new_mag, new_err)
-        except NotImplementedError:
-            return NotImplemented
+        return self.__class__(*binary(np.add, self.nom, self.err, other, other_error))
 
     __radd__ = __add__
 
@@ -783,21 +503,12 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom - other._nom
-            new_err = np.sqrt(self._err**2 + other._err**2)
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom - other
-            new_err = (
-                np.broadcast_to(self._err, np.shape(new_mag)).copy()
-                if np.ndim(new_mag)
-                else self._err
-            )
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        try:
-            return self.__class__(new_mag, new_err)
-        except NotImplementedError:
-            return NotImplemented
+        return self.__class__(*binary(np.subtract, self.nom, self.err, other, other_error))
 
     def __rsub__(self, other: Any) -> Uncertainty[Any] | NotImplementedType:
         """
@@ -809,7 +520,13 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The resulting uncertainty, or ``NotImplemented`` for unsupported
             operands.
         """
-        return -self.__sub__(other)
+        if isinstance(other, Uncertainty):
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
+        else:
+            return NotImplemented
+        return self.__class__(*binary(np.subtract, other, other_error, self.nom, self.err))
 
     def __mul__(self, other: Any) -> Uncertainty[Any] | NotImplementedType:
         """
@@ -822,17 +539,12 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom * other._nom
-            new_err = np.sqrt((other._nom * self._err) ** 2 + (self._nom * other._err) ** 2)
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom * other
-            new_err = np.abs(self._err * other)
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        try:
-            return self.__class__(new_mag, new_err)
-        except NotImplementedError:
-            return NotImplemented
+        return self.__class__(*binary(np.multiply, self.nom, self.err, other, other_error))
 
     __rmul__ = __mul__
 
@@ -848,19 +560,12 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom / other._nom
-            new_err = np.sqrt(
-                (self._err / other._nom) ** 2 + (self._nom * other._err / other._nom**2) ** 2
-            )
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom / other
-            new_err = np.abs(self._err / other)
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        try:
-            return self.__class__(new_mag, new_err)
-        except NotImplementedError:
-            return NotImplemented
+        return self.__class__(*binary(np.divide, self.nom, self.err, other, other_error))
 
     @ignore_runtime_warnings
     def __rtruediv__(self, other: Any) -> Uncertainty[Any] | NotImplementedType:
@@ -875,16 +580,12 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            raise TypeError
-        if isinstance(other, self._HANDLED_TYPES):
-            new_mag = other / self._nom
-            new_err = np.abs(new_mag) * np.abs(self.rel)
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        try:
-            return self.__class__(new_mag, new_err)
-        except NotImplementedError:
-            return NotImplemented
+        return self.__class__(*binary(np.divide, other, other_error, self.nom, self.err))
 
     __div__ = __truediv__
     __rdiv__ = __rtruediv__
@@ -900,9 +601,9 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom // other._nom
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom // other
+            new_mag = self.nom // other.nom
+        elif isinstance(other, self.HANDLED_TYPES):
+            new_mag = self.nom // other
         else:
             return NotImplemented
         new_err = self.__div__(other).error
@@ -921,8 +622,8 @@ class Uncertainty(UncertaintyDisplay[T]):
         """
         if isinstance(other, Uncertainty):
             return other.__floordiv__(self)
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = other // self._nom
+        elif isinstance(other, self.HANDLED_TYPES):
+            new_mag = other // self.nom
             new_err = self.__rdiv__(other).error
             return self.__class__(new_mag, new_err)
         else:
@@ -939,14 +640,14 @@ class Uncertainty(UncertaintyDisplay[T]):
             operands.
         """
         if isinstance(other, Uncertainty):
-            new_mag = self._nom % other._nom
-            new_err = np.hypot(self._err, (self._nom // other._nom) * other._err)
-        elif isinstance(other, self._HANDLED_TYPES):
-            new_mag = self._nom % other
+            new_mag = self.nom % other.nom
+            new_err = np.hypot(self.err, (self.nom // other.nom) * other.err)
+        elif isinstance(other, self.HANDLED_TYPES):
+            new_mag = self.nom % other
             new_err = (
-                np.broadcast_to(self._err, np.shape(new_mag)).copy()
+                np.broadcast_to(self.err, np.shape(new_mag)).copy()
                 if np.ndim(new_mag)
-                else self._err
+                else self.err
             )
         else:
             return NotImplemented
@@ -962,9 +663,9 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The resulting uncertainty, or ``NotImplemented`` for unsupported
             operands.
         """
-        if isinstance(other, self._HANDLED_TYPES):
-            new_mag = other % self._nom
-            new_err = np.abs((other // self._nom) * self._err)
+        if isinstance(other, self.HANDLED_TYPES):
+            new_mag = other % self.nom
+            new_err = np.abs((other // self.nom) * self.err)
             return self.__class__(new_mag, new_err)
         else:
             return NotImplemented
@@ -1003,21 +704,13 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The resulting uncertainty, or ``NotImplemented`` for unsupported
             operands.
         """
-        A = self._nom
-        sA = self._err
         if isinstance(other, Uncertainty):
-            B = other._nom
-            sB = other._err
-
-        elif isinstance(other, self._HANDLED_TYPES):
-            B = other
-            sB = 0
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-
-        new_mag, new_err = _power_uncertainty(A, sA, B, sB)
-
-        return self.__class__(new_mag, new_err)
+        return self.__class__(*binary(np.power, self.nom, self.err, other, other_error))
 
     @ignore_runtime_warnings
     def __rpow__(self, other: Any) -> Uncertainty[Any] | NotImplementedType:
@@ -1031,48 +724,42 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The resulting uncertainty, or ``NotImplemented`` for unsupported
             operands.
         """
-        B = self._nom
-        sB = self._err
         if isinstance(other, Uncertainty):
-            A = other._nom
-            sA = other._err
-        elif isinstance(other, self._HANDLED_TYPES):
-            A = other
-            sA = 0
+            other, other_error = other.nom, other.err
+        elif isinstance(other, (*self.HANDLED_TYPES, np.floating, np.integer)):
+            other_error = 0
         else:
             return NotImplemented
-        new_mag, new_err = _power_uncertainty(A, sA, B, sB)
+        return self.__class__(*binary(np.power, other, other_error, self.nom, self.err))
 
-        return self.__class__(new_mag, new_err)
-
-    def __abs__(self) -> Uncertainty[T]:
+    def __abs__(self) -> Uncertainty[ValueT]:
         """
         Evaluate ``abs(self)`` while preserving the error.
 
         :return: A new uncertainty with the transformed nominal values and unchanged
             errors.
         """
-        return self.__class__(abs(self._nom), self._err)
+        return self.__class__(abs(self.nom), self.err)
 
-    def __pos__(self) -> Uncertainty[T]:
+    def __pos__(self) -> Uncertainty[ValueT]:
         """
         Evaluate ``+self`` while preserving the error.
 
         :return: A new uncertainty with the transformed nominal values and unchanged
             errors.
         """
-        return self.__class__(operator.pos(self._nom), self._err)
+        return self.__class__(operator.pos(self.nom), self.err)
 
-    def __neg__(self) -> Uncertainty[T]:
+    def __neg__(self) -> Uncertainty[ValueT]:
         """
         Evaluate ``-self`` while preserving the error.
 
         :return: A new uncertainty with the transformed nominal values and unchanged
             errors.
         """
-        return self.__class__(operator.neg(self._nom), self._err)
+        return self.__class__(operator.neg(self.nom), self.err)
 
-    def _compare(
+    def compare(
         self, other: Any, op: Callable[[Any, Any], Any]
     ) -> bool | np.bool_ | npt.NDArray[np.bool_]:
         """
@@ -1083,9 +770,9 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The comparison result, without considering either operand error.
         """
         if isinstance(other, Uncertainty):
-            return op(self._nom, other._nom)
+            return op(self.nom, other.nom)
         else:
-            return op(self._nom, other)
+            return op(self.nom, other)
 
     def __lt__(self, other: Any) -> bool | np.bool_ | npt.NDArray[np.bool_]:
         """
@@ -1094,7 +781,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param other: Exact or uncertain operand to compare.
         :return: The nominal less-than comparison, elementwise for arrays.
         """
-        return self._compare(other, op=operator.lt)
+        return self.compare(other, op=operator.lt)
 
     def __le__(self, other: Any) -> bool | np.bool_ | npt.NDArray[np.bool_]:
         """
@@ -1103,7 +790,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param other: Exact or uncertain operand to compare.
         :return: The nominal less-than-or-equal comparison, elementwise for arrays.
         """
-        return self._compare(other, op=operator.le)
+        return self.compare(other, op=operator.le)
 
     def __ge__(self, other: Any) -> bool | np.bool_ | npt.NDArray[np.bool_]:
         """
@@ -1112,7 +799,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param other: Exact or uncertain operand to compare.
         :return: The nominal greater-than-or-equal comparison, elementwise for arrays.
         """
-        return self._compare(other, op=operator.ge)
+        return self.compare(other, op=operator.ge)
 
     def __gt__(self, other: Any) -> bool | np.bool_ | npt.NDArray[np.bool_]:
         """
@@ -1121,7 +808,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param other: Exact or uncertain operand to compare.
         :return: The nominal greater-than comparison, elementwise for arrays.
         """
-        return self._compare(other, op=operator.gt)
+        return self.compare(other, op=operator.gt)
 
     def __bool__(self) -> bool:
         """
@@ -1130,7 +817,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The nominal truth value.
         :raises ValueError: An array has no unambiguous truth value.
         """
-        return bool(self._nom)
+        return bool(self.nom)
 
     __nonzero__ = __bool__
 
@@ -1141,7 +828,7 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :param other: Operand to compare with this uncertainty.
         :return: The logical inverse of :meth:`__eq__`.
-        :raises EqualityError: The equality check rejects incompatible errors under the
+        :raises auto_uncertainties.exceptions.EqualityError: The equality check rejects incompatible errors under the
             current settings.
         """
         out = self.__eq__(other)
@@ -1160,14 +847,14 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :param other: Exact or uncertain operand to compare.
         :return: Whether the nominal values compare equal.
-        :raises EqualityError: Nominal values match but error information differs and
+        :raises auto_uncertainties.exceptions.EqualityError: Nominal values match but error information differs and
             ``error_on_equality`` is enabled.
         """
         if self.is_vector:
             # Compare vector Uncertainty with vector Uncertainty.
             if isinstance(other, Uncertainty):
-                result = np.array_equal(self._nom, other._nom)
-                if result and not np.array_equal(self._err, other._err):
+                result = np.array_equal(self.nom, other.nom)
+                if result and not np.array_equal(self.err, other.err):
                     msg = "Uncertainty objects have identical values but different standard deviations."
                     if get_settings().error_on_equality:
                         raise EqualityError(msg)
@@ -1175,7 +862,7 @@ class Uncertainty(UncertaintyDisplay[T]):
                 return result
 
             # Compare vector Uncertainty with other object.
-            result = np.array_equal(self._nom, cast("npt.ArrayLike", other))
+            result = np.array_equal(self.nom, cast("npt.ArrayLike", other))
             if result:
                 msg = "Compared Uncertainty object with non-Uncertainty object."
                 if get_settings().error_on_equality:
@@ -1188,14 +875,14 @@ class Uncertainty(UncertaintyDisplay[T]):
             if isinstance(other, Uncertainty):
                 try:
                     val_result = math.isclose(
-                        self._nom, other._nom, rel_tol=get_settings().compare_rtol
+                        self.nom, other.nom, rel_tol=get_settings().compare_rtol
                     )
                     err_result = math.isclose(
-                        self._err, other._err, rel_tol=get_settings().compare_rtol
+                        self.err, other.err, rel_tol=get_settings().compare_rtol
                     )
                 except TypeError:
-                    val_result = self._nom == other._nom
-                    err_result = self._err == other._err
+                    val_result = self.nom == other.nom
+                    err_result = self.err == other.err
                 if val_result and not err_result:
                     msg = "Uncertainty objects have identical values but different standard deviations."
                     if get_settings().error_on_equality:
@@ -1206,10 +893,10 @@ class Uncertainty(UncertaintyDisplay[T]):
             # Compare scalar Uncertainty with other object.
             try:
                 result = math.isclose(
-                    self._nom, cast("SupportsFloat", other), rel_tol=get_settings().compare_rtol
+                    self.nom, cast("SupportsFloat", other), rel_tol=get_settings().compare_rtol
                 )
             except TypeError:
-                result = self._nom == other
+                result = self.nom == other
             if result:
                 msg = "Compared Uncertainty object with non-Uncertainty object."
                 if get_settings().error_on_equality:
@@ -1226,10 +913,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         """
         if ndigits is None:
             ndigits = 0
-        if isinstance(self._nom, np.ndarray | np.number):
-            return self.__class__(np.round(self._nom, decimals=ndigits), self._err)
+        if isinstance(self.nom, np.ndarray | np.number):
+            return self.__class__(np.round(self.nom, decimals=ndigits), self.err)
         else:
-            return self.__class__(float(round(self._nom, ndigits=ndigits)), self._err)
+            return self.__class__(float(round(self.nom, ndigits=ndigits)), self.err)
 
     # Approximate equality and mutable arrays cannot support a consistent hash.
     __hash__ = None
@@ -1294,7 +981,7 @@ class Uncertainty(UncertaintyDisplay[T]):
         :param copy: NumPy copy policy: always copy, never copy, or copy only when
             needed.
         :return: The nominal values as a NumPy array.
-        :raises DowncastError: The settings prohibit discarding uncertainty.
+        :raises auto_uncertainties.exceptions.DowncastError: The settings prohibit discarding uncertainty.
         """
         msg = "The uncertainty is stripped when downcasting to ndarray."
         if get_settings().error_on_downcast:
@@ -1304,44 +991,468 @@ class Uncertainty(UncertaintyDisplay[T]):
             DowncastWarning,
             stacklevel=2,
         )
-        return np.asarray(self._nom, dtype=dtype, copy=copy)
+        return np.asarray(self.nom, dtype=dtype, copy=copy)
 
-    def __getattr__(self, item: str) -> Any:
+    def apply_numpy(self, func: Callable[..., Any], **options: Any) -> Any:
         """
-        Resolve supported array attributes and registered NumPy operations.
+        Forward an explicit method call to the shared NumPy dispatcher.
 
-        :param item: Attribute or operation name to resolve.
-        :return: The requested metadata, transformed uncertainty, or callable operation.
-        :raises AttributeError: The requested attribute is not supported.
+        :param func: NumPy operation whose first argument is this uncertainty.
+        :param options: Declared options; omitted NumPy defaults remain omitted.
+        :return: The NumPy dispatch result.
         """
-        if item.startswith("__array_"):
-            # Handle array protocol attributes other than `__array__`
-            msg = f"Array protocol attribute {item} not available."
-            raise AttributeError(msg)
+        return func(
+            self, **{key: value for key, value in options.items() if value is not np._NoValue}
+        )
 
-        # Vector uncertainty
-        if self.is_vector:
-            if item in self.__ndarray_attributes__:
-                return getattr(self._nom, item)
-            elif item in self.__apply_to_both_ndarray__:
-                val: npt.NDArray | np.number | ScalarT | Callable = getattr(self._nom, item)
-                err = getattr(self._err, item)
-                if callable(val):
-                    return lambda *args, **kwargs: self.__class__(
-                        val(*args, **kwargs), err(*args, **kwargs)
-                    )
-                else:
-                    return self.__class__(val, err)
+    def sum(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        dtype: npt.DTypeLike | None = None,
+        out: Uncertainty[Any] | None = None,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        initial: Any = np._NoValue,
+        where: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.sum` through the shared uncertainty handler.
 
-        if item in HANDLED_UFUNCS:
-            return lambda *args, **kwargs: wrap_numpy("ufunc", item, [self, *list(args)], kwargs)
-        elif item in HANDLED_FUNCTIONS:
-            return lambda *args, **kwargs: wrap_numpy(
-                "function", item, [self, *list(args)], kwargs
-            )
+        :param axis: Axes to reduce.
+        :param dtype: Computation dtype.
+        :param out: Optional destination.
+        :param keepdims: Retain reduced axes.
+        :param initial: Initial value.
+        :param where: Elements included in the reduction.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.sum,
+            axis=axis,
+            dtype=dtype,
+            out=out,
+            keepdims=keepdims,
+            initial=initial,
+            where=where,
+        )
 
-        msg = f"Attribute {item} not available in Uncertainty, or as NumPy ufunc or function."
-        raise AttributeError(msg) from None
+    def mean(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        dtype: npt.DTypeLike | None = None,
+        out: Uncertainty[Any] | None = None,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        where: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.mean` through the shared uncertainty handler.
+
+        :param axis: Axes to reduce.
+        :param dtype: Computation dtype.
+        :param out: Optional destination.
+        :param keepdims: Retain reduced axes.
+        :param where: Elements included in the reduction.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.mean, axis=axis, dtype=dtype, out=out, keepdims=keepdims, where=where
+        )
+
+    def std(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        dtype: npt.DTypeLike | None = None,
+        out: Uncertainty[Any] | None = None,
+        ddof: float = 0,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        where: Any = np._NoValue,
+        mean: Any = np._NoValue,
+        correction: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.std` through the shared uncertainty handler.
+
+        :param axis: Axes to reduce.
+        :param dtype: Computation dtype.
+        :param out: Optional destination.
+        :param ddof: Degrees of freedom adjustment.
+        :param keepdims: Retain reduced axes.
+        :param where: Elements included in the reduction.
+        :param mean: Precomputed mean.
+        :param correction: Alternative degrees of freedom adjustment.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.std,
+            axis=axis,
+            dtype=dtype,
+            out=out,
+            ddof=ddof,
+            keepdims=keepdims,
+            where=where,
+            mean=mean,
+            correction=correction,
+        )
+
+    def var(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        dtype: npt.DTypeLike | None = None,
+        out: Uncertainty[Any] | None = None,
+        ddof: float = 0,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        where: Any = np._NoValue,
+        mean: Any = np._NoValue,
+        correction: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.var` through the shared uncertainty handler.
+
+        :param axis: Axes to reduce.
+        :param dtype: Computation dtype.
+        :param out: Optional destination.
+        :param ddof: Degrees of freedom adjustment.
+        :param keepdims: Retain reduced axes.
+        :param where: Elements included in the reduction.
+        :param mean: Precomputed mean.
+        :param correction: Alternative degrees of freedom adjustment.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.var,
+            axis=axis,
+            dtype=dtype,
+            out=out,
+            ddof=ddof,
+            keepdims=keepdims,
+            where=where,
+            mean=mean,
+            correction=correction,
+        )
+
+    def min(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        out: Uncertainty[Any] | None = None,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        initial: Any = np._NoValue,
+        where: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.min` through the shared uncertainty handler.
+
+        :param axis: Axes to reduce.
+        :param out: Optional destination.
+        :param keepdims: Retain reduced axes.
+        :param initial: Initial comparison value.
+        :param where: Elements included in the reduction.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.min, axis=axis, out=out, keepdims=keepdims, initial=initial, where=where
+        )
+
+    def max(
+        self,
+        axis: int | tuple[int, ...] | None = None,
+        out: Uncertainty[Any] | None = None,
+        keepdims: bool = False,  # noqa: FBT001, FBT002 - NumPy signature.
+        *,
+        initial: Any = np._NoValue,
+        where: Any = np._NoValue,
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.max` through the shared uncertainty handler.
+
+        :param axis: Axes to reduce.
+        :param out: Optional destination.
+        :param keepdims: Retain reduced axes.
+        :param initial: Initial comparison value.
+        :param where: Elements included in the reduction.
+        :return: The operation result.
+        """
+        return self.apply_numpy(
+            np.max, axis=axis, out=out, keepdims=keepdims, initial=initial, where=where
+        )
+
+    def argmin(
+        self,
+        axis: int | None = None,
+        out: npt.NDArray[np.intp] | None = None,
+        *,
+        keepdims: bool = False,
+    ) -> np.intp | npt.NDArray[np.intp]:
+        """
+        Apply :func:`numpy.argmin` through the shared uncertainty handler.
+
+        :param axis: Axis to search.
+        :param out: Optional index destination.
+        :param keepdims: Retain the searched axis.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.argmin, axis=axis, out=out, keepdims=keepdims)
+
+    def argmax(
+        self,
+        axis: int | None = None,
+        out: npt.NDArray[np.intp] | None = None,
+        *,
+        keepdims: bool = False,
+    ) -> np.intp | npt.NDArray[np.intp]:
+        """
+        Apply :func:`numpy.argmax` through the shared uncertainty handler.
+
+        :param axis: Axis to search.
+        :param out: Optional index destination.
+        :param keepdims: Retain the searched axis.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.argmax, axis=axis, out=out, keepdims=keepdims)
+
+    def ravel(self, order: Literal["C", "F", "A", "K"] = "C") -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.ravel` through the shared uncertainty handler.
+
+        :param order: Traversal order.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.ravel, order=order)
+
+    def repeat(
+        self, repeats: int | Sequence[int] | npt.NDArray[np.integer], axis: int | None = None
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.repeat` through the shared uncertainty handler.
+
+        :param repeats: Repetition counts.
+        :param axis: Axis to repeat.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.repeat, repeats=repeats, axis=axis)
+
+    def squeeze(self, axis: int | tuple[int, ...] | None = None) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.squeeze` through the shared uncertainty handler.
+
+        :param axis: Singleton axes to remove.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.squeeze, axis=axis)
+
+    def swapaxes(self, axis1: int, axis2: int) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.swapaxes` through the shared uncertainty handler.
+
+        :param axis1: First axis.
+        :param axis2: Second axis.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.swapaxes, axis1=axis1, axis2=axis2)
+
+    def diagonal(self, offset: int = 0, axis1: int = 0, axis2: int = 1) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.diagonal` through the shared uncertainty handler.
+
+        :param offset: Diagonal offset.
+        :param axis1: First matrix axis.
+        :param axis2: Second matrix axis.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.diagonal, offset=offset, axis1=axis1, axis2=axis2)
+
+    def take(
+        self,
+        indices: npt.ArrayLike,
+        axis: int | None = None,
+        out: Uncertainty[Any] | None = None,
+        mode: str = "raise",
+    ) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.take` through the shared uncertainty handler.
+
+        :param indices: Indices to select.
+        :param axis: Axis to index.
+        :param out: Optional destination.
+        :param mode: Out-of-bounds handling.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.take, indices=indices, axis=axis, out=out, mode=mode)
+
+    def round(self, decimals: int = 0, out: Uncertainty[Any] | None = None) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.round` through the shared uncertainty handler.
+
+        :param decimals: Decimal places to retain.
+        :param out: Optional destination.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.round, decimals=decimals, out=out)
+
+    def sort(
+        self,
+        axis: int | None = -1,
+        kind: str | None = None,
+        order: Any = None,
+        *,
+        stable: bool | None = None,
+    ) -> Uncertainty[Any]:
+        """
+        Return a sorted copy, keeping errors paired with nominal values.
+
+        :param axis: Axis to sort.
+        :param kind: Sorting algorithm.
+        :param order: Structured field order.
+        :param stable: Request a stable sort.
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.sort, axis=axis, kind=kind, order=order, stable=stable)
+
+    def conjugate(self) -> Uncertainty[Any]:
+        """
+        Apply :func:`numpy.conjugate` through the shared uncertainty handler.
+
+        :return: The operation result.
+        """
+        return self.apply_numpy(np.conjugate)
+
+    conj = conjugate
+
+    def reshape(
+        self,
+        *shape: int | tuple[int, ...],
+        order: Literal["C", "F", "A", "K"] = "C",
+        copy: bool | None = None,
+    ) -> Uncertainty[Any]:
+        """
+        Reshape values and errors together.
+
+        :param shape: New dimensions, supplied separately or as one tuple.
+        :param order: Element traversal order.
+        :param copy: Whether to copy, share storage, or copy only when needed.
+        :return: The reshaped uncertainty.
+        """
+        dimensions = shape[0] if len(shape) == 1 else shape
+        return self.apply_numpy(np.reshape, shape=dimensions, order=order, copy=copy)
+
+    def transpose(self, *axes: int | tuple[int, ...] | None) -> Uncertainty[Any]:
+        """
+        Permute the axes of both components.
+
+        :param axes: Axis order as individual indices or one tuple; omitted to reverse.
+        :return: The transposed uncertainty.
+        """
+        order = axes[0] if len(axes) == 1 else axes or None
+        return self.apply_numpy(np.transpose, axes=order)
+
+    def compress(
+        self,
+        condition: npt.ArrayLike,
+        axis: int | None = None,
+        out: Uncertainty[Any] | None = None,
+    ) -> Uncertainty[Any]:
+        """
+        Select entries using a boolean condition.
+
+        :param condition: Boolean selection mask.
+        :param axis: Axis to select along, or ``None`` to flatten.
+        :param out: Optional destination.
+        :return: The selected uncertainty.
+        """
+        return wrap_numpy("function", np.compress, (condition, self), {"axis": axis, "out": out})
+
+    @unsupported_type("scal")
+    def flatten(self, order: Literal["C", "F", "A", "K"] = "C") -> Uncertainty[Any]:
+        """
+        Copy both components into one-dimensional arrays.
+
+        :param order: Element traversal order.
+        :return: A flattened copy.
+        """
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        return self.__class__(self.nom.flatten(order), self.err.flatten(order))
+
+    @unsupported_type("scal")
+    def astype(
+        self,
+        dtype: npt.DTypeLike,
+        order: Literal["C", "F", "A", "K"] = "K",
+        casting: Literal["no", "equiv", "safe", "same_kind", "unsafe", "same_value"] = "unsafe",
+        subok: bool = True,  # noqa: FBT001, FBT002 - NumPy signature.
+        copy: bool = True,  # noqa: FBT001, FBT002 - NumPy signature.
+    ) -> Uncertainty[Any]:
+        """
+        Cast component arrays before applying normal uncertainty construction.
+
+        :param dtype: Requested component dtype; integer results normalize to floats.
+        :param order: Memory layout policy.
+        :param casting: NumPy casting rule.
+        :param subok: Preserve ndarray subclasses.
+        :param copy: Whether to always copy component arrays.
+        :return: An uncertainty with converted components.
+        """
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        return self.__class__(
+            self.nom.astype(dtype, order, casting, subok, copy),
+            self.err.astype(dtype, order, casting, subok, copy),
+        )
+
+    @property
+    def dtype(self) -> np.dtype[Any]:
+        """
+        Access the ``dtype`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return np.asarray(self.nom).dtype
+
+    @property
+    def ndim(self) -> int:
+        """
+        Access the ``ndim`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return np.ndim(self.nom)
+
+    @property
+    def size(self) -> int:
+        """
+        Access the ``size`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return np.size(self.nom)
+
+    @property
+    def T(self) -> Uncertainty[Any]:
+        """
+        Access the ``T`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return self.transpose()
+
+    @property
+    def real(self) -> Uncertainty[Any]:
+        """
+        Access the ``real`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return self.__class__(np.real(self.nom), np.real(self.err))
+
+    @property
+    def imag(self) -> Uncertainty[Any]:
+        """
+        Access the ``imag`` array property.
+
+        :return: The nominal metadata or corresponding component transformation.
+        """
+        return self.__class__(np.imag(self.nom), np.imag(self.err))
 
     def __bytes__(self) -> bytes:
         """
@@ -1355,38 +1466,35 @@ class Uncertainty(UncertaintyDisplay[T]):
     # ------------------ VECTOR-SPECIFIC FUNCTIONALITY ------------------
     # ===================================================================
 
-    __apply_to_both_ndarray__ = (
-        "flatten",
-        "real",
-        "imag",
-        "astype",
-        "T",
-        "reshape",
-    )
-    __ndarray_attributes__ = ("dtype", "ndim", "size")
-
     __array_priority__ = 18
 
-    @_unsupported_type("scal")
-    def clip(self, *args: Any, **kwargs: Any) -> Uncertainty[T]:
+    @unsupported_type("scal")
+    def clip(
+        self,
+        a_min: Any = np._NoValue,
+        a_max: Any = np._NoValue,
+        out: Uncertainty[Any] | None = None,
+        *,
+        min: Any = np._NoValue,  # noqa: A002 - NumPy keyword.
+        max: Any = np._NoValue,  # noqa: A002 - NumPy keyword.
+        **kwargs: Any,
+    ) -> Uncertainty[Any]:
         """
         Clip nominal values while preserving their existing errors.
 
-        Available only for vector uncertainties. Options are forwarded to
-        :meth:`numpy.ndarray.clip`.
-
-        :param args: Positional clipping bounds and any positional output argument.
-        :param kwargs: Keyword clipping bounds and NumPy clipping options.
-        :return: A new uncertainty containing the clipped nominal values and original
-            errors.
+        :param a_min: Lower bound, or ``None`` for no lower bound.
+        :param a_max: Upper bound, or ``None`` for no upper bound.
+        :param out: Optional destination, updated after validating both components.
+        :param min: Alternative keyword for the lower bound.
+        :param max: Alternative keyword for the upper bound.
+        :param kwargs: Additional NumPy clipping options, validated by NumPy.
+        :return: The clipped uncertainty or the supplied destination.
         """
-        assert isinstance(self._nom, np.ndarray)
-        return cast(
-            "Uncertainty[T]",
-            self.__class__(self._nom.clip(*args, **kwargs), self._err),
+        return self.apply_numpy(
+            np.clip, a_min=a_min, a_max=a_max, out=out, min=min, max=max, **kwargs
         )
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def fill(self, value: ScalarT | Uncertainty[Any]) -> None:
         """
         Fill a vector uncertainty in place.
@@ -1399,9 +1507,9 @@ class Uncertainty(UncertaintyDisplay[T]):
         :raises TypeError: The receiver or supplied uncertainty has an unsupported
             scalar/vector kind.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        nominal = self._nom.copy()
-        error = self._err.copy()
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        nominal = self.nom.copy()
+        error = self.err.copy()
         if isinstance(value, Uncertainty):
             if value.is_vector:
                 msg = "fill requires a scalar value"
@@ -1411,10 +1519,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         else:
             nominal.fill(value)
         normalized = self.__class__(nominal, error)
-        self._nom[...] = normalized.value
-        self._err[...] = normalized.error
+        self.nom[...] = normalized.value
+        self.err[...] = normalized.error
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def put(
         self,
         indices: int | Sequence[int] | npt.NDArray[np.integer],
@@ -1434,33 +1542,33 @@ class Uncertainty(UncertaintyDisplay[T]):
             uncertainty.
         :raises IndexError: An index is out of bounds in ``"raise"`` mode.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
         if isinstance(values, Uncertainty):
-            nominal = self._nom.copy()
-            error = self._err.copy()
-            nominal.put(indices, values._nom, mode)
-            error.put(indices, values._err, mode)
+            nominal = self.nom.copy()
+            error = self.err.copy()
+            nominal.put(indices, values.nom, mode)
+            error.put(indices, values.err, mode)
             normalized = self.__class__(nominal, error)
-            self._nom[...] = normalized.value
-            self._err[...] = normalized.error
+            self.nom[...] = normalized.value
+            self.err[...] = normalized.error
         else:
             msg = "Can only 'put' Uncertainty objects into Uncertainty objects"
             raise TypeError(msg)
 
-    @_unsupported_type("scal")
-    def copy(self) -> Uncertainty[T]:
+    @unsupported_type("scal")
+    def copy(self) -> Uncertainty[ValueT]:
         """
         Copy a vector uncertainty and both of its arrays.
 
         :return: A new uncertainty with independent nominal and error storage.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        return cast("Uncertainty[T]", self.__class__(self._nom.copy(), self._err.copy()))
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        return cast("Uncertainty[ValueT]", self.__class__(self.nom.copy(), self.err.copy()))
 
     # Special properties.
     @property
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def flat(self) -> Iterator[Uncertainty[np.floating]]:
         """
         Iterate over scalar uncertainties in row-major order.
@@ -1468,12 +1576,12 @@ class Uncertainty(UncertaintyDisplay[T]):
         :yields: A scalar uncertainty for each nominal value and matching error.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        for u, v in zip(self._nom.flat, self._err.flat, strict=False):
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        for u, v in zip(self.nom.flat, self.err.flat, strict=False):
             yield self.__class__(u, v)
 
     @property
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def shape(self) -> tuple[int, ...]:
         """
         Access the shape of a vector uncertainty.
@@ -1481,11 +1589,11 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The shared shape of the nominal and error arrays.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray)
-        return self._nom.shape
+        assert isinstance(self.nom, np.ndarray)
+        return self.nom.shape
 
     @shape.setter
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def shape(self, value: int | tuple[int, ...]) -> None:
         """
         Change both vector array shapes in place after validating their layouts.
@@ -1497,16 +1605,16 @@ class Uncertainty(UncertaintyDisplay[T]):
         :raises AttributeError: An array cannot adopt the requested shape without
             copying.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        nominal_view = self._nom.view()
-        error_view = self._err.view()
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        nominal_view = self.nom.view()
+        error_view = self.err.view()
         nominal_view.shape = value
         error_view.shape = value
-        self._nom.shape = value
-        self._err.shape = value
+        self.nom.shape = value
+        self.err.shape = value
 
     @property
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def nbytes(self) -> int:
         """
         Count the storage occupied by a vector uncertainty.
@@ -1514,10 +1622,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The total bytes occupied by the nominal and error arrays.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        return self._nom.nbytes + self._err.nbytes
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        return self.nom.nbytes + self.err.nbytes
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def searchsorted(
         self,
         v: npt.ArrayLike,
@@ -1534,10 +1642,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The insertion positions returned by :meth:`numpy.ndarray.searchsorted`.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray)
-        return self._nom.searchsorted(v, side=side, sorter=sorter)
+        assert isinstance(self.nom, np.ndarray)
+        return self.apply_numpy(np.searchsorted, v=v, side=side, sorter=sorter)
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def tolist(self) -> list[Any] | Uncertainty[Any]:
         """
         Convert a vector uncertainty into nested lists of scalar uncertainties.
@@ -1545,10 +1653,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: Nested lists preserving the array dimensions and each element error.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
         try:
-            nom = self._nom.tolist()
-            err = self._err.tolist()
+            nom = self.nom.tolist()
+            err = self.err.tolist()
             if not isinstance(nom, list):
                 return self.__class__(nom, err)
             else:
@@ -1561,10 +1669,10 @@ class Uncertainty(UncertaintyDisplay[T]):
                     for n, e in zip(nom, err, strict=False)
                 ]
         except AttributeError:
-            msg = f"{type(self._nom).__name__}' does not support tolist."
+            msg = f"{type(self.nom).__name__}' does not support tolist."
             raise AttributeError(msg) from None
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def view(self) -> Self:
         """
         Create an uncertainty sharing the current vector storage.
@@ -1573,10 +1681,10 @@ class Uncertainty(UncertaintyDisplay[T]):
             arrays.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        return self.__class__(self._nom.view(), self._err.view())
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        return self.__class__(self.nom.view(), self.err.view())
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def __iter__(self) -> Iterator[Uncertainty[Any]]:
         """
         Iterate over a vector uncertainty along its first dimension.
@@ -1584,11 +1692,11 @@ class Uncertainty(UncertaintyDisplay[T]):
         :yields: An uncertainty for each nominal slice and its matching errors.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
-        for v, e in zip(self._nom, self._err, strict=False):
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
+        for v, e in zip(self.nom, self.err, strict=False):
             yield self.__class__(v, e)
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def __len__(self) -> int:
         """
         Count entries along the first dimension of a vector uncertainty.
@@ -1596,10 +1704,10 @@ class Uncertainty(UncertaintyDisplay[T]):
         :return: The length of the nominal array.
         :raises TypeError: The uncertainty is scalar.
         """
-        assert isinstance(self._nom, np.ndarray)
-        return len(self._nom)
+        assert isinstance(self.nom, np.ndarray)
+        return len(self.nom)
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def __getitem__(self, key: Any) -> Uncertainty[Any]:
         """
         Select nominal values and their matching errors from a vector uncertainty.
@@ -1609,14 +1717,14 @@ class Uncertainty(UncertaintyDisplay[T]):
         :raises TypeError: The uncertainty is scalar.
         :raises IndexError: The index is invalid for the array.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
         try:
-            return self.__class__(self._nom[key], self._err[key])
+            return self.__class__(self.nom[key], self.err[key])
         except IndexError as e:
             msg = f"Index '{key}' not supported"
             raise IndexError(msg) from e
 
-    @_unsupported_type("scal")
+    @unsupported_type("scal")
     def __setitem__(self, key: Any, value: Uncertainty[Any] | ScalarT) -> None:
         """
         Assign nominal values and matching errors to selected vector entries.
@@ -1628,24 +1736,24 @@ class Uncertainty(UncertaintyDisplay[T]):
         :raises TypeError: The receiver is scalar or a bare finite replacement value is
             supplied.
         """
-        assert isinstance(self._nom, np.ndarray) and isinstance(self._err, np.ndarray)
+        assert isinstance(self.nom, np.ndarray) and isinstance(self.err, np.ndarray)
         if not isinstance(value, Uncertainty) and np.isfinite(value):
             msg = f"Can only pass Uncertainty type to __setitem__! Instead passed {type(value)}"
             raise TypeError(msg)
 
         value = self.__class__(value)
-        if np.size(value._nom) == 1 and np.ndim(value._nom) > 0:
-            self._nom[key] = value._nom[0]
-            self._err[key] = value._err[0]
+        if np.size(value.nom) == 1 and np.ndim(value.nom) > 0:
+            self.nom[key] = value.nom[0]
+            self.err[key] = value.err[0]
         else:
-            self._nom[key] = value._nom
-            self._err[key] = value._err
+            self.nom[key] = value.nom
+            self.err[key] = value.err
 
     # ===================================================================
     # ------------------ SCALAR-SPECIFIC FUNCTIONALITY ------------------
     # ===================================================================
 
-    @_unsupported_type("vec")
+    @unsupported_type("vec")
     def __float__(self) -> float:
         """
         Apply ``float`` to the scalar nominal value, discarding its error.
@@ -1654,7 +1762,7 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :return: The nominal value converted by ``float``.
         :raises TypeError: The uncertainty is vector-valued.
-        :raises DowncastError: The settings prohibit discarding uncertainty.
+        :raises auto_uncertainties.exceptions.DowncastError: The settings prohibit discarding uncertainty.
         """
         msg = "The uncertainty is stripped when downcasting to float."
         if get_settings().error_on_downcast:
@@ -1664,9 +1772,9 @@ class Uncertainty(UncertaintyDisplay[T]):
             DowncastWarning,
             stacklevel=2,
         )
-        return float(self._nom)
+        return float(self.nom)
 
-    @_unsupported_type("vec")
+    @unsupported_type("vec")
     def __int__(self) -> int:
         """
         Apply ``int`` to the scalar nominal value, discarding its error.
@@ -1675,7 +1783,7 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :return: The nominal value converted by ``int``.
         :raises TypeError: The uncertainty is vector-valued.
-        :raises DowncastError: The settings prohibit discarding uncertainty.
+        :raises auto_uncertainties.exceptions.DowncastError: The settings prohibit discarding uncertainty.
         """
         msg = "The uncertainty is stripped when downcasting to int."
         if get_settings().error_on_downcast:
@@ -1685,9 +1793,9 @@ class Uncertainty(UncertaintyDisplay[T]):
             DowncastWarning,
             stacklevel=2,
         )
-        return int(self._nom)
+        return int(self.nom)
 
-    @_unsupported_type("vec")
+    @unsupported_type("vec")
     def __complex__(self) -> complex:
         """
         Apply ``complex`` to the scalar nominal value, discarding its error.
@@ -1696,7 +1804,7 @@ class Uncertainty(UncertaintyDisplay[T]):
 
         :return: The nominal value converted by ``complex``.
         :raises TypeError: The uncertainty is vector-valued.
-        :raises DowncastError: The settings prohibit discarding uncertainty.
+        :raises auto_uncertainties.exceptions.DowncastError: The settings prohibit discarding uncertainty.
         """
         msg = "The uncertainty is stripped when downcasting to float."
         if get_settings().error_on_downcast:
@@ -1706,19 +1814,11 @@ class Uncertainty(UncertaintyDisplay[T]):
             DowncastWarning,
             stacklevel=2,
         )
-        return complex(self._nom)
-
-
-VectorUncertainty = Uncertainty
-"""Alias for `Uncertainty` to maintain backward compatibility."""
-
-
-ScalarUncertainty = Uncertainty
-"""Alias for `Uncertainty` to maintain backward compatibility."""
+        return complex(self.nom)
 
 
 @overload
-def nominal_values(x: Uncertainty[T]) -> T: ...
+def nominal_values(x: Uncertainty[ValueT]) -> ValueT: ...
 @overload
 def nominal_values(x: object) -> Any: ...
 
@@ -1746,7 +1846,7 @@ def nominal_values(x: Any) -> Any:
 
 
 @overload
-def std_devs(x: Uncertainty[T]) -> T: ...
+def std_devs(x: Uncertainty[ValueT]) -> ValueT: ...
 @overload
 def std_devs(x: object) -> Any: ...
 
@@ -1772,44 +1872,122 @@ def std_devs(x: Any) -> Any:
                 return x2.error
 
 
-def _check_units(value: Any, err: Any) -> tuple[Any, Any, Any]:
+def normalize(value: Any, error: Any) -> tuple[Any, Any]:
     """
-    Separate magnitudes and compatible units from nominal values and errors.
+    Normalize unitless inputs without constructing another uncertainty.
 
-    :param value: Central values, possibly carrying units.
-    :param err: Standard deviations, possibly carrying units.
-    :return: The nominal magnitude, error magnitude, and selected units, or ``None`` for
-        unitless inputs.
-    :raises pint.errors.DimensionalityError: The supplied quantities have incompatible
-        units.
+    :param value: Scalar, array, sequence, or existing uncertainty.
+    :param error: Matching standard deviations or ``None``.
+    :return: Validated nominal values and standard deviations.
+    :raises TypeError: Input types are unsupported or incompatible.
+    :raises auto_uncertainties.exceptions.NegativeStdDevError: A standard deviation is negative.
+    :raises ValueError: Component shapes differ.
     """
-    mag_has_units = hasattr(value, "units")
-    mag_units = getattr(value, "units", None)
-    err_has_units = hasattr(err, "units")
-    err_units = getattr(err, "units", None)
+    if isinstance(value, Uncertainty):
+        value, error = value.value, value.error
+    if isinstance(value, np.ndarray) and value.ndim == 0:
+        value = value[()]
+    if isinstance(error, np.ndarray) and error.ndim == 0:
+        error = error[()]
+    if isinstance(value, Sequence):
+        return normalize_sequence(value, error)
+    if isinstance(value, np.ndarray):
+        return normalize_array(value, error)
+    if not isinstance(value, ScalarT) or (error is not None and not isinstance(error, ScalarT)):
+        msg = f"Unsupported argument types (type(value)={type(value)}, type(error)={type(error)})"
+        raise TypeError(msg)
+    propagate = get_settings().nonfinite_error_policy == "propagate"
+    if error is not None and error < 0 and (np.isfinite(error) or propagate):
+        msg = f"Got negative value ({error}) for the standard deviation"
+        raise NegativeStdDevError(msg)
+    caster = np.float64 if isinstance(value, np.number) else float
+    if isinstance(value, int | np.integer):
+        value = caster(value)
+        error = (
+            caster(error) if error is not None and (np.isfinite(error) or propagate) else caster(0)
+        )
+    elif error is None or (not propagate and not np.isfinite(error)):
+        error = caster(0)
+    elif not (isinstance(value, np.floating) and isinstance(error, np.floating)):
+        error = caster(error)
+    if propagate and (np.isnan(value) or np.isnan(error)):
+        value, error = type(cast("Any", value))(np.nan), type(error)(np.nan)
+    return value, error
 
-    if mag_has_units and mag_units is not None:
-        Q = mag_units._REGISTRY.Quantity
-        ret_val = Q(value.m, value.units).to(mag_units).m
-        ret_err = Q(err.m, err.units).to(mag_units).m if err_has_units else err
-        ret_units = mag_units
-    # This branch will never actually work, but it's here
-    # to raise a Dimensionality error without needing to import pint
-    elif err_has_units:
-        assert err_units is not None
-        Q = err_units._REGISTRY.Quantity
-        ret_val = Q(value).to(err_units).m
-        ret_err = Q(err.m, err.units).to(err_units).m
-        ret_units = err_units
-    else:
-        ret_units = None
-        ret_val = value
-        ret_err = err
 
-    return ret_val, ret_err, ret_units
+def normalize_sequence(value: Sequence[Any], error: Any) -> tuple[Any, Any]:
+    """
+    Convert a sequence into floating-point component arrays.
+
+    :param value: Sequence of numbers or scalar uncertainties.
+    :param error: A scalar, a matching sequence, or ``None``.
+    :return: Normalized component arrays; uncertain elements supply their own errors.
+    :raises TypeError: A component has an unsupported type.
+    :raises ValueError: Sequence lengths differ.
+    """
+    if error is not None and not isinstance(error, Sequence | ScalarT):
+        msg = "Error must be a sequence or scalar when value is a sequence"
+        raise TypeError(msg)
+    if isinstance(error, Sequence) and len(error) != len(value):
+        msg = "Error must be the same length as the value sequence"
+        raise ValueError(msg)
+    nominal = np.empty(len(value), dtype=np.float64)
+    deviation = np.empty(len(value), dtype=np.float64)
+    for index, element in enumerate(value):
+        if isinstance(element, Uncertainty):
+            item, item_error = element.value, element.error
+        else:
+            item = element
+            item_error = error[index] if isinstance(error, Sequence) else error
+        if not isinstance(item, ScalarT) or (
+            item_error is not None and not isinstance(item_error, ScalarT)
+        ):
+            msg = "Value and error sequences must contain scalars or scalar uncertainties"
+            raise TypeError(msg)
+        nominal[index], deviation[index] = item, 0 if item_error is None else item_error
+    return normalize_array(nominal, deviation)
 
 
-def _type_error_msg(u_type: str, operation: str) -> str:
+def normalize_array(value: npt.NDArray[Any], error: Any) -> tuple[Any, Any]:
+    """
+    Validate array components, copying only when normalization requires it.
+
+    :param value: Nominal array.
+    :param error: A matching array, scalar error, or ``None``.
+    :return: Normalized nominal and error arrays.
+    :raises TypeError: The error type is unsupported.
+    :raises ValueError: Component shapes differ.
+    :raises auto_uncertainties.exceptions.NegativeStdDevError: A standard deviation is negative.
+    """
+    if error is None:
+        error = np.zeros_like(value)
+    elif isinstance(error, ScalarT):
+        error = np.ones_like(value) * error
+    elif not isinstance(error, np.ndarray):
+        msg = "Error must be a NumPy array or scalar when value is a NumPy array"
+        raise TypeError(msg)
+    elif error.shape != value.shape:
+        msg = f"Error must have the same shape as value (got {value.shape} and {error.shape})"
+        raise ValueError(msg)
+    if get_settings().nonfinite_error_policy == "zero":
+        invalid = ~np.isfinite(error)
+        if np.any(invalid):
+            error = np.where(invalid, 0, error)
+    if np.any(error < 0):
+        msg = "Found negative values for the standard deviation"
+        raise NegativeStdDevError(msg)
+    if np.issubdtype(value.dtype, np.integer):
+        value = value.astype(np.float64)
+    if np.issubdtype(error.dtype, np.integer):
+        error = error.astype(np.float64)
+    if get_settings().nonfinite_error_policy == "propagate":
+        invalid = np.isnan(value) | np.isnan(error)
+        if np.any(invalid):
+            value, error = np.where(invalid, np.nan, value), np.where(invalid, np.nan, error)
+    return value, error
+
+
+def type_error_msg(u_type: str, operation: str) -> str:
     """
     Describe an operation unsupported by an uncertainty kind.
 

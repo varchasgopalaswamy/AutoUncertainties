@@ -10,17 +10,10 @@ import pytest
 from auto_uncertainties import Uncertainty, configure
 from auto_uncertainties.display_format import (
     PDG_precision,
-    ScalarDisplay,
     UncertaintyDisplay,
-    VectorDisplay,
     first_digit,
     pdg_round,
 )
-
-
-def test_legacy_classes():
-    assert VectorDisplay is UncertaintyDisplay
-    assert ScalarDisplay is UncertaintyDisplay
 
 
 class TestVectorDisplay:
@@ -36,9 +29,9 @@ class TestVectorDisplay:
         ),
     )
     def test__repr_html_(arr1, arr2, expected):
-        vd = VectorDisplay()
-        vd._nom = arr1
-        vd._err = arr2
+        vd = UncertaintyDisplay()
+        vd.nom = arr1
+        vd.err = arr2
         assert vd._repr_html_() == expected
 
     @staticmethod
@@ -47,9 +40,9 @@ class TestVectorDisplay:
         ((np.array([1, 2, 3]), np.array([4, 5, 6]), "$1 \\pm 4, 2 \\pm 5, 3 \\pm 6~$"),),
     )
     def test__repr_latex_(arr1, arr2, expected):
-        vd = VectorDisplay()
-        vd._nom = arr1
-        vd._err = arr2
+        vd = UncertaintyDisplay()
+        vd.nom = arr1
+        vd.err = arr2
         assert vd._repr_latex_() == expected
 
     @staticmethod
@@ -58,9 +51,9 @@ class TestVectorDisplay:
         ((np.array([1, 2, 3]), np.array([4, 5, 6]), "[1 +/- 4, 2 +/- 5, 3 +/- 6]"),),
     )
     def test_str_and_repr(arr1, arr2, expected):
-        vd = VectorDisplay()
-        vd._nom = arr1
-        vd._err = arr2
+        vd = UncertaintyDisplay()
+        vd.nom = arr1
+        vd.err = arr2
         assert vd.__str__() == expected
         assert vd.__repr__() == expected
 
@@ -77,9 +70,9 @@ class TestVectorDisplay:
         ),
     )
     def test___format__(arr1, arr2, fmt, expected):
-        vd = VectorDisplay()
-        vd._nom = arr1
-        vd._err = arr2
+        vd = UncertaintyDisplay()
+        vd.nom = arr1
+        vd.err = arr2
         assert vd.__format__(fmt) == expected
 
 
@@ -94,9 +87,9 @@ class TestScalarDisplay:
         st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
     )
     def test__repr_html_(f1, f2):
-        sd = ScalarDisplay()
-        sd._nom = f1
-        sd._err = f2
+        sd = UncertaintyDisplay()
+        sd.nom = f1
+        sd.err = f2
         value, error = pdg_round(f1, f2)
         assert sd._repr_html_() == (f"{value} ± {error}" if error else value)
 
@@ -106,9 +99,9 @@ class TestScalarDisplay:
         st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
     )
     def test__repr_latex_(f1, f2):
-        sd = ScalarDisplay()
-        sd._nom = f1
-        sd._err = f2
+        sd = UncertaintyDisplay()
+        sd.nom = f1
+        sd.err = f2
         value, error = pdg_round(f1, f2)
         assert sd._repr_latex_() == (f"{value} \\pm {error}" if error else value)
 
@@ -118,9 +111,9 @@ class TestScalarDisplay:
         st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
     )
     def test_str_and_repr(f1, f2):
-        sd = ScalarDisplay()
-        sd._nom = f1
-        sd._err = f2
+        sd = UncertaintyDisplay()
+        sd.nom = f1
+        sd.err = f2
         value, error = pdg_round(f1, f2)
         expected = f"{value} +/- {error}" if error else value
         assert sd.__str__() == expected
@@ -132,9 +125,9 @@ class TestScalarDisplay:
         st.floats(min_value=0, max_value=5.0, allow_nan=False, allow_infinity=False),
     )
     def test___format__(f1, f2):
-        sd = ScalarDisplay()
-        sd._nom = f1
-        sd._err = f2
+        sd = UncertaintyDisplay()
+        sd.nom = f1
+        sd.err = f2
         value, error = pdg_round(f1, f2, return_zero=True)
         assert sd.__format__("g") == f"{value} +/- {error}"
 
@@ -142,9 +135,9 @@ class TestScalarDisplay:
     def test_edge_cases():
         configure(round_on_display=True)
 
-        sd = ScalarDisplay()
-        sd._nom = 10
-        sd._err = -2.5
+        sd = UncertaintyDisplay()
+        sd.nom = 10
+        sd.err = -2.5
 
         assert sd._repr_html_() == "10"
         assert sd._repr_latex_() == "10"

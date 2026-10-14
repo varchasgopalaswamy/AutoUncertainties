@@ -7,7 +7,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def _format_function_defaults(docstring: str, obj_args: str) -> str:
+def render_function_defaults(docstring: str, obj_args: str) -> str:
     """
     Append signature defaults to rST parameter descriptions.
 
@@ -78,7 +78,7 @@ def _format_function_defaults(docstring: str, obj_args: str) -> str:
     return result
 
 
-def _apply_regex_backticks(str_in: str) -> str:
+def apply_regex_backticks(str_in: str) -> str:
     """
     Add cross-reference delimiters to a rendered type expression.
 
@@ -91,7 +91,7 @@ def _apply_regex_backticks(str_in: str) -> str:
     return re.sub(r"([a-zA-Z0-9~]),", r"\1`,", str_in)
 
 
-def _format_alias(str_in: str) -> str:
+def render_alias(str_in: str) -> str:
     """
     Render a type alias expression as indented rST references.
 
@@ -116,7 +116,7 @@ def _format_alias(str_in: str) -> str:
         str_in = str_in.replace(old, new)
 
     # Perform regex-based substitutions for more complicated issues
-    str_in = _apply_regex_backticks(str_in)
+    str_in = apply_regex_backticks(str_in)
 
     # Add ending backtick, if necessary
     if not str_in.endswith("]"):
@@ -148,7 +148,7 @@ def _format_alias(str_in: str) -> str:
     return "      " + str_in
 
 
-def _format_typevar(str_in: str) -> str:
+def render_typevar(str_in: str) -> str:
     """
     Render a type variable and its constraints as rST references.
 
@@ -187,7 +187,7 @@ def _format_typevar(str_in: str) -> str:
         constraint = constraint.replace("[", r"`\[`")
 
         # Perform regex-based substitutions for more complicated issues
-        constraint = _apply_regex_backticks(constraint)
+        constraint = apply_regex_backticks(constraint)
 
         # Add ending backtick, if necessary
         if not constraint.endswith("]"):
@@ -209,7 +209,7 @@ def format_function_defaults(docstring: str, obj_args: str) -> str:
         logged.
     """
     try:
-        return _format_function_defaults(docstring, obj_args)
+        return render_function_defaults(docstring, obj_args)
     except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
         logger.warning(
             "Failed to format a function docstring. 'ERROR' will show up in the docs where this occured. "
@@ -228,7 +228,7 @@ def format_alias(str_in: str) -> str:
         warning is logged.
     """
     try:
-        return _format_alias(str_in)
+        return render_alias(str_in)
     except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
         logger.warning(
             "Failed to format a TypeAlias. 'ERROR' will show up in the docs where this occured. "
@@ -247,7 +247,7 @@ def format_typevar(str_in: str) -> str:
         warning is logged.
     """
     try:
-        return _format_typevar(str_in)
+        return render_typevar(str_in)
     except Exception as e:  # noqa: BLE001 - Render an error marker for any broken template input.
         logger.warning(
             "Failed to format a TypeVar. 'ERROR' will show up in the docs where this occured. "
