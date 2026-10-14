@@ -1,7 +1,7 @@
-Migrating from 1.2
-==================
+Migrating from 1.2 to 1.3
+========================
 
-These changes are intended for the next major release. Python 3.15 or newer is
+Version 1.3 includes the API changes described below. Python 3.15 or newer is
 required. Runtime, documentation, development, and build dependency minimums have
 been raised to the stable releases recorded in ``pyproject.toml``. The lockfile
 records the complete tested dependency set.
